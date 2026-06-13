@@ -1,0 +1,103 @@
+---
+title: "Manage repositories"
+description: "Create Final Git repositories and mint short-lived Git credentials."
+---
+
+Use the console API to manage Git-backed file systems. Every request requires a production access token.
+
+```bash
+access_token="<access-token>"
+```
+
+## Create a repository
+
+```bash
+curl -X POST "https://api.primary.final.ai/api/file-systems" \
+  -H "Authorization: Bearer ${access_token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Docs",
+    "registrySlug": "docs",
+    "defaultBranch": "main"
+  }'
+```
+
+```json
+{
+  "fileSystem": {
+    "id": "fs_123",
+    "displayName": "Docs",
+    "registrySlug": "docs"
+  }
+}
+```
+
+Use the returned `fileSystem.id` when minting Git credentials.
+
+## List repositories
+
+```bash
+curl "https://api.primary.final.ai/api/file-systems" \
+  -H "Authorization: Bearer ${access_token}"
+```
+
+## Get a repository
+
+```bash
+file_system_id="<file-system-id>"
+
+curl "https://api.primary.final.ai/api/file-systems/${file_system_id}" \
+  -H "Authorization: Bearer ${access_token}"
+```
+
+## Mint Git credentials
+
+```bash
+file_system_id="<file-system-id>"
+
+curl -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+  -H "Authorization: Bearer ${access_token}" \
+  -H "Content-Type: application/json" \
+  -d '{"access":"write"}'
+```
+
+```json
+{
+  "repoId": "gsr_123",
+  "repoPath": "org/repo",
+  "remoteUrl": "https://git.us-west-2.portland.finalwebservices.com/git/org/repo.git",
+  "defaultBranch": "main",
+  "username": "final",
+  "password": "<token>",
+  "expiresAt": "2026-06-13T18:10:00.000Z"
+}
+```
+
+The `username` and `password` fields are HTTPS Git credentials.
+
+## Delete a repository
+
+Archive marks the repository as archived:
+
+```bash
+file_system_id="<file-system-id>"
+
+curl -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/archive" \
+  -H "Authorization: Bearer ${access_token}"
+```
+
+Delete removes it:
+
+```bash
+file_system_id="<file-system-id>"
+
+curl -X DELETE "https://api.primary.final.ai/api/file-systems/${file_system_id}" \
+  -H "Authorization: Bearer ${access_token}"
+```
+
+## Token scopes
+
+| Access | Scopes |
+| --- | --- |
+| `read` | `repo:read`, `git:read` |
+| `write` | `repo:read`, `repo:write`, `refs:write`, `git:read`, `git:write` |

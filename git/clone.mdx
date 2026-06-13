@@ -1,0 +1,58 @@
+---
+title: "Clone and work with a repository"
+description: "Mint Git credentials, clone a Final Git repository, and push changes."
+---
+
+Use a file system ID to mint short-lived Git credentials. Then use the returned HTTPS remote with normal Git commands.
+
+## Full example
+
+```bash
+# Fill these in.
+file_system_id="<file-system-id>"
+access_token="<access-token>"
+
+# Mint credentials with write access.
+credentials=$(curl -s -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+  -H "Authorization: Bearer ${access_token}" \
+  -H "Content-Type: application/json" \
+  -d '{"access":"write"}')
+
+# Read the Git remote and HTTPS credentials from the response.
+repo_path=$(echo "$credentials" | jq -r .repoPath)
+remote_url=$(echo "$credentials" | jq -r .remoteUrl)
+username=$(echo "$credentials" | jq -r .username)
+password=$(echo "$credentials" | jq -r .password)
+repo_dir=$(basename "$repo_path")
+
+# Clone with the returned credentials.
+git clone "https://${username}:${password}@${remote_url#https://}"
+cd "$repo_dir"
+
+# Commit and push.
+git add .
+git commit -m "Update repository content"
+git push origin HEAD
+```
+
+Use `access: "read"` for clone and fetch. Use `access: "write"` for push.
+
+Tokens expire after 10 minutes. Mint a new credential set for each workflow run.
+
+## Fetch later
+
+```bash
+file_system_id="<file-system-id>"
+access_token="<access-token>"
+
+credentials=$(curl -s -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+  -H "Authorization: Bearer ${access_token}" \
+  -H "Content-Type: application/json" \
+  -d '{"access":"read"}')
+
+remote_url=$(echo "$credentials" | jq -r .remoteUrl)
+username=$(echo "$credentials" | jq -r .username)
+password=$(echo "$credentials" | jq -r .password)
+
+git fetch "https://${username}:${password}@${remote_url#https://}"
+```
