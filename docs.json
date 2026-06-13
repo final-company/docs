@@ -3,9 +3,9 @@
   "theme": "maple",
   "name": "Final",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#000",
+    "light": "#000",
+    "dark": "#fff"
   },
   "favicon": "/favicon.png",
   "navigation": {
@@ -32,7 +32,21 @@
   ],
   "logo": {
     "light": "/logo/final-light.svg",
-    "dark": "/logo/final-dark.svg"
+    "dark": "/logo/final-dark.svg",
+    "href": "https://final.ai/?ref=docs"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@final.ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://app.mintlify.com"
+    }
   },
   "contextual": {
     "options": [
@@ -45,5 +59,19 @@
       "cursor",
       "vscode"
     ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/final_company",
+      "linkedin": "https://www.linkedin.com/company/final-ai"
+    }
+  },
+  "fonts": {
+    "heading": {
+      "family": "Inter"
+    },
+    "body": {
+      "family": "Inter"
+    }
   }
 }
