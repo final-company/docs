@@ -4,7 +4,7 @@ info:
   version: "1.0"
   description: REST API for Final Git repositories, pull requests, merge queues, and CI checks.
 servers:
-  - url: https://api.primary.final.ai
+  - url: https://api.final.ai
 security:
   - bearerAuth: []
 tags:

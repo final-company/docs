@@ -11,11 +11,13 @@ The CLI stores credentials in `~/.config/final-vm/config.json`. You can also set
 
 You need an organization API key. Organization admins can create one in Final under **Settings** > **API Keys**.
 
-The public VM API URL is:
+The public API host is:
 
 ```text
-https://vm-api.final.ai
+https://api.final.ai
 ```
+
+Direct VM REST endpoints are namespaced under `https://api.final.ai/v1/vms`.
 
 ## Authenticate the CLI
 
@@ -27,7 +29,7 @@ For automation, set environment variables instead:
 
 ```bash
 export FINAL_VM_API_KEY="<api-key>"
-export FINAL_VM_API_URL="https://vm-api.final.ai"
+export FINAL_VM_API_URL="https://api.final.ai"
 ```
 
 ## Create a VM

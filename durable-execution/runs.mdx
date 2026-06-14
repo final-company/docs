@@ -3,29 +3,29 @@ title: "Runs and signals"
 description: "Inspect, cancel, retry, and signal durable execution runs."
 ---
 
-A run is one execution of a durable function. Runs move through these statuses:
+A run is one execution of a durable workflow. Runs move through these statuses:
 
 | Status | Meaning |
 | --- | --- |
 | `queued` | The run is waiting for a worker lease. |
 | `running` | A worker is executing the run. |
 | `waiting` | The run is suspended on a sleep, event wait, or signal. |
-| `completed` | The function returned a result. |
-| `failed` | The function failed and has no retry remaining. |
+| `completed` | The workflow returned a result. |
+| `failed` | The workflow failed and has no retry remaining. |
 | `cancelled` | The run was cancelled. |
 
-## Trigger a function directly
+## Trigger a workflow directly
 
-Use direct triggers when you want to start one function without sending a normal event through the app trigger matcher:
+Use direct triggers when you want to start one workflow without sending a normal event through the app trigger matcher:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/functions/send-receipt/runs" \
-  -H "Authorization: ApiKey ${FINAL_API_KEY}" \
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/workflows/send-receipt/runs" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "idempotencyKey": "manual-run-123",
     "event": {
-      "name": "function.triggered",
+      "name": "workflow.triggered",
       "data": {
         "invoiceId": "inv_123"
       }
@@ -36,7 +36,7 @@ curl -X POST "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP
   }'
 ```
 
-See [trigger a function run](/api-reference/durable-execution/runs/trigger).
+See [trigger a workflow run](/api-reference/durable-execution/runs/trigger).
 
 ## Inspect a run
 
@@ -49,8 +49,8 @@ Use [list run history](/api-reference/durable-execution/runs/history) to read or
 Signal a waiting run when an external system or human action has the data needed to continue:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/signals" \
-  -H "Authorization: ApiKey ${FINAL_API_KEY}" \
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/signals" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "stepId": "approval",
@@ -70,15 +70,15 @@ See [signal a run](/api-reference/durable-execution/runs/signal).
 Cancel a run that should not continue:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/cancel" \
-  -H "Authorization: ApiKey ${FINAL_API_KEY}"
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/cancel" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 Retry a terminal run:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/retry" \
-  -H "Authorization: ApiKey ${FINAL_API_KEY}"
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/retry" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 See [cancel a run](/api-reference/durable-execution/runs/cancel) and [retry a run](/api-reference/durable-execution/runs/retry).

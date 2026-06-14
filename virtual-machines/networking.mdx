@@ -32,7 +32,7 @@ You can toggle public HTTP access with [update VM visibility](/api-reference/vir
 Add a domain to a VM:
 
 ```bash
-curl -X POST "https://vm-api.final.ai/v1/vms/preview-app/domains" \
+curl -X POST "https://api.final.ai/v1/vms/preview-app/domains" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"domain":"preview.example.com"}'

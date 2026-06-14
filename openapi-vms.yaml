@@ -4,7 +4,7 @@ info:
   version: "1.0"
   description: REST API for Final Virtual Machines.
 servers:
-  - url: https://vm-api.final.ai
+  - url: https://api.final.ai
 security:
   - bearerAuth: []
 tags:
@@ -458,12 +458,12 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
-  /v1/tokens:
+  /v1/vms/tokens:
     get:
       operationId: listVmTokens
       tags: [Tokens]
       summary: List tokens
-      description: List VM bearer tokens for the authenticated organization.
+      description: List VM tokens for the authenticated organization.
       responses:
         "200":
           description: Tokens were returned.
@@ -481,7 +481,7 @@ paths:
       operationId: createVmToken
       tags: [Tokens]
       summary: Create a token
-      description: Create a VM bearer token. The plaintext token is returned once.
+      description: Create a VM token. The plaintext token is returned once.
       requestBody:
         required: true
         content:
@@ -502,12 +502,12 @@ paths:
                     example: fvm1.payload.sig
                   id:
                     type: string
-  /v1/tokens/{tokenId}:
+  /v1/vms/tokens/{tokenId}:
     delete:
       operationId: revokeVmToken
       tags: [Tokens]
       summary: Revoke a token
-      description: Revoke a VM bearer token.
+      description: Revoke a VM token.
       parameters:
         - name: tokenId
           in: path
@@ -517,7 +517,7 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
-  /v1/ssh-keys:
+  /v1/vms/ssh-keys:
     get:
       operationId: listVmSshKeys
       tags: [SSH keys]
@@ -567,7 +567,7 @@ paths:
                     $ref: "#/components/schemas/SshKey"
         "403":
           $ref: "#/components/responses/Error"
-  /v1/ssh-keys/{keyId}:
+  /v1/vms/ssh-keys/{keyId}:
     delete:
       operationId: deleteVmSshKey
       tags: [SSH keys]
@@ -582,7 +582,7 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
-  /v1/regions:
+  /v1/vms/regions:
     get:
       operationId: listVmRegions
       tags: [Regions]
@@ -601,7 +601,7 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/VmRegion"
-  /v1/exec:
+  /v1/vms/exec:
     post:
       operationId: runVmCliCommand
       tags: [Execution]
@@ -633,7 +633,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: token
-      description: Organization API key or VM bearer token.
+      description: Organization API key.
   parameters:
     IdOrName:
       name: idOrName

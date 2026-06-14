@@ -4,16 +4,16 @@ info:
   version: "1.0"
   description: REST API for Final Durable Execution.
 servers:
-  - url: https://api.primary.final.ai
+  - url: https://api.final.ai
 security:
-  - apiKeyAuth: []
+  - bearerAuth: []
 tags:
   - name: Apps
-  - name: Functions
+  - name: Workflows
   - name: Events
   - name: Runs
 paths:
-  /api/durable-execution/v1/apps/{appId}/meta:
+  /v1/durable-execution/apps/{appId}/meta:
     get:
       operationId: getDurableAppMeta
       tags: [Apps]
@@ -36,34 +36,34 @@ paths:
                     type: string
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /api/durable-execution/v1/apps/{appId}/functions:
+  /v1/durable-execution/apps/{appId}/workflows:
     get:
-      operationId: listDurableFunctions
-      tags: [Functions]
-      summary: List functions
-      description: List function versions registered for the app.
+      operationId: listDurableWorkflows
+      tags: [Workflows]
+      summary: List workflows
+      description: List workflow versions registered for the app.
       parameters:
         - $ref: "#/components/parameters/AppId"
       responses:
         "200":
-          description: Functions were returned.
+          description: Workflows were returned.
           content:
             application/json:
               schema:
                 type: object
-                required: [functions]
+                required: [workflows]
                 properties:
-                  functions:
+                  workflows:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Function"
+                      $ref: "#/components/schemas/Workflow"
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
-      operationId: registerDurableFunction
-      tags: [Functions]
-      summary: Register a function
-      description: Register or update a durable function version.
+      operationId: registerDurableWorkflow
+      tags: [Workflows]
+      summary: Register a workflow
+      description: Register or update a durable workflow version.
       parameters:
         - $ref: "#/components/parameters/AppId"
       requestBody:
@@ -71,25 +71,25 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/RegisterFunctionRequest"
+              $ref: "#/components/schemas/RegisterWorkflowRequest"
       responses:
         "201":
-          description: Function was registered.
+          description: Workflow was registered.
           content:
             application/json:
               schema:
                 type: object
-                required: [function]
+                required: [workflow]
                 properties:
-                  function:
-                    $ref: "#/components/schemas/Function"
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /api/durable-execution/v1/apps/{appId}/events:
+  /v1/durable-execution/apps/{appId}/events:
     post:
       operationId: sendDurableEvents
       tags: [Events]
@@ -119,12 +119,12 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /api/durable-execution/v1/apps/{appId}/functions/{workflowId}/runs:
+  /v1/durable-execution/apps/{appId}/workflows/{workflowId}/runs:
     post:
-      operationId: triggerDurableFunctionRun
+      operationId: triggerDurableWorkflowRun
       tags: [Runs]
-      summary: Trigger a function run
-      description: Start one run for a function directly.
+      summary: Trigger a workflow run
+      description: Start one run for a workflow directly.
       parameters:
         - $ref: "#/components/parameters/AppId"
         - $ref: "#/components/parameters/WorkflowId"
@@ -145,7 +145,7 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /api/durable-execution/v1/apps/{appId}/runs/{runId}:
+  /v1/durable-execution/apps/{appId}/runs/{runId}:
     get:
       operationId: getDurableRun
       tags: [Runs]
@@ -165,7 +165,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/durable-execution/v1/apps/{appId}/runs/{runId}/history:
+  /v1/durable-execution/apps/{appId}/runs/{runId}/history:
     get:
       operationId: listDurableRunHistory
       tags: [Runs]
@@ -191,7 +191,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/durable-execution/v1/apps/{appId}/runs/{runId}/cancel:
+  /v1/durable-execution/apps/{appId}/runs/{runId}/cancel:
     post:
       operationId: cancelDurableRun
       tags: [Runs]
@@ -211,7 +211,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/durable-execution/v1/apps/{appId}/runs/{runId}/retry:
+  /v1/durable-execution/apps/{appId}/runs/{runId}/retry:
     post:
       operationId: retryDurableRun
       tags: [Runs]
@@ -231,7 +231,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/durable-execution/v1/apps/{appId}/runs/{runId}/signals:
+  /v1/durable-execution/apps/{appId}/runs/{runId}/signals:
     post:
       operationId: signalDurableRun
       tags: [Runs]
@@ -261,11 +261,11 @@ paths:
           $ref: "#/components/responses/Error"
 components:
   securitySchemes:
-    apiKeyAuth:
-      type: apiKey
-      in: header
-      name: Authorization
-      description: "Use `ApiKey <api-key>`."
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API key
+      description: Organization API key.
   parameters:
     AppId:
       name: appId
@@ -279,7 +279,7 @@ components:
       name: workflowId
       in: path
       required: true
-      description: Durable function ID.
+      description: Durable workflow ID.
       schema:
         type: string
         example: send-receipt
@@ -330,7 +330,7 @@ components:
           items:
             type: object
             additionalProperties: true
-    Function:
+    Workflow:
       type: object
       required:
         - workflowId
@@ -368,7 +368,7 @@ components:
         registeredAt:
           type: string
           format: date-time
-    RegisterFunctionRequest:
+    RegisterWorkflowRequest:
       type: object
       required: [workflowId, version, displayName, runtime]
       properties:
@@ -501,7 +501,7 @@ components:
               nullable: true
             name:
               type: string
-              default: function.triggered
+              default: workflow.triggered
             data:
               type: object
               default: {}
@@ -516,7 +516,7 @@ components:
         version:
           type: string
           nullable: true
-          description: Specific function version to run. Latest matching version is used when omitted.
+          description: Specific workflow version to run. Latest matching version is used when omitted.
     RunEnvelope:
       type: object
       required: [run]

@@ -12,7 +12,7 @@ access_token="<access-token>"
 ## Create a repository
 
 ```bash
-curl -X POST "https://api.primary.final.ai/api/file-systems" \
+curl -X POST "https://api.final.ai/api/file-systems" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -39,7 +39,7 @@ Use the returned `fileSystem.id` when minting Git credentials. See [create a rep
 See [list repositories](/api-reference/repositories/list) for query parameters and response fields.
 
 ```bash
-curl "https://api.primary.final.ai/api/file-systems" \
+curl "https://api.final.ai/api/file-systems" \
   -H "Authorization: Bearer ${access_token}"
 ```
 
@@ -50,7 +50,7 @@ See [get a repository](/api-reference/repositories/get) for response fields.
 ```bash
 file_system_id="<file-system-id>"
 
-curl "https://api.primary.final.ai/api/file-systems/${file_system_id}" \
+curl "https://api.final.ai/api/file-systems/${file_system_id}" \
   -H "Authorization: Bearer ${access_token}"
 ```
 
@@ -61,7 +61,7 @@ See [mint Git credentials](/api-reference/repositories/mint-git-credentials) for
 ```bash
 file_system_id="<file-system-id>"
 
-curl -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+curl -X POST "https://api.final.ai/api/file-systems/${file_system_id}/git-credentials" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{"access":"write"}'
@@ -90,7 +90,7 @@ Archive marks the repository as archived:
 ```bash
 file_system_id="<file-system-id>"
 
-curl -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/archive" \
+curl -X POST "https://api.final.ai/api/file-systems/${file_system_id}/archive" \
   -H "Authorization: Bearer ${access_token}"
 ```
 
@@ -99,7 +99,7 @@ Delete removes it:
 ```bash
 file_system_id="<file-system-id>"
 
-curl -X DELETE "https://api.primary.final.ai/api/file-systems/${file_system_id}" \
+curl -X DELETE "https://api.final.ai/api/file-systems/${file_system_id}" \
   -H "Authorization: Bearer ${access_token}"
 ```
 

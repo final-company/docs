@@ -1,6 +1,6 @@
 ---
 title: "Tokens and SSH keys"
-description: "Use API keys, VM bearer tokens, and SSH public keys with Final Virtual Machines."
+description: "Use organization API keys, VM tokens, and SSH public keys with Final Virtual Machines."
 ---
 
 Virtual Machines use three credential types:
@@ -8,7 +8,7 @@ Virtual Machines use three credential types:
 | Credential | Use it for |
 | --- | --- |
 | Organization API key | Authenticating the CLI, SDK, and public REST API. |
-| VM bearer token | Granting scoped API access, optionally limited to one VM. |
+| VM token | Granting scoped VM access where VM tokens are supported. |
 | SSH public key | Connecting to VMs over SSH. |
 
 ## Organization API keys
@@ -18,7 +18,7 @@ Organization admins can create API keys in Final under **Settings** > **API Keys
 Use the key as a bearer token:
 
 ```bash
-curl "https://vm-api.final.ai/v1/vms" \
+curl "https://api.final.ai/v1/vms" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
 ```
 
@@ -28,9 +28,11 @@ Use the same key with the CLI:
 final-vm login --api-key "${FINAL_VM_API_KEY}"
 ```
 
-## VM bearer tokens
+## VM tokens
 
-Create VM bearer tokens when you need a credential that can be revoked independently or scoped to a VM.
+Create VM tokens when you need a credential that can be revoked independently or scoped to a VM.
+
+Use an organization API key to call the public API at `api.final.ai`. VM tokens are managed by the public API, but they do not authenticate public API requests.
 
 ```bash
 final-vm token create ci-token --vm docs-demo --expires-days 30

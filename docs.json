@@ -40,7 +40,7 @@
             "pages": [
               "durable-execution/index",
               "durable-execution/quickstart",
-              "durable-execution/functions-and-events",
+              "durable-execution/workflows-and-events",
               "durable-execution/runs"
             ]
           }
@@ -187,10 +187,10 @@
                 ]
               },
               {
-                "group": "Functions",
+                "group": "Workflows",
                 "pages": [
-                  "api-reference/durable-execution/functions/list",
-                  "api-reference/durable-execution/functions/register"
+                  "api-reference/durable-execution/workflows/list",
+                  "api-reference/durable-execution/workflows/register"
                 ]
               },
               {

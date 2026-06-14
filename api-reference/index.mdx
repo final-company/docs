@@ -5,11 +5,11 @@ description: "Reference for the Final REST API."
 
 Use the API reference for endpoint details, request schemas, response schemas, and interactive examples.
 
-Git endpoints use a production access token. Virtual Machines endpoints use an organization API key or VM bearer token. Durable Execution endpoints use an organization API key:
+Git endpoints use a production access token. Virtual Machines and Durable Execution endpoints use an organization API key:
 
 ```bash
 Authorization: Bearer <token>
-Authorization: ApiKey <api-key>
+Authorization: Bearer <api-key>
 ```
 
 <Card title="Repositories" icon="folder-git-2" href="/api-reference/repositories/list">
@@ -33,5 +33,5 @@ Authorization: ApiKey <api-key>
 </Card>
 
 <Card title="Durable Execution" icon="workflow" href="/api-reference/durable-execution">
-  Register functions, send events, inspect runs, and signal waiting work.
+  Register workflows, send events, inspect runs, and signal waiting work.
 </Card>

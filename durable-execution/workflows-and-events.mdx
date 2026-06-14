@@ -1,23 +1,23 @@
 ---
-title: "Functions and events"
-description: "Register durable functions and send events that start or resume runs."
+title: "Workflows and events"
+description: "Register durable workflows and send events that start or resume runs."
 ---
 
-A durable function is registered under one app. Final injects tenant scope from the API key and URL, so request bodies do not include `scope`.
+A durable workflow is registered under one app. Final injects tenant scope from the API key and URL, so request bodies do not include `scope`.
 
-## Register function versions
+## Register workflow versions
 
-Register each deployable function version with:
+Register each deployable workflow version with:
 
 | Field | Description |
 | --- | --- |
-| `workflowId` | Stable function ID, such as `send-receipt`. |
-| `version` | Function version to execute, such as `1` or a build ID. |
-| `displayName` | Human-readable function name. |
+| `workflowId` | Stable workflow ID, such as `send-receipt`. |
+| `version` | Workflow version to execute, such as `1` or a build ID. |
+| `displayName` | Human-readable workflow name. |
 | `runtime` | HTTP worker endpoint Final calls to execute work. |
 | `triggers` | Event or cron triggers that schedule runs. |
 | `retryPolicy` | Retry limit and backoff settings. Defaults to three exponential attempts. |
-| `metadata` | App-defined metadata attached to the function registration. |
+| `metadata` | App-defined metadata attached to the workflow registration. |
 
 The runtime defaults to:
 
@@ -28,7 +28,7 @@ The runtime defaults to:
 }
 ```
 
-Register functions with the [register a function endpoint](/api-reference/durable-execution/functions/register).
+Register workflows with the [register a workflow endpoint](/api-reference/durable-execution/workflows/register).
 
 ## Event triggers
 
@@ -46,7 +46,7 @@ Use event triggers when an incoming event should start a run:
 
 ## Cron triggers
 
-Use cron triggers for scheduled functions:
+Use cron triggers for scheduled workflows:
 
 ```json
 {
@@ -75,8 +75,8 @@ Use stable event IDs for idempotency. If you omit `id`, Final generates one for 
 
 Send events with the [send events endpoint](/api-reference/durable-execution/events/send).
 
-## List registered functions
+## List registered workflows
 
-Use [list functions](/api-reference/durable-execution/functions/list) to inspect the function versions registered for an app.
+Use [list workflows](/api-reference/durable-execution/workflows/list) to inspect the workflow versions registered for an app.
 
 Use [get app metadata](/api-reference/durable-execution/apps/get-meta) to confirm the resolved app namespace.

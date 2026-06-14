@@ -5,16 +5,16 @@ description: "Create and manage VMs with the public Final Virtual Machines REST 
 
 Final Virtual Machines has a public REST API. Use it when you want to create, inspect, update, execute commands on, and delete VMs from your own services or automation.
 
-The public base URL is:
+The public VM API namespace is:
 
 ```text
-https://vm-api.final.ai/v1
+https://api.final.ai/v1/vms
 ```
 
-Every request uses bearer authentication with an organization API key or VM bearer token:
+Every request uses bearer authentication with an organization API key:
 
 ```bash
-Authorization: Bearer <token>
+Authorization: Bearer <api-key>
 ```
 
 For every endpoint, schema, and response, see the [Virtual Machines API reference](/api-reference/virtual-machines).
@@ -22,7 +22,7 @@ For every endpoint, schema, and response, see the [Virtual Machines API referenc
 ## Create a VM
 
 ```bash
-curl -X POST "https://vm-api.final.ai/v1/vms" \
+curl -X POST "https://api.final.ai/v1/vms" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: docs-demo-001" \
@@ -42,12 +42,12 @@ See [create a VM](/api-reference/virtual-machines/vms/create).
 ## List and inspect VMs
 
 ```bash
-curl "https://vm-api.final.ai/v1/vms" \
+curl "https://api.final.ai/v1/vms" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
 ```
 
 ```bash
-curl "https://vm-api.final.ai/v1/vms/docs-demo" \
+curl "https://api.final.ai/v1/vms/docs-demo" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
 ```
 
@@ -56,7 +56,7 @@ See [list VMs](/api-reference/virtual-machines/vms/list) and [get a VM](/api-ref
 ## Update a VM
 
 ```bash
-curl -X PATCH "https://vm-api.final.ai/v1/vms/docs-demo" \
+curl -X PATCH "https://api.final.ai/v1/vms/docs-demo" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -73,7 +73,7 @@ See [update a VM](/api-reference/virtual-machines/vms/update).
 ## Run a command
 
 ```bash
-curl -X POST "https://vm-api.final.ai/v1/vms/docs-demo/exec" \
+curl -X POST "https://api.final.ai/v1/vms/docs-demo/exec" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -89,7 +89,7 @@ See [execute a command](/api-reference/virtual-machines/execution/execute).
 ## Delete a VM
 
 ```bash
-curl -X DELETE "https://vm-api.final.ai/v1/vms/docs-demo" \
+curl -X DELETE "https://api.final.ai/v1/vms/docs-demo" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
 ```
 

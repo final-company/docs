@@ -13,7 +13,7 @@ file_system_id="<file-system-id>"
 access_token="<access-token>"
 
 # Mint credentials with write access.
-credentials=$(curl -s -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+credentials=$(curl -s -X POST "https://api.final.ai/api/file-systems/${file_system_id}/git-credentials" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{"access":"write"}')
@@ -45,7 +45,7 @@ Tokens expire after 10 minutes. Mint a new credential set for each workflow run.
 file_system_id="<file-system-id>"
 access_token="<access-token>"
 
-credentials=$(curl -s -X POST "https://api.primary.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+credentials=$(curl -s -X POST "https://api.final.ai/api/file-systems/${file_system_id}/git-credentials" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{"access":"read"}')
