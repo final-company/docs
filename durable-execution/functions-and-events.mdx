@@ -1,0 +1,82 @@
+---
+title: "Functions and events"
+description: "Register durable functions and send events that start or resume runs."
+---
+
+A durable function is registered under one app. Final injects tenant scope from the API key and URL, so request bodies do not include `scope`.
+
+## Register function versions
+
+Register each deployable function version with:
+
+| Field | Description |
+| --- | --- |
+| `workflowId` | Stable function ID, such as `send-receipt`. |
+| `version` | Function version to execute, such as `1` or a build ID. |
+| `displayName` | Human-readable function name. |
+| `runtime` | HTTP worker endpoint Final calls to execute work. |
+| `triggers` | Event or cron triggers that schedule runs. |
+| `retryPolicy` | Retry limit and backoff settings. Defaults to three exponential attempts. |
+| `metadata` | App-defined metadata attached to the function registration. |
+
+The runtime defaults to:
+
+```json
+{
+  "transport": "http",
+  "path": "/v1/execute"
+}
+```
+
+Register functions with the [register a function endpoint](/api-reference/durable-execution/functions/register).
+
+## Event triggers
+
+Use event triggers when an incoming event should start a run:
+
+```json
+{
+  "kind": "event",
+  "eventName": "invoice.paid",
+  "expression": null
+}
+```
+
+`expression` is optional. Use `null` when every event with the same name should match the trigger.
+
+## Cron triggers
+
+Use cron triggers for scheduled functions:
+
+```json
+{
+  "kind": "cron",
+  "cron": "0 9 * * *"
+}
+```
+
+## Send events
+
+Send one event:
+
+```json
+{
+  "id": "evt_invoice_paid_123",
+  "name": "invoice.paid",
+  "data": {
+    "invoiceId": "inv_123"
+  }
+}
+```
+
+Send a batch by posting an array of events to the same endpoint.
+
+Use stable event IDs for idempotency. If you omit `id`, Final generates one for that request.
+
+Send events with the [send events endpoint](/api-reference/durable-execution/events/send).
+
+## List registered functions
+
+Use [list functions](/api-reference/durable-execution/functions/list) to inspect the function versions registered for an app.
+
+Use [get app metadata](/api-reference/durable-execution/apps/get-meta) to confirm the resolved app namespace.

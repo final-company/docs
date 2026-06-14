@@ -1,0 +1,100 @@
+---
+title: "Durable Execution quickstart"
+description: "Register a durable function and start runs with the public REST API."
+---
+
+Use the Durable Execution REST API to register functions, emit events, start runs, and inspect results.
+
+## Before you begin
+
+You need an organization API key. Organization admins can create one in Final under **Settings** > **API Keys**.
+
+Set the base URL and API key:
+
+```bash
+export FINAL_API_URL="https://api.primary.final.ai"
+export FINAL_API_KEY="<api-key>"
+```
+
+Durable Execution uses the `ApiKey` authorization scheme:
+
+```bash
+Authorization: ApiKey <api-key>
+```
+
+## Choose an app
+
+The app ID is the durable namespace in the URL:
+
+```bash
+export FINAL_DURABLE_APP_ID="billing"
+```
+
+## Register a function
+
+Register a function version with an HTTP worker runtime and an event trigger:
+
+```bash
+curl -X POST "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/functions" \
+  -H "Authorization: ApiKey ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workflowId": "send-receipt",
+    "version": "1",
+    "displayName": "Send receipt",
+    "runtime": {
+      "transport": "http",
+      "url": "https://worker.example.com",
+      "path": "/v1/execute"
+    },
+    "triggers": [
+      {
+        "kind": "event",
+        "eventName": "invoice.paid",
+        "expression": null
+      }
+    ]
+  }'
+```
+
+See [register a function](/api-reference/durable-execution/functions/register).
+
+## Send an event
+
+Send an event that matches the registered trigger:
+
+```bash
+curl -X POST "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/events" \
+  -H "Authorization: ApiKey ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "evt_invoice_paid_123",
+    "name": "invoice.paid",
+    "data": {
+      "invoiceId": "inv_123",
+      "customerId": "cus_123"
+    }
+  }'
+```
+
+The response includes `scheduledRunIds` for new runs and `resumedRunIds` for waiting runs that the event resumed.
+
+See [send events](/api-reference/durable-execution/events/send).
+
+## Read a run
+
+Fetch a run by ID:
+
+```bash
+curl "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>" \
+  -H "Authorization: ApiKey ${FINAL_API_KEY}"
+```
+
+Read run history:
+
+```bash
+curl "${FINAL_API_URL}/api/durable-execution/v1/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/history" \
+  -H "Authorization: ApiKey ${FINAL_API_KEY}"
+```
+
+See [get a run](/api-reference/durable-execution/runs/get) and [list run history](/api-reference/durable-execution/runs/history).

@@ -34,6 +34,15 @@
               "virtual-machines/networking",
               "virtual-machines/access"
             ]
+          },
+          {
+            "group": "Durable Execution",
+            "pages": [
+              "durable-execution/index",
+              "durable-execution/quickstart",
+              "durable-execution/functions-and-events",
+              "durable-execution/runs"
+            ]
           }
         ]
       },
@@ -163,6 +172,42 @@
                 "group": "Regions",
                 "pages": [
                   "api-reference/virtual-machines/regions/list"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Durable Execution",
+            "pages": [
+              "api-reference/durable-execution/index",
+              {
+                "group": "Apps",
+                "pages": [
+                  "api-reference/durable-execution/apps/get-meta"
+                ]
+              },
+              {
+                "group": "Functions",
+                "pages": [
+                  "api-reference/durable-execution/functions/list",
+                  "api-reference/durable-execution/functions/register"
+                ]
+              },
+              {
+                "group": "Events",
+                "pages": [
+                  "api-reference/durable-execution/events/send"
+                ]
+              },
+              {
+                "group": "Runs",
+                "pages": [
+                  "api-reference/durable-execution/runs/trigger",
+                  "api-reference/durable-execution/runs/get",
+                  "api-reference/durable-execution/runs/history",
+                  "api-reference/durable-execution/runs/cancel",
+                  "api-reference/durable-execution/runs/retry",
+                  "api-reference/durable-execution/runs/signal"
                 ]
               }
             ]

@@ -1,0 +1,637 @@
+openapi: 3.0.3
+info:
+  title: Final Durable Execution API
+  version: "1.0"
+  description: REST API for Final Durable Execution.
+servers:
+  - url: https://api.primary.final.ai
+security:
+  - apiKeyAuth: []
+tags:
+  - name: Apps
+  - name: Functions
+  - name: Events
+  - name: Runs
+paths:
+  /api/durable-execution/v1/apps/{appId}/meta:
+    get:
+      operationId: getDurableAppMeta
+      tags: [Apps]
+      summary: Get app metadata
+      description: Inspect the resolved app scope for the authenticated organization.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+      responses:
+        "200":
+          description: App metadata was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [appId, tenantId]
+                properties:
+                  appId:
+                    type: string
+                  tenantId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/durable-execution/v1/apps/{appId}/functions:
+    get:
+      operationId: listDurableFunctions
+      tags: [Functions]
+      summary: List functions
+      description: List function versions registered for the app.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+      responses:
+        "200":
+          description: Functions were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [functions]
+                properties:
+                  functions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Function"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: registerDurableFunction
+      tags: [Functions]
+      summary: Register a function
+      description: Register or update a durable function version.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterFunctionRequest"
+      responses:
+        "201":
+          description: Function was registered.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [function]
+                properties:
+                  function:
+                    $ref: "#/components/schemas/Function"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/durable-execution/v1/apps/{appId}/events:
+    post:
+      operationId: sendDurableEvents
+      tags: [Events]
+      summary: Send events
+      description: Send one event or a batch of events. Matching triggers schedule new runs; matching waits resume existing runs.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/Event"
+                - type: array
+                  minItems: 1
+                  items:
+                    $ref: "#/components/schemas/Event"
+      responses:
+        "202":
+          description: Event or events were accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendEventsResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/durable-execution/v1/apps/{appId}/functions/{workflowId}/runs:
+    post:
+      operationId: triggerDurableFunctionRun
+      tags: [Runs]
+      summary: Trigger a function run
+      description: Start one run for a function directly.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerRunRequest"
+      responses:
+        "201":
+          description: Run was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/durable-execution/v1/apps/{appId}/runs/{runId}:
+    get:
+      operationId: getDurableRun
+      tags: [Runs]
+      summary: Get a run
+      description: Get the current state of a durable execution run.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Run was returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/durable-execution/v1/apps/{appId}/runs/{runId}/history:
+    get:
+      operationId: listDurableRunHistory
+      tags: [Runs]
+      summary: List run history
+      description: List ordered history records for a run.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Run history was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [history]
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RunHistoryRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/durable-execution/v1/apps/{appId}/runs/{runId}/cancel:
+    post:
+      operationId: cancelDurableRun
+      tags: [Runs]
+      summary: Cancel a run
+      description: Cancel a durable execution run.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Run was cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/durable-execution/v1/apps/{appId}/runs/{runId}/retry:
+    post:
+      operationId: retryDurableRun
+      tags: [Runs]
+      summary: Retry a run
+      description: Retry a terminal durable execution run.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "202":
+          description: Run retry was accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/durable-execution/v1/apps/{appId}/runs/{runId}/signals:
+    post:
+      operationId: signalDurableRun
+      tags: [Runs]
+      summary: Signal a run
+      description: Send a signal payload to a waiting run.
+      parameters:
+        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/RunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignalRunRequest"
+      responses:
+        "202":
+          description: Signal was accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "Use `ApiKey <api-key>`."
+  parameters:
+    AppId:
+      name: appId
+      in: path
+      required: true
+      description: Durable app namespace.
+      schema:
+        type: string
+        example: billing
+    WorkflowId:
+      name: workflowId
+      in: path
+      required: true
+      description: Durable function ID.
+      schema:
+        type: string
+        example: send-receipt
+    RunId:
+      name: runId
+      in: path
+      required: true
+      description: Durable run ID.
+      schema:
+        type: string
+        example: run_123
+  responses:
+    Unauthorized:
+      description: API key or session is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidRequest:
+      description: Request body, path, or headers are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unavailable:
+      description: Durable execution is not configured or unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Error:
+      description: Request failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Error:
+      type: object
+      required: [error, status]
+      properties:
+        error:
+          type: string
+        status:
+          type: integer
+        details:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    Function:
+      type: object
+      required:
+        - workflowId
+        - version
+        - displayName
+        - runtime
+        - triggers
+        - concurrency
+        - retryPolicy
+        - metadata
+        - registeredAt
+      properties:
+        workflowId:
+          type: string
+        version:
+          type: string
+        displayName:
+          type: string
+        runtime:
+          $ref: "#/components/schemas/Runtime"
+        triggers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Trigger"
+        concurrency:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        retryPolicy:
+          $ref: "#/components/schemas/RetryPolicy"
+        metadata:
+          type: object
+          additionalProperties: true
+        registeredAt:
+          type: string
+          format: date-time
+    RegisterFunctionRequest:
+      type: object
+      required: [workflowId, version, displayName, runtime]
+      properties:
+        workflowId:
+          type: string
+        version:
+          type: string
+        displayName:
+          type: string
+        runtime:
+          $ref: "#/components/schemas/Runtime"
+        triggers:
+          type: array
+          default: []
+          items:
+            $ref: "#/components/schemas/Trigger"
+        concurrency:
+          type: array
+          default: []
+          items:
+            type: object
+            additionalProperties: true
+        retryPolicy:
+          $ref: "#/components/schemas/RetryPolicy"
+        metadata:
+          type: object
+          default: {}
+          additionalProperties: true
+    Runtime:
+      type: object
+      required: [url]
+      properties:
+        transport:
+          type: string
+          enum: [http]
+          default: http
+        url:
+          type: string
+          format: uri
+          example: https://worker.example.com
+        path:
+          type: string
+          default: /v1/execute
+    Trigger:
+      oneOf:
+        - $ref: "#/components/schemas/EventTrigger"
+        - $ref: "#/components/schemas/CronTrigger"
+    EventTrigger:
+      type: object
+      required: [kind, eventName]
+      properties:
+        kind:
+          type: string
+          enum: [event]
+        eventName:
+          type: string
+          example: invoice.paid
+        expression:
+          type: string
+          nullable: true
+          default: null
+    CronTrigger:
+      type: object
+      required: [kind, cron]
+      properties:
+        kind:
+          type: string
+          enum: [cron]
+        cron:
+          type: string
+          example: "0 9 * * *"
+    RetryPolicy:
+      type: object
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          default: 3
+        maxDelayMs:
+          type: integer
+          minimum: 0
+          default: 60000
+        minDelayMs:
+          type: integer
+          minimum: 0
+          default: 1000
+        strategy:
+          type: string
+          enum: [exponential]
+          default: exponential
+    Event:
+      type: object
+      required: [name]
+      properties:
+        id:
+          type: string
+          nullable: true
+          description: Stable event ID used as the idempotency key. Generated when omitted.
+        name:
+          type: string
+          example: invoice.paid
+        data:
+          type: object
+          default: {}
+          additionalProperties: true
+    SendEventsResponse:
+      type: object
+      required: [ids, scheduledRunIds, resumedRunIds]
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+        scheduledRunIds:
+          type: array
+          items:
+            type: string
+        resumedRunIds:
+          type: array
+          items:
+            type: string
+    TriggerRunRequest:
+      type: object
+      properties:
+        event:
+          type: object
+          properties:
+            id:
+              type: string
+              nullable: true
+            name:
+              type: string
+              default: function.triggered
+            data:
+              type: object
+              default: {}
+              additionalProperties: true
+        idempotencyKey:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          default: {}
+          additionalProperties: true
+        version:
+          type: string
+          nullable: true
+          description: Specific function version to run. Latest matching version is used when omitted.
+    RunEnvelope:
+      type: object
+      required: [run]
+      properties:
+        run:
+          $ref: "#/components/schemas/Run"
+    Run:
+      type: object
+      required: [runId, status]
+      properties:
+        runId:
+          type: string
+        workflowId:
+          type: string
+        workflowVersion:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, waiting, completed, failed, cancelled]
+        idempotencyKey:
+          type: string
+          nullable: true
+        triggerEvent:
+          $ref: "#/components/schemas/TriggerEvent"
+        attempt:
+          type: integer
+        maxAttempts:
+          type: integer
+        result:
+          nullable: true
+        error:
+          nullable: true
+          $ref: "#/components/schemas/ExecutionError"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+    TriggerEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        name:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        receivedAt:
+          type: string
+          format: date-time
+    ExecutionError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        retryable:
+          type: boolean
+        details:
+          type: object
+          additionalProperties: true
+    RunHistoryRecord:
+      type: object
+      required: [historyId, runId, sequenceNumber, type, stepId, payload, createdAt]
+      properties:
+        historyId:
+          type: string
+        runId:
+          type: string
+        sequenceNumber:
+          type: integer
+        type:
+          type: string
+          enum:
+            - queued
+            - leased
+            - step_completed
+            - waiting
+            - resumed
+            - pause_timed_out
+            - retry_scheduled
+            - completed
+            - failed
+            - cancelled
+            - signal_received
+        stepId:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    SignalRunRequest:
+      type: object
+      required: [payload]
+      properties:
+        stepId:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true

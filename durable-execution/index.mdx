@@ -1,0 +1,42 @@
+---
+title: "Durable Execution"
+description: "Run event-driven functions with durable steps, retries, waits, and run history."
+---
+
+Durable Execution runs long-lived functions that can retry, sleep, wait for correlated events, and resume without losing completed step output.
+
+Use it when a workflow needs to survive process restarts, external callbacks, human approval, or delayed work.
+
+<Card title="Quickstart" icon="rocket" href="/durable-execution/quickstart">
+  Register a function, send an event, inspect the run, and read history.
+</Card>
+
+<Card title="Functions and events" icon="workflow" href="/durable-execution/functions-and-events">
+  Define event triggers, register function versions, and send one event or a batch.
+</Card>
+
+<Card title="Runs and signals" icon="activity" href="/durable-execution/runs">
+  Trigger a function directly, inspect status, cancel, retry, and signal waiting runs.
+</Card>
+
+<Card title="API reference" icon="book-open" href="/api-reference/durable-execution">
+  Browse every public REST endpoint for apps, functions, events, and runs.
+</Card>
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| App | A durable execution namespace. The `appId` path segment identifies the app, such as `billing`. |
+| Function | A registered durable function version with a runtime endpoint and one or more triggers. |
+| Event | A named payload that can schedule matching functions or resume waiting runs. |
+| Run | One execution of a function. Runs can be `queued`, `running`, `waiting`, `completed`, `failed`, or `cancelled`. |
+| Signal | A payload sent to a waiting run, optionally targeting a specific step. |
+
+The public API is mounted under:
+
+```text
+https://api.primary.final.ai/api/durable-execution/v1/apps/{appId}
+```
+
+For endpoint details, see the [Durable Execution API reference](/api-reference/durable-execution).

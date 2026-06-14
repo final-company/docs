@@ -1,0 +1,34 @@
+---
+title: "Durable Execution API"
+description: "Reference for the public Durable Execution REST API."
+---
+
+Use the Durable Execution API to register functions, send events, start runs, inspect history, cancel, retry, and signal waiting runs.
+
+Every machine-facing request uses organization API key authentication:
+
+```bash
+Authorization: ApiKey <api-key>
+```
+
+The public base URL is:
+
+```text
+https://api.primary.final.ai/api/durable-execution/v1
+```
+
+<Card title="Apps" icon="box" href="/api-reference/durable-execution/apps/get-meta">
+  Inspect the resolved app namespace.
+</Card>
+
+<Card title="Functions" icon="workflow" href="/api-reference/durable-execution/functions/list">
+  List and register durable function versions.
+</Card>
+
+<Card title="Events" icon="send" href="/api-reference/durable-execution/events/send">
+  Send one event or a batch of events.
+</Card>
+
+<Card title="Runs" icon="activity" href="/api-reference/durable-execution/runs/get">
+  Start, inspect, cancel, retry, signal, and read run history.
+</Card>
