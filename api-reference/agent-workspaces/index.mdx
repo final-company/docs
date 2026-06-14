@@ -1,0 +1,30 @@
+---
+title: "Agent Workspaces API"
+description: "Reference for the public Agent Workspaces REST API."
+---
+
+Use the Agent Workspaces API to create workspaces, start sessions, send messages, poll state, and archive completed work.
+
+Every request uses bearer authentication with an organization or user API key:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+The public Agent Workspaces namespace is:
+
+```text
+https://api.final.ai/v1/agent-workspaces
+```
+
+<Card title="Workspaces" icon="folder-code" href="/api-reference/agent-workspaces/workspaces/list">
+  Create, list, update, inspect, and archive agent workspaces.
+</Card>
+
+<Card title="Sessions" icon="messages-square" href="/api-reference/agent-workspaces/sessions/list">
+  Create sessions, update runtime settings, poll state, stop work, and archive sessions.
+</Card>
+
+<Card title="Messages" icon="message-square" href="/api-reference/agent-workspaces/messages/list">
+  Send user messages and read session message history.
+</Card>

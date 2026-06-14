@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "maple",
+  "theme": "sequoia",
   "name": "Final",
   "colors": {
     "primary": "#000",
@@ -11,8 +11,25 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "User Guides",
         "pages": [
+          {
+            "group": "Overview",
+            "pages": [
+              "user-guides/index"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guides",
+        "pages": [
+          {
+            "group": "Platform",
+            "pages": [
+              "authentication"
+            ]
+          },
           {
             "group": "Git",
             "pages": [
@@ -36,6 +53,12 @@
             ]
           },
           {
+            "group": "Agent Workspaces",
+            "pages": [
+              "agent-workspaces/index"
+            ]
+          },
+          {
             "group": "Durable Execution",
             "pages": [
               "durable-execution/index",
@@ -47,7 +70,7 @@
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "pages": [
           {
             "group": "Git",
@@ -99,6 +122,52 @@
                 "pages": [
                   "api-reference/checks/create-commit-status",
                   "api-reference/checks/create-check-run"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Platform",
+            "pages": [
+              {
+                "group": "API keys",
+                "pages": [
+                  "api-reference/api-keys/create"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Agent Workspaces",
+            "pages": [
+              "api-reference/agent-workspaces/index",
+              {
+                "group": "Workspaces",
+                "pages": [
+                  "api-reference/agent-workspaces/workspaces/list",
+                  "api-reference/agent-workspaces/workspaces/create",
+                  "api-reference/agent-workspaces/workspaces/get",
+                  "api-reference/agent-workspaces/workspaces/update",
+                  "api-reference/agent-workspaces/workspaces/archive"
+                ]
+              },
+              {
+                "group": "Sessions",
+                "pages": [
+                  "api-reference/agent-workspaces/sessions/list",
+                  "api-reference/agent-workspaces/sessions/create",
+                  "api-reference/agent-workspaces/sessions/get",
+                  "api-reference/agent-workspaces/sessions/update",
+                  "api-reference/agent-workspaces/sessions/state",
+                  "api-reference/agent-workspaces/sessions/stop",
+                  "api-reference/agent-workspaces/sessions/archive"
+                ]
+              },
+              {
+                "group": "Messages",
+                "pages": [
+                  "api-reference/agent-workspaces/messages/list",
+                  "api-reference/agent-workspaces/messages/send"
                 ]
               }
             ]
@@ -241,7 +310,7 @@
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "href": "https://console.final.ai"
     }
   },
   "contextual": {

@@ -1,0 +1,89 @@
+---
+title: "Authentication"
+description: "Authenticate requests to the Final API with bearer credentials."
+---
+
+Final APIs use bearer authentication. Send your credential in the `Authorization` header:
+
+```bash
+Authorization: Bearer <credential>
+```
+
+Use the unified API host for public REST APIs:
+
+```text
+https://api.final.ai
+```
+
+## Choose a credential
+
+| Credential | Use it for |
+| --- | --- |
+| Organization API key | Public REST APIs for Agent Workspaces, Virtual Machines, Durable Execution, and API key management. |
+| User API key | User-attributed Agent Workspaces requests. |
+| Production access token | Git repository management endpoints. |
+| Minted Git credentials | Short-lived Git HTTPS clone, fetch, and push operations. |
+| VM token | Scoped VM access where VM tokens are supported. VM tokens do not authenticate public API requests to `api.final.ai`. |
+
+## Use API keys
+
+Organization admins can create API keys in Final under **Settings** > **API Keys**.
+
+Store API keys in your secret manager and load them into your automation environment:
+
+```bash
+export FINAL_API_KEY="<api-key>"
+```
+
+Call public API endpoints with bearer auth:
+
+```bash
+curl "https://api.final.ai/v1/agent-workspaces" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Create API keys from the API
+
+You can create organization API keys from automation with [create an API key](/api-reference/api-keys/create).
+
+The caller key must be organization-owned and must have the `api_keys:write` permission. A new key cannot request permissions that the caller key does not already have.
+
+```bash
+curl -X POST "https://api.final.ai/v1/api-keys" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI deploy",
+    "permissions": ["apps:read"],
+    "expiresAt": "2027-01-01T00:00:00.000Z"
+  }'
+```
+
+The response includes the plaintext `value` once. Store it immediately.
+
+## Authenticate Agent Workspaces
+
+Agent Workspaces accepts organization-owned and user-owned API keys.
+
+Organization-owned keys create workspaces through an agent profile. Include `agentProfileId` when you create a workspace or session.
+
+User-owned keys create workspaces as the key owner and do not require `agentProfileId`.
+
+See [Agent Workspaces](/agent-workspaces) and the [Agent Workspaces API reference](/api-reference/agent-workspaces).
+
+## Authenticate Git operations
+
+Git repository management endpoints currently use a production access token:
+
+```bash
+curl "https://api.final.ai/api/file-systems" \
+  -H "Authorization: Bearer ${access_token}"
+```
+
+For Git clone, fetch, and push, first mint short-lived Git credentials with [mint Git credentials](/api-reference/repositories/mint-git-credentials). Use those credentials with the Git remote URL instead of sending your API key to Git.
+
+## Handle auth errors
+
+`401` means the credential is missing, malformed, expired, or invalid.
+
+`403` means the credential is valid but cannot perform the requested action. For API key creation, check that the caller key is organization-owned, includes `api_keys:write`, and already has every permission requested for the new key.

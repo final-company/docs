@@ -2,17 +2,433 @@ openapi: 3.0.3
 info:
   title: Final API
   version: "1.0"
-  description: REST API for Final Git repositories, pull requests, merge queues, and CI checks.
+  description: REST API for Final platform features.
 servers:
   - url: https://api.final.ai
 security:
   - bearerAuth: []
 tags:
+  - name: API keys
+  - name: Agent workspaces
+  - name: Agent sessions
+  - name: Agent messages
   - name: Repositories
   - name: Pull requests
   - name: Merge queues
   - name: Checks
 paths:
+  /v1/api-keys:
+    post:
+      operationId: createApiKey
+      tags: [API keys]
+      summary: Create an API key
+      description: "Create an organization API key. The caller must use an organization-owned API key with the `api_keys:write` permission. Requested permissions cannot exceed the caller key's permissions."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKeyRequest"
+      responses:
+        "201":
+          description: API key was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apiKey]
+                properties:
+                  apiKey:
+                    $ref: "#/components/schemas/ApiKey"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces:
+    get:
+      operationId: listAgentWorkspaces
+      tags: [Agent workspaces]
+      summary: List agent workspaces
+      description: List active agent workspaces visible to the authenticated API key.
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Agent workspaces were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workspaces]
+                properties:
+                  workspaces:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentWorkspace"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createAgentWorkspace
+      tags: [Agent workspaces]
+      summary: Create an agent workspace
+      description: "Create an agent workspace and its main session. Organization-owned API keys must provide `agentProfileId`."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: expand
+          in: query
+          required: false
+          description: Optional expansion forwarded to the workspace service.
+          schema:
+            type: string
+            example: mainSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentWorkspaceRequest"
+      responses:
+        "201":
+          description: Agent workspace was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workspace, session]
+                properties:
+                  workspace:
+                    $ref: "#/components/schemas/AgentWorkspace"
+                  session:
+                    $ref: "#/components/schemas/AgentSession"
+                  command:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+        "412":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}:
+    parameters:
+      - $ref: "#/components/parameters/AgentWorkspaceId"
+    get:
+      operationId: getAgentWorkspace
+      tags: [Agent workspaces]
+      summary: Get an agent workspace
+      responses:
+        "200":
+          description: Agent workspace was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workspace]
+                properties:
+                  workspace:
+                    $ref: "#/components/schemas/AgentWorkspace"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateAgentWorkspace
+      tags: [Agent workspaces]
+      summary: Update an agent workspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentWorkspaceRequest"
+      responses:
+        "200":
+          description: Agent workspace was updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workspace]
+                properties:
+                  workspace:
+                    $ref: "#/components/schemas/AgentWorkspace"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}/archive:
+    post:
+      operationId: archiveAgentWorkspace
+      tags: [Agent workspaces]
+      summary: Archive an agent workspace
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+      responses:
+        "200":
+          description: Agent workspace was archived.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [archived]
+                properties:
+                  archived:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}/sessions:
+    get:
+      operationId: listAgentWorkspaceSessions
+      tags: [Agent sessions]
+      summary: List workspace sessions
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Sessions were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: createAgentWorkspaceSession
+      tags: [Agent sessions]
+      summary: Create a workspace session
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentSessionRequest"
+      responses:
+        "201":
+          description: Session was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session]
+                properties:
+                  session:
+                    $ref: "#/components/schemas/AgentSession"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/AgentWorkspaceId"
+      - $ref: "#/components/parameters/AgentSessionId"
+    get:
+      operationId: getAgentWorkspaceSession
+      tags: [Agent sessions]
+      summary: Get a workspace session
+      responses:
+        "200":
+          description: Session was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session]
+                properties:
+                  session:
+                    $ref: "#/components/schemas/AgentSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateAgentWorkspaceSession
+      tags: [Agent sessions]
+      summary: Update a workspace session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentSessionRequest"
+      responses:
+        "200":
+          description: Session was updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session]
+                properties:
+                  session:
+                    $ref: "#/components/schemas/AgentSession"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/archive:
+    post:
+      operationId: archiveAgentWorkspaceSession
+      tags: [Agent sessions]
+      summary: Archive a workspace session
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentSessionId"
+      responses:
+        "200":
+          description: Session was archived.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [archived]
+                properties:
+                  archived:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/messages:
+    get:
+      operationId: listAgentWorkspaceSessionMessages
+      tags: [Agent messages]
+      summary: List session messages
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentSessionId"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Messages were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [messages, cursor]
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentMessage"
+                  cursor:
+                    type: string
+                    nullable: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: sendAgentWorkspaceSessionMessage
+      tags: [Agent messages]
+      summary: Send a session message
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentSessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendAgentMessageRequest"
+      responses:
+        "200":
+          description: Message command was accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [command]
+                properties:
+                  command:
+                    type: object
+                    additionalProperties: true
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/state:
+    get:
+      operationId: getAgentWorkspaceSessionState
+      tags: [Agent sessions]
+      summary: Get session state
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentSessionId"
+      responses:
+        "200":
+          description: Session state was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/AgentSessionState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/stop:
+    post:
+      operationId: stopAgentWorkspaceSession
+      tags: [Agent sessions]
+      summary: Stop a running session
+      parameters:
+        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentSessionId"
+      responses:
+        "200":
+          description: Session stop was requested.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [stopped, commandId]
+                properties:
+                  stopped:
+                    type: boolean
+                  commandId:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
   /api/file-systems:
     get:
       operationId: listFileSystems
@@ -699,7 +1115,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: token
-      description: Production access token.
+      description: Final access token or API key.
   parameters:
     FileSystemId:
       name: fileSystemId
@@ -737,6 +1153,37 @@ components:
       schema:
         type: string
       description: Merge queue entry ID.
+    AgentWorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Encoded agent workspace ID.
+    AgentSessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Encoded agent session ID.
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Cursor returned by the previous page.
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Maximum number of records to return.
   responses:
     Error:
       description: Request failed.
@@ -786,6 +1233,315 @@ components:
           items:
             type: object
             additionalProperties: true
+    ApiKey:
+      type: object
+      required:
+        - id
+        - name
+        - obfuscatedValue
+        - permissions
+        - owner
+        - lastUsedAt
+        - expiresAt
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          example: api_key_new
+        name:
+          type: string
+          example: CI deploy
+        obfuscatedValue:
+          type: string
+          example: sk_...new
+        value:
+          type: string
+          nullable: true
+          description: Plaintext API key value. Returned only when the key is created.
+          example: sk_live_new
+        permissions:
+          type: array
+          items:
+            type: string
+          example: [apps:read]
+        owner:
+          type: object
+          required: [type, id]
+          properties:
+            type:
+              type: string
+              enum: [organization]
+            id:
+              type: string
+              example: org_01HZY...
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateApiKeyRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          example: CI deploy
+        permissions:
+          type: array
+          maxItems: 100
+          default: []
+          items:
+            type: string
+          description: Permissions for the new key. These cannot exceed the caller key's permissions.
+          example: [apps:read]
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Expiration time for the key. Omit or pass `null` for no expiration."
+    AgentWorkspace:
+      type: object
+      required:
+        - id
+        - title
+        - mainSessionId
+        - workspaceKind
+        - fileSystemId
+        - finalNodeId
+        - workspaceDir
+        - metadata
+        - archivedAt
+        - createdAt
+        - updatedAt
+        - lastActivityAt
+      properties:
+        id:
+          type: string
+          example: agw_123
+        title:
+          type: string
+          nullable: true
+        mainSessionId:
+          type: string
+          example: ags_123
+        workspaceKind:
+          type: integer
+          enum: [0, 1, 2]
+          description: "`0` unknown, `1` main, `2` ticket."
+        fileSystemId:
+          type: string
+          nullable: true
+        finalNodeId:
+          type: string
+          nullable: true
+        workspaceDir:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        archivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+    AgentSession:
+      type: object
+      required:
+        - id
+        - workspaceId
+        - title
+        - provider
+        - modelId
+        - effortLevel
+        - permissionMode
+        - status
+        - lastError
+        - agentProfileId
+        - metadata
+        - createdAt
+        - updatedAt
+        - lastActivityAt
+      properties:
+        id:
+          type: string
+          example: ags_123
+        workspaceId:
+          type: string
+          nullable: true
+          example: agw_123
+        title:
+          type: string
+          nullable: true
+        provider:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: "`0` unknown, `1` Claude, `2` Codex, `3` Pi."
+        modelId:
+          type: string
+          example: gpt-5
+        effortLevel:
+          type: string
+          example: high
+        permissionMode:
+          type: string
+          example: full-access
+        status:
+          type: integer
+          enum: [0, 1, 2, 3, 4]
+          description: "`0` unknown, `1` idle, `2` running, `3` failed, `4` provisioning."
+        lastError:
+          type: string
+          nullable: true
+        agentProfileId:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+    CreateAgentWorkspaceRequest:
+      type: object
+      properties:
+        agentProfileId:
+          type: string
+          description: Agent profile to run as. Required for organization-owned API keys.
+          example: agp_123
+        title:
+          type: string
+          nullable: true
+        fileSystemId:
+          type: string
+          nullable: true
+          description: File system to mount into the workspace.
+        workspaceDir:
+          type: string
+          nullable: true
+          description: Directory where the agent should start.
+        finalNodeType:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: "`1` local, `2` dedicated cloud, `3` on-demand cloud."
+        message:
+          type: string
+          description: Optional first user message to submit after the workspace is created.
+          example: Start work
+    CreateAgentSessionRequest:
+      type: object
+      properties:
+        agentProfileId:
+          type: string
+          description: Agent profile to use for runtime defaults. Required for organization-owned API keys.
+          example: agp_123
+        title:
+          type: string
+          nullable: true
+        workspaceDir:
+          type: string
+          nullable: true
+          description: Directory where the agent should start.
+        finalNodeType:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: "`1` local, `2` dedicated cloud, `3` on-demand cloud."
+    UpdateAgentWorkspaceRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+    UpdateAgentSessionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+        modelId:
+          type: string
+        effortLevel:
+          type: string
+        permissionMode:
+          type: string
+    AgentMessage:
+      type: object
+      required: [id, sessionId, role, type, text, createdAt]
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant]
+        type:
+          type: string
+          enum: [message, event]
+        text:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    SendAgentMessageRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          example: Please inspect the failing tests.
+        commandId:
+          type: string
+          format: uuid
+          description: Optional idempotency key for the command.
+    AgentSessionState:
+      type: object
+      required: [status, running, blocked, error, latestMessageCursor, pollAfterMs]
+      properties:
+        status:
+          type: integer
+          enum: [0, 1, 2, 3, 4]
+        running:
+          type: boolean
+        blocked:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        latestMessageCursor:
+          type: string
+          nullable: true
+        pollAfterMs:
+          type: integer
+          example: 1000
     FileSystem:
       type: object
       additionalProperties: true

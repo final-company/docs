@@ -1,0 +1,82 @@
+---
+title: "Agent Workspaces"
+description: "Create agent workspaces, send messages, and poll session state with the public REST API."
+---
+
+Agent Workspaces let you start agent work from the public API. A workspace contains one or more sessions. A session receives messages, runs work, and exposes state you can poll.
+
+Use the [Agent Workspaces API reference](/api-reference/agent-workspaces) for endpoint details.
+
+## Before you begin
+
+You need an API key. See [authentication](/authentication) for credential types and bearer auth examples.
+
+Organization-owned keys can create workspaces for an agent profile. User-owned keys create workspaces as the key owner.
+
+Organization-owned keys must include `agentProfileId` when they create a workspace or session.
+
+## Create a workspace
+
+Create a workspace and optionally send the first message:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-workspaces" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: workspace-001" \
+  -d '{
+    "agentProfileId": "agp_123",
+    "title": "Investigate failing tests",
+    "message": "Find the failing tests and propose a fix."
+  }'
+```
+
+The response includes a `workspace`, its main `session`, and a `command` when you include `message`.
+
+See [create an agent workspace](/api-reference/agent-workspaces/workspaces/create).
+
+## Send another message
+
+Post follow-up work to a session:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/${SESSION_ID}/messages" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Focus on the API client tests first."
+  }'
+```
+
+See [send a session message](/api-reference/agent-workspaces/messages/send).
+
+## Poll state and messages
+
+Poll session state to decide when to fetch new messages:
+
+```bash
+curl "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/${SESSION_ID}/state" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Use `latestMessageCursor` from the state response with the messages endpoint:
+
+```bash
+curl "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/${SESSION_ID}/messages?cursor=${CURSOR}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+See [get session state](/api-reference/agent-workspaces/sessions/state) and [list session messages](/api-reference/agent-workspaces/messages/list).
+
+## Stop or archive work
+
+Stop a running session when you no longer want it to continue:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/${SESSION_ID}/stop" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Archive completed workspaces to remove them from active lists.
+
+See [stop a running session](/api-reference/agent-workspaces/sessions/stop) and [archive an agent workspace](/api-reference/agent-workspaces/workspaces/archive).
