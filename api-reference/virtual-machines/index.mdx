@@ -1,0 +1,42 @@
+---
+title: "Virtual Machines API"
+description: "Reference for the Final Virtual Machines REST API."
+---
+
+Use the public Virtual Machines REST API to create machines, run commands, read and write files, manage networking, and control access.
+
+Every request to the public VM API uses bearer authentication:
+
+```bash
+Authorization: Bearer <api-key-or-vm-token>
+```
+
+The public base URL is:
+
+```text
+https://vm-api.final.ai/v1
+```
+
+<Card title="VMs" icon="server" href="/api-reference/virtual-machines/vms/list">
+  Create, list, inspect, update, and delete VMs.
+</Card>
+
+<Card title="Execution" icon="terminal" href="/api-reference/virtual-machines/execution/execute">
+  Run commands, stream command output, and inspect running processes.
+</Card>
+
+<Card title="Files" icon="file" href="/api-reference/virtual-machines/files/read">
+  Read and write files inside a VM.
+</Card>
+
+<Card title="Shares and domains" icon="globe" href="/api-reference/virtual-machines/shares/list">
+  Share VM access and attach custom domains.
+</Card>
+
+<Card title="Tokens and SSH keys" icon="key-round" href="/api-reference/virtual-machines/tokens/list">
+  Mint VM bearer tokens and manage SSH public keys.
+</Card>
+
+<Card title="Regions" icon="map" href="/api-reference/virtual-machines/regions/list">
+  List regions that can accept new VMs.
+</Card>

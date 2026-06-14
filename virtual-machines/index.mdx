@@ -1,0 +1,49 @@
+---
+title: "Virtual Machines"
+description: "Create and operate Final Virtual Machines from container images."
+---
+
+Final Virtual Machines run container images as persistent or ephemeral cloud machines. Use them for agent runtimes, sandboxes, build jobs, preview services, and workloads that need command execution, files, SSH, and HTTP access.
+
+You can manage VMs with the public REST API, the `final-vm` CLI, or the TypeScript SDK.
+
+<Card title="Use the REST API" icon="braces" href="/virtual-machines/rest-api">
+  Create, inspect, update, execute commands on, and delete VMs with HTTP requests.
+</Card>
+
+<Card title="Create your first VM" icon="terminal" href="/virtual-machines/quickstart">
+  Authenticate the CLI, create a VM from a container image, and connect with SSH.
+</Card>
+
+<Card title="Use the TypeScript SDK" icon="code" href="/virtual-machines/sdk">
+  Create VMs, run commands, read and write files, and clean up ephemeral machines from code.
+</Card>
+
+<Card title="Manage lifecycle and settings" icon="settings" href="/virtual-machines/lifecycle">
+  Resize machines, update environment variables, restart workloads, and control idle behavior.
+</Card>
+
+<Card title="Expose apps and share access" icon="globe" href="/virtual-machines/networking">
+  Configure HTTP ports, public access, custom domains, and sharing.
+</Card>
+
+<Card title="Manage tokens and SSH keys" icon="key-round" href="/virtual-machines/access">
+  Create VM bearer tokens, register SSH public keys, and choose the right credential for each workflow.
+</Card>
+
+<Card title="API reference" icon="book-open" href="/api-reference/virtual-machines">
+  Browse every public REST endpoint for VMs, execution, files, shares, domains, tokens, SSH keys, and regions.
+</Card>
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| VM | A cloud machine created from a container image. Each VM has a name, region, resources, HTTP settings, and lifecycle state. |
+| Image | The container image used to boot the VM, such as `docker.io/library/ubuntu:24.04` or a private image. |
+| Ephemeral VM | A VM that is deleted when it becomes idle instead of being paused. Use this for short-lived jobs and sandboxes. |
+| Auto resume | A setting that lets retained VMs wake when accessed after being paused or shelved. |
+| VM token | A bearer token for the VM API. Tokens can be scoped to one VM and can expire. |
+| SSH key | An OpenSSH public key registered to your user for SSH access to VMs in your organization. |
+
+For raw API details, start with [create a VM](/api-reference/virtual-machines/vms/create) and [list VMs](/api-reference/virtual-machines/vms/list).

@@ -22,6 +22,18 @@
               "git/merge-queues",
               "git/manage"
             ]
+          },
+          {
+            "group": "Virtual Machines",
+            "pages": [
+              "virtual-machines/index",
+              "virtual-machines/rest-api",
+              "virtual-machines/quickstart",
+              "virtual-machines/sdk",
+              "virtual-machines/lifecycle",
+              "virtual-machines/networking",
+              "virtual-machines/access"
+            ]
           }
         ]
       },
@@ -78,6 +90,79 @@
                 "pages": [
                   "api-reference/checks/create-commit-status",
                   "api-reference/checks/create-check-run"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Virtual Machines",
+            "pages": [
+              "api-reference/virtual-machines/index",
+              {
+                "group": "VMs",
+                "pages": [
+                  "api-reference/virtual-machines/vms/list",
+                  "api-reference/virtual-machines/vms/create",
+                  "api-reference/virtual-machines/vms/get",
+                  "api-reference/virtual-machines/vms/update",
+                  "api-reference/virtual-machines/vms/update-visibility",
+                  "api-reference/virtual-machines/vms/action",
+                  "api-reference/virtual-machines/vms/list-events",
+                  "api-reference/virtual-machines/vms/delete"
+                ]
+              },
+              {
+                "group": "Execution",
+                "pages": [
+                  "api-reference/virtual-machines/execution/execute",
+                  "api-reference/virtual-machines/execution/stream",
+                  "api-reference/virtual-machines/execution/list-processes",
+                  "api-reference/virtual-machines/execution/run-cli-command"
+                ]
+              },
+              {
+                "group": "Files",
+                "pages": [
+                  "api-reference/virtual-machines/files/read",
+                  "api-reference/virtual-machines/files/write"
+                ]
+              },
+              {
+                "group": "Shares",
+                "pages": [
+                  "api-reference/virtual-machines/shares/list",
+                  "api-reference/virtual-machines/shares/create",
+                  "api-reference/virtual-machines/shares/delete"
+                ]
+              },
+              {
+                "group": "Domains",
+                "pages": [
+                  "api-reference/virtual-machines/domains/list",
+                  "api-reference/virtual-machines/domains/add",
+                  "api-reference/virtual-machines/domains/delete"
+                ]
+              },
+              {
+                "group": "Tokens",
+                "pages": [
+                  "api-reference/virtual-machines/tokens/list",
+                  "api-reference/virtual-machines/tokens/create",
+                  "api-reference/virtual-machines/tokens/delete"
+                ]
+              },
+              {
+                "group": "SSH keys",
+                "pages": [
+                  "api-reference/virtual-machines/ssh-keys/list",
+                  "api-reference/virtual-machines/ssh-keys/add",
+                  "api-reference/virtual-machines/ssh-keys/delete"
+                ]
+              },
+              {
+                "group": "Regions",
+                "pages": [
+                  "api-reference/virtual-machines/regions/list"
                 ]
               }
             ]

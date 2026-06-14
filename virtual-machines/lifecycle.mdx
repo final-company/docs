@@ -1,0 +1,79 @@
+---
+title: "Lifecycle and settings"
+description: "Control VM state, resource sizing, environment variables, and idle behavior."
+---
+
+VMs move through lifecycle states such as `pending`, `creating`, `running`, `paused`, `stopped`, `resuming`, `shelved`, `error`, and `deleted`.
+
+Use lifecycle actions when you need to change the VM process state. Use settings updates when you need to change the VM configuration.
+
+## Lifecycle actions
+
+| Action | Use it when |
+| --- | --- |
+| `start` | You want to start a stopped VM. |
+| `stop` | You want to stop a VM without deleting its record. |
+| `pause` | You want to retain the VM and let it resume later. |
+| `resume` | You want to wake a paused, stopped, or shelved VM. |
+| `restart` | You want to restart the VM workload. |
+| `delete` | You want to remove the VM. |
+
+Run an action with the CLI:
+
+```bash
+final-vm restart docs-demo
+```
+
+Or call the [perform a VM action endpoint](/api-reference/virtual-machines/vms/action).
+
+## Resize a VM
+
+You can update CPU, memory, and disk size:
+
+```bash
+final-vm resize docs-demo --vcpu 4 --memory 8192 --disk 40
+```
+
+Disk size is grow-only. Plan disk reductions by creating a new VM and copying the data you need.
+
+Use the [update a VM endpoint](/api-reference/virtual-machines/vms/update) for API-based resizing.
+
+## Rename, tag, and comment
+
+```bash
+final-vm rename docs-demo docs-prod
+final-vm tag docs-prod production owner-docs
+final-vm comment docs-prod "Preview app for documentation testing"
+```
+
+Tags replace the existing tag list. Comments can be set to an empty value to clear them through the API.
+
+## Update environment variables
+
+Use the API or SDK to replace environment variables:
+
+```ts
+await vm.settings({
+  env: {
+    NODE_ENV: "production",
+    FEATURE_FLAG: "enabled",
+  },
+});
+```
+
+Environment variables are part of the VM settings payload on [update a VM](/api-reference/virtual-machines/vms/update).
+
+## Configure idle behavior
+
+`idleTimeoutSeconds` controls when an idle VM pauses or is reaped. `autoResume` controls whether retained VMs wake on access.
+
+Ephemeral VMs are deleted when they become idle. Non-ephemeral VMs are retained and can resume later.
+
+```bash
+final-vm new docker.io/library/ubuntu:24.04 \
+  --name short-job \
+  --ephemeral \
+  --idle-timeout 300
+```
+
+Use ephemeral VMs for sandboxes and jobs. Use retained VMs for services, development environments, and workloads where state matters.

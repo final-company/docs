@@ -1,0 +1,107 @@
+---
+title: "Virtual Machines quickstart"
+description: "Create, inspect, connect to, and delete a VM with the final-vm CLI."
+---
+
+Use the `final-vm` CLI for day-to-day VM work. The CLI is a thin client over the public Virtual Machines REST API. If you want to call the API directly, see [use the REST API](/virtual-machines/rest-api).
+
+The CLI stores credentials in `~/.config/final-vm/config.json`. You can also set `FINAL_VM_API_KEY` and `FINAL_VM_API_URL` in your environment.
+
+## Before you begin
+
+You need an organization API key. Organization admins can create one in Final under **Settings** > **API Keys**.
+
+The public VM API URL is:
+
+```text
+https://vm-api.final.ai
+```
+
+## Authenticate the CLI
+
+```bash
+final-vm login --api-key <api-key>
+```
+
+For automation, set environment variables instead:
+
+```bash
+export FINAL_VM_API_KEY="<api-key>"
+export FINAL_VM_API_URL="https://vm-api.final.ai"
+```
+
+## Create a VM
+
+Create a VM from a container image:
+
+```bash
+final-vm new docker.io/library/ubuntu:24.04 --name docs-demo
+```
+
+Create a VM that exposes an HTTP app on port `3000`:
+
+```bash
+final-vm new docker.io/library/node:22-slim \
+  --name preview-app \
+  --port 3000 \
+  --public \
+  --command "node server.js"
+```
+
+The CLI prints the VM hostname after creation. To create VMs from the API, use the [create a VM endpoint](/api-reference/virtual-machines/vms/create).
+
+## List and inspect VMs
+
+```bash
+final-vm ls
+final-vm stat docs-demo
+```
+
+Use `--json` with any command when you need machine-readable output:
+
+```bash
+final-vm stat docs-demo --json
+```
+
+The matching REST endpoints are [list VMs](/api-reference/virtual-machines/vms/list) and [get a VM](/api-reference/virtual-machines/vms/get).
+
+## Connect with SSH
+
+Register an SSH public key before connecting:
+
+```bash
+final-vm ssh-key add laptop "$(cat ~/.ssh/id_ed25519.pub)"
+```
+
+Then connect:
+
+```bash
+final-vm ssh docs-demo
+```
+
+You can pass extra SSH flags after the VM name:
+
+```bash
+final-vm ssh docs-demo -L 8080:localhost:3000
+```
+
+For API details, see [add an SSH key](/api-reference/virtual-machines/ssh-keys/add).
+
+## Copy files
+
+Use `final-vm cp` with VM-side paths written as `<vm>:<path>`:
+
+```bash
+final-vm cp ./app.tar.gz docs-demo:/tmp/app.tar.gz
+final-vm cp docs-demo:/var/log/app.log ./app.log
+```
+
+The REST API also supports direct file reads and writes. See [read a file](/api-reference/virtual-machines/files/read) and [write a file](/api-reference/virtual-machines/files/write).
+
+## Delete the VM
+
+```bash
+final-vm rm docs-demo
+```
+
+You can also delete a VM with the [delete a VM endpoint](/api-reference/virtual-machines/vms/delete).

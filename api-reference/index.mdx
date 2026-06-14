@@ -5,10 +5,10 @@ description: "Reference for the Final REST API."
 
 Use the API reference for endpoint details, request schemas, response schemas, and interactive examples.
 
-Every request requires a production access token:
+Git endpoints use a production access token. Virtual Machines endpoints use an organization API key or VM bearer token:
 
 ```bash
-Authorization: Bearer <access-token>
+Authorization: Bearer <token>
 ```
 
 <Card title="Repositories" icon="folder-git-2" href="/api-reference/repositories/list">
@@ -25,4 +25,8 @@ Authorization: Bearer <access-token>
 
 <Card title="Checks" icon="badge-check" href="/api-reference/checks/create-commit-status">
   Report commit statuses and check runs for pull request and merge queue CI.
+</Card>
+
+<Card title="Virtual Machines" icon="server" href="/api-reference/virtual-machines">
+  Create VMs, run commands, manage files, attach domains, and control access.
 </Card>

@@ -1,0 +1,96 @@
+---
+title: "Use the REST API"
+description: "Create and manage VMs with the public Final Virtual Machines REST API."
+---
+
+Final Virtual Machines has a public REST API. Use it when you want to create, inspect, update, execute commands on, and delete VMs from your own services or automation.
+
+The public base URL is:
+
+```text
+https://vm-api.final.ai/v1
+```
+
+Every request uses bearer authentication with an organization API key or VM bearer token:
+
+```bash
+Authorization: Bearer <token>
+```
+
+For every endpoint, schema, and response, see the [Virtual Machines API reference](/api-reference/virtual-machines).
+
+## Create a VM
+
+```bash
+curl -X POST "https://vm-api.final.ai/v1/vms" \
+  -H "Authorization: Bearer ${FINAL_VM_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: docs-demo-001" \
+  -d '{
+    "name": "docs-demo",
+    "image": "docker.io/library/ubuntu:24.04",
+    "vcpu": 2,
+    "memoryMb": 4096,
+    "diskGb": 20
+  }'
+```
+
+Use the `Idempotency-Key` header when retrying create requests. If Final replays a previous create response, the response includes `Idempotency-Replayed: true`.
+
+See [create a VM](/api-reference/virtual-machines/vms/create).
+
+## List and inspect VMs
+
+```bash
+curl "https://vm-api.final.ai/v1/vms" \
+  -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
+```
+
+```bash
+curl "https://vm-api.final.ai/v1/vms/docs-demo" \
+  -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
+```
+
+See [list VMs](/api-reference/virtual-machines/vms/list) and [get a VM](/api-reference/virtual-machines/vms/get).
+
+## Update a VM
+
+```bash
+curl -X PATCH "https://vm-api.final.ai/v1/vms/docs-demo" \
+  -H "Authorization: Bearer ${FINAL_VM_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vcpu": 4,
+    "memoryMb": 8192,
+    "tags": ["docs", "preview"]
+  }'
+```
+
+Disk size is grow-only. You can also update HTTP settings, idle behavior, tags, comments, and environment variables.
+
+See [update a VM](/api-reference/virtual-machines/vms/update).
+
+## Run a command
+
+```bash
+curl -X POST "https://vm-api.final.ai/v1/vms/docs-demo/exec" \
+  -H "Authorization: Bearer ${FINAL_VM_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command": "uname -a",
+    "timeoutMs": 30000
+  }'
+```
+
+Use the buffered command endpoint for short commands. Use the [exec WebSocket](/api-reference/virtual-machines/execution/stream) for streaming output.
+
+See [execute a command](/api-reference/virtual-machines/execution/execute).
+
+## Delete a VM
+
+```bash
+curl -X DELETE "https://vm-api.final.ai/v1/vms/docs-demo" \
+  -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
+```
+
+See [delete a VM](/api-reference/virtual-machines/vms/delete).

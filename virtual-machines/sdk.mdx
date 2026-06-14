@@ -1,0 +1,114 @@
+---
+title: "TypeScript SDK"
+description: "Use the Final VM TypeScript SDK to create VMs and run commands from code."
+---
+
+Use `@final/vm-sdk` when your application needs to create VMs, run commands, move files, or manage short-lived sandboxes from TypeScript.
+
+## Authenticate
+
+Create a client with an organization API key:
+
+```ts
+import { createVmClient, orThrow } from "@final/vm-sdk";
+
+const client = createVmClient({
+  baseUrl: "https://vm-api.final.ai",
+  auth: { apiKey: process.env.FINAL_VM_API_KEY! },
+});
+```
+
+Every SDK call uses the same public REST API documented in the [Virtual Machines API reference](/api-reference/virtual-machines).
+
+## Create a VM
+
+```ts
+const vm = orThrow(
+  await client.createVm({
+    image: "docker.io/library/node:22-slim",
+    name: "sdk-preview",
+    httpPort: 3000,
+    httpPublic: true,
+    env: {
+      NODE_ENV: "production",
+    },
+    idempotencyKey: "preview-123",
+  }),
+);
+
+console.log(vm.getInfo().hostname);
+```
+
+The SDK sends `idempotencyKey` as the `Idempotency-Key` header on the [create a VM endpoint](/api-reference/virtual-machines/vms/create).
+
+## Run commands
+
+For buffered output, call `commands.run` without streaming callbacks:
+
+```ts
+const result = orThrow(
+  await vm.commands.run("node --version", {
+    timeoutMs: 30_000,
+  }),
+);
+
+console.log(result.stdout);
+```
+
+For streamed output, pass `onStdout` or `onStderr`:
+
+```ts
+await vm.commands.run("npm test", {
+  onStdout: (chunk) => process.stdout.write(chunk),
+  onStderr: (chunk) => process.stderr.write(chunk),
+  timeoutMs: 120_000,
+});
+```
+
+Buffered execution uses [execute a command](/api-reference/virtual-machines/execution/execute). Streaming execution uses the [exec WebSocket](/api-reference/virtual-machines/execution/stream).
+
+## Read and write files
+
+```ts
+orThrow(await vm.files.write("/srv/app/config.json", JSON.stringify({ mode: "preview" })));
+
+const configText = orThrow(await vm.files.read("/srv/app/config.json"));
+console.log(configText);
+```
+
+See [read a file](/api-reference/virtual-machines/files/read) and [write a file](/api-reference/virtual-machines/files/write) for request details.
+
+## Use ephemeral VMs
+
+Use ephemeral VMs for jobs that should clean themselves up:
+
+```ts
+const output = await client.withEphemeralVm(
+  { image: "docker.io/library/ubuntu:24.04" },
+  async (sandbox) => {
+    return orThrow(await sandbox.commands.run("uname -a")).stdout;
+  },
+);
+
+console.log(output);
+```
+
+`withEphemeralVm` creates the VM with `ephemeral: true` and deletes it after your callback finishes.
+
+## Manage lifecycle
+
+```ts
+await vm.pause();
+await vm.resume();
+await vm.restart();
+
+await vm.settings({
+  vcpu: 4,
+  memoryMb: 8192,
+  diskGb: 40,
+});
+
+await vm.kill();
+```
+
+These helpers call the [perform a VM action](/api-reference/virtual-machines/vms/action) and [update a VM](/api-reference/virtual-machines/vms/update) endpoints.
