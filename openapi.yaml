@@ -1,0 +1,1356 @@
+openapi: 3.0.3
+info:
+  title: Final API
+  version: "1.0"
+  description: REST API for Final Git repositories, pull requests, merge queues, and CI checks.
+servers:
+  - url: https://api.primary.final.ai
+security:
+  - bearerAuth: []
+tags:
+  - name: Repositories
+  - name: Pull requests
+  - name: Merge queues
+  - name: Checks
+paths:
+  /api/file-systems:
+    get:
+      operationId: listFileSystems
+      tags: [Repositories]
+      summary: List repositories
+      description: List Git-backed file systems available to the authenticated user.
+      parameters:
+        - name: deviceId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Repositories were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fileSystems]
+                properties:
+                  fileSystems:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FileSystem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createFileSystem
+      tags: [Repositories]
+      summary: Create a repository
+      description: Create a Git-backed file system.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFileSystemRequest"
+      responses:
+        "201":
+          description: Repository was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fileSystem]
+                properties:
+                  fileSystem:
+                    $ref: "#/components/schemas/FileSystem"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/file-systems/{fileSystemId}:
+    get:
+      operationId: getFileSystem
+      tags: [Repositories]
+      summary: Get a repository
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      responses:
+        "200":
+          description: Repository was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [fileSystem]
+                properties:
+                  fileSystem:
+                    $ref: "#/components/schemas/FileSystem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteFileSystem
+      tags: [Repositories]
+      summary: Delete a repository
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      responses:
+        "200":
+          description: Repository was deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/archive:
+    post:
+      operationId: archiveFileSystem
+      tags: [Repositories]
+      summary: Archive a repository
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      responses:
+        "200":
+          description: Repository was archived.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [archived]
+                properties:
+                  archived:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/git-credentials:
+    post:
+      operationId: mintGitCredentials
+      tags: [Repositories]
+      summary: Mint Git credentials
+      description: Mint short-lived HTTPS Git credentials for clone, fetch, and push workflows.
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                access:
+                  type: string
+                  enum: [read, write]
+                  default: read
+      responses:
+        "200":
+          description: Git credentials were minted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitCredentials"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/pull-requests:
+    get:
+      operationId: listPullRequests
+      tags: [Pull requests]
+      summary: List pull requests
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      responses:
+        "200":
+          description: Pull requests were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pullRequests]
+                properties:
+                  pullRequests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PullRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createPullRequest
+      tags: [Pull requests]
+      summary: Create a pull request
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePullRequestRequest"
+      responses:
+        "201":
+          description: Pull request was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pullRequest]
+                properties:
+                  pullRequest:
+                    $ref: "#/components/schemas/PullRequest"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestNumber}:
+    get:
+      operationId: getPullRequest
+      tags: [Pull requests]
+      summary: Get a pull request
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestNumber"
+      responses:
+        "200":
+          description: Pull request details were returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestDetail"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestNumber}/diff:
+    get:
+      operationId: getPullRequestDiff
+      tags: [Pull requests]
+      summary: Get a pull request diff
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestNumber"
+        - name: maxBytes
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1048576
+      responses:
+        "200":
+          description: Pull request diff was returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestDiff"
+        "404":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}:
+    patch:
+      operationId: updatePullRequest
+      tags: [Pull requests]
+      summary: Update a pull request
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePullRequestRequest"
+      responses:
+        "200":
+          description: Pull request was updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pullRequest]
+                properties:
+                  pullRequest:
+                    $ref: "#/components/schemas/PullRequest"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/parent:
+    post:
+      operationId: setPullRequestParent
+      tags: [Pull requests]
+      summary: Set pull request parent
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parentPullRequestId]
+              properties:
+                parentPullRequestId:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Pull request parent was updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pullRequest]
+                properties:
+                  pullRequest:
+                    $ref: "#/components/schemas/PullRequest"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/detach:
+    post:
+      operationId: detachPullRequest
+      tags: [Pull requests]
+      summary: Detach a pull request
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestId"
+      responses:
+        "200":
+          description: Pull request was detached.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pullRequest]
+                properties:
+                  pullRequest:
+                    $ref: "#/components/schemas/PullRequest"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/reviews:
+    post:
+      operationId: createPullRequestReview
+      tags: [Pull requests]
+      summary: Create a pull request review
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  type: string
+                  enum: [approved, commented, changes_requested]
+                body:
+                  type: string
+                  maxLength: 10000
+                  default: ""
+      responses:
+        "201":
+          description: Review was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [review]
+                properties:
+                  review:
+                    $ref: "#/components/schemas/PullRequestReview"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/stack/repair:
+    post:
+      operationId: repairPullRequestStack
+      tags: [Pull requests]
+      summary: Repair a pull request stack
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestId"
+      responses:
+        "200":
+          $ref: "#/components/responses/PullRequestList"
+  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/stack/split:
+    post:
+      operationId: splitPullRequestStack
+      tags: [Pull requests]
+      summary: Split a pull request stack
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/PullRequestId"
+      responses:
+        "200":
+          $ref: "#/components/responses/PullRequestList"
+  /api/file-systems/{fileSystemId}/pull-requests/stack/reorder:
+    post:
+      operationId: reorderPullRequestStack
+      tags: [Pull requests]
+      summary: Reorder a pull request stack
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pullRequestIds]
+              properties:
+                pullRequestIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/PullRequestList"
+  /api/file-systems/{fileSystemId}/commit-statuses:
+    post:
+      operationId: createCommitStatus
+      tags: [Checks]
+      summary: Create a commit status
+      description: Report CI status for a commit SHA. Merge queues require statuses on the candidate SHA.
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommitStatusRequest"
+      responses:
+        "201":
+          description: Commit status was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [commitStatus]
+                properties:
+                  commitStatus:
+                    $ref: "#/components/schemas/CommitStatus"
+  /api/file-systems/{fileSystemId}/check-runs:
+    post:
+      operationId: createCheckRun
+      tags: [Checks]
+      summary: Create a check run
+      description: Report a CI check run for a commit SHA. Merge queues require checks on the candidate SHA.
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCheckRunRequest"
+      responses:
+        "201":
+          description: Check run was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkRun]
+                properties:
+                  checkRun:
+                    $ref: "#/components/schemas/CheckRun"
+  /api/file-systems/{fileSystemId}/merge-queues:
+    get:
+      operationId: listMergeQueues
+      tags: [Merge queues]
+      summary: List merge queues
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      responses:
+        "200":
+          description: Merge queues were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mergeQueues]
+                properties:
+                  mergeQueues:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MergeQueue"
+    put:
+      operationId: configureMergeQueue
+      tags: [Merge queues]
+      summary: Create or update a merge queue
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigureMergeQueueRequest"
+      responses:
+        "200":
+          description: Merge queue was created or updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mergeQueue]
+                properties:
+                  mergeQueue:
+                    $ref: "#/components/schemas/MergeQueue"
+  /api/file-systems/{fileSystemId}/merge-queues/{queueId}/entries:
+    get:
+      operationId: listMergeQueueEntries
+      tags: [Merge queues]
+      summary: List merge queue entries
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/QueueId"
+      responses:
+        "200":
+          description: Merge queue entries were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MergeQueueEntry"
+  /api/file-systems/{fileSystemId}/merge-queues/{queueId}/attempts:
+    get:
+      operationId: listMergeQueueAttempts
+      tags: [Merge queues]
+      summary: List merge queue attempts
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/QueueId"
+        - name: entryId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Merge queue attempts were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [attempts]
+                properties:
+                  attempts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MergeQueueAttempt"
+  /api/file-systems/{fileSystemId}/merge-queues/{queueId}/activity:
+    get:
+      operationId: listMergeQueueActivity
+      tags: [Merge queues]
+      summary: List merge queue activity
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/QueueId"
+      responses:
+        "200":
+          description: Merge queue activity was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MergeQueueEvent"
+  /api/file-systems/{fileSystemId}/merge-queues/enqueue:
+    post:
+      operationId: enqueuePullRequest
+      tags: [Merge queues]
+      summary: Enqueue a pull request
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnqueuePullRequestRequest"
+      responses:
+        "201":
+          description: Pull request was enqueued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entry]
+                properties:
+                  entry:
+                    $ref: "#/components/schemas/MergeQueueEntry"
+        "409":
+          $ref: "#/components/responses/Error"
+  /api/file-systems/{fileSystemId}/merge-queues/entries/{entryId}/dequeue:
+    post:
+      operationId: dequeueMergeQueueEntry
+      tags: [Merge queues]
+      summary: Dequeue a merge queue entry
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/EntryId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 500
+      responses:
+        "200":
+          description: Queue entry was dequeued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entry]
+                properties:
+                  entry:
+                    $ref: "#/components/schemas/MergeQueueEntry"
+  /api/file-systems/{fileSystemId}/merge-queues/entries/{entryId}:
+    patch:
+      operationId: updateMergeQueueEntry
+      tags: [Merge queues]
+      summary: Update a merge queue entry
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/EntryId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                priority:
+                  type: integer
+                fastTrack:
+                  type: boolean
+      responses:
+        "200":
+          description: Queue entry was updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entry]
+                properties:
+                  entry:
+                    $ref: "#/components/schemas/MergeQueueEntry"
+  /api/file-systems/{fileSystemId}/merge-queues/entries/reorder:
+    post:
+      operationId: reorderMergeQueueEntries
+      tags: [Merge queues]
+      summary: Reorder merge queue entries
+      parameters:
+        - $ref: "#/components/parameters/FileSystemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [queueId, entryIds]
+              properties:
+                queueId:
+                  type: string
+                entryIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Queue entries were reordered.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MergeQueueEntry"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+      description: Production access token.
+  parameters:
+    FileSystemId:
+      name: fileSystemId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Encoded file system ID.
+    PullRequestId:
+      name: pullRequestId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Pull request ID.
+    PullRequestNumber:
+      name: pullRequestNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: Pull request number.
+    QueueId:
+      name: queueId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Merge queue ID.
+    EntryId:
+      name: entryId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Merge queue entry ID.
+  responses:
+    Error:
+      description: Request failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/InvalidRequest"
+    Unauthorized:
+      description: Access token is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PullRequestList:
+      description: Pull requests were returned.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [pullRequests]
+            properties:
+              pullRequests:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PullRequest"
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    InvalidRequest:
+      type: object
+      required: [error, issues]
+      properties:
+        error:
+          type: string
+        issues:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    FileSystem:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        registrySlug:
+          type: string
+        defaultBranch:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+        capabilities:
+          type: object
+          additionalProperties: true
+    CreateFileSystemRequest:
+      type: object
+      required: [displayName]
+      properties:
+        registrySlug:
+          type: string
+          maxLength: 120
+        displayName:
+          type: string
+          maxLength: 120
+        family:
+          type: string
+          enum: [versioned_fs]
+        defaultBranch:
+          type: string
+        grants:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    GitCredentials:
+      type: object
+      required: [repoId, repoPath, remoteUrl, defaultBranch, username, password, expiresAt]
+      properties:
+        repoId:
+          type: string
+        repoPath:
+          type: string
+        remoteUrl:
+          type: string
+          format: uri
+        defaultBranch:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    PullRequest:
+      type: object
+      required:
+        - pullRequestId
+        - number
+        - sourceBranch
+        - targetBranch
+        - headSha
+        - baseSha
+        - title
+        - body
+        - draft
+        - state
+        - parentPullRequestId
+        - stackRootPullRequestId
+        - stackPosition
+        - restackState
+        - mergeWhenReady
+      properties:
+        pullRequestId:
+          type: string
+        number:
+          type: integer
+        sourceBranch:
+          type: string
+        targetBranch:
+          type: string
+        headSha:
+          type: string
+        baseSha:
+          type: string
+        title:
+          type: string
+        body:
+          type: string
+        draft:
+          type: boolean
+        state:
+          type: string
+        parentPullRequestId:
+          type: string
+          nullable: true
+        stackRootPullRequestId:
+          type: string
+        stackPosition:
+          type: integer
+        restackState:
+          type: string
+        mergeWhenReady:
+          type: boolean
+    CreatePullRequestRequest:
+      type: object
+      required: [sourceBranch, targetBranch, title]
+      properties:
+        sourceBranch:
+          type: string
+          maxLength: 255
+        targetBranch:
+          type: string
+          maxLength: 255
+        title:
+          type: string
+          maxLength: 500
+        body:
+          type: string
+          maxLength: 50000
+          default: ""
+        draft:
+          type: boolean
+          default: false
+        parentPullRequestId:
+          type: string
+          nullable: true
+    UpdatePullRequestRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 500
+        body:
+          type: string
+        draft:
+          type: boolean
+        state:
+          type: string
+          enum: [open, closed, merged]
+        mergeWhenReady:
+          type: boolean
+    PullRequestReview:
+      type: object
+      additionalProperties: true
+      properties:
+        reviewId:
+          type: string
+        pullRequestId:
+          type: string
+        actor:
+          type: string
+        state:
+          type: string
+        body:
+          type: string
+        commitSha:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CommitStatus:
+      type: object
+      required: [statusId, sha, context, state]
+      properties:
+        statusId:
+          type: string
+        sha:
+          type: string
+        context:
+          type: string
+        state:
+          type: string
+        description:
+          type: string
+          nullable: true
+        targetUrl:
+          type: string
+          nullable: true
+        externalId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CheckRun:
+      type: object
+      required: [checkRunId, sha, name, status]
+      properties:
+        checkRunId:
+          type: string
+        sha:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        conclusion:
+          type: string
+          nullable: true
+        detailsUrl:
+          type: string
+          nullable: true
+        externalId:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          nullable: true
+        completedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateCommitStatusRequest:
+      type: object
+      required: [sha, context, state]
+      properties:
+        sha:
+          type: string
+          pattern: "^[0-9a-f]{40}$"
+        context:
+          type: string
+          maxLength: 200
+        state:
+          type: string
+          enum: [pending, success, failure, error]
+        description:
+          type: string
+          nullable: true
+        targetUrl:
+          type: string
+          format: uri
+          nullable: true
+        externalId:
+          type: string
+          nullable: true
+    CreateCheckRunRequest:
+      type: object
+      required: [sha, name, status]
+      properties:
+        sha:
+          type: string
+          pattern: "^[0-9a-f]{40}$"
+        name:
+          type: string
+          maxLength: 200
+        status:
+          type: string
+          enum: [queued, in_progress, completed]
+        conclusion:
+          type: string
+          enum: [success, failure, neutral, cancelled, timed_out, action_required]
+          nullable: true
+        detailsUrl:
+          type: string
+          format: uri
+          nullable: true
+        externalId:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    PullRequestDetail:
+      type: object
+      required: [pullRequest, reviews, events, statuses, checkRuns, commits, files]
+      properties:
+        pullRequest:
+          $ref: "#/components/schemas/PullRequest"
+        reviews:
+          type: array
+          items:
+            $ref: "#/components/schemas/PullRequestReview"
+        events:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        statuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommitStatus"
+        checkRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckRun"
+        commits:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        files:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        filteredFiles:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        diffStats:
+          type: object
+          additionalProperties: true
+        diffTruncated:
+          type: boolean
+    PullRequestDiff:
+      type: object
+      additionalProperties: true
+      properties:
+        pullRequest:
+          $ref: "#/components/schemas/PullRequest"
+        sha:
+          type: string
+        base:
+          type: string
+        files:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        filteredFiles:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        diffStats:
+          type: object
+          additionalProperties: true
+        diffTruncated:
+          type: boolean
+    MergeQueue:
+      type: object
+      required:
+        - queueId
+        - targetBranch
+        - requiredContexts
+        - requiredApprovalCount
+        - timeoutSeconds
+        - strategy
+        - speculativeConcurrency
+        - speculativeEnabled
+        - batchingEnabled
+        - batchMaxSize
+        - batchIsolationStrategy
+        - paused
+        - enforced
+        - webhookSecretConfigured
+      properties:
+        queueId:
+          type: string
+        targetBranch:
+          type: string
+        requiredContexts:
+          type: array
+          items:
+            type: string
+        requiredApprovalCount:
+          type: integer
+        timeoutSeconds:
+          type: integer
+        strategy:
+          type: string
+          enum: [rebase, squash]
+        speculativeConcurrency:
+          type: integer
+        speculativeEnabled:
+          type: boolean
+        batchingEnabled:
+          type: boolean
+        batchMaxSize:
+          type: integer
+        batchIsolationStrategy:
+          type: string
+          enum: [full_parallel, bisection]
+        paused:
+          type: boolean
+        enforced:
+          type: boolean
+        webhookUrl:
+          type: string
+          nullable: true
+        webhookSecretConfigured:
+          type: boolean
+    ConfigureMergeQueueRequest:
+      type: object
+      required: [targetBranch]
+      properties:
+        targetBranch:
+          type: string
+        requiredContexts:
+          type: array
+          maxItems: 100
+          default: []
+          items:
+            type: string
+        requiredApprovalCount:
+          type: integer
+          minimum: 0
+          maximum: 20
+          default: 1
+        timeoutSeconds:
+          type: integer
+          minimum: 60
+          maximum: 86400
+          default: 1800
+        strategy:
+          type: string
+          enum: [rebase, squash]
+          default: rebase
+        speculativeConcurrency:
+          type: integer
+          minimum: 1
+          maximum: 32
+          default: 4
+        speculativeEnabled:
+          type: boolean
+          default: false
+        batchingEnabled:
+          type: boolean
+          default: false
+        batchMaxSize:
+          type: integer
+          minimum: 1
+          maximum: 32
+          default: 4
+        batchIsolationStrategy:
+          type: string
+          enum: [full_parallel, bisection]
+          default: full_parallel
+        paused:
+          type: boolean
+          default: false
+        enforced:
+          type: boolean
+          default: true
+        webhookUrl:
+          type: string
+          format: uri
+          nullable: true
+        webhookSecret:
+          type: string
+          nullable: true
+    MergeQueueEntry:
+      type: object
+      required: [entryId, queueId, pullRequestId, selectedPullRequestIds, priority, fastTrack, status]
+      properties:
+        entryId:
+          type: string
+        queueId:
+          type: string
+        pullRequestId:
+          type: string
+        selectedPullRequestIds:
+          type: array
+          items:
+            type: string
+        priority:
+          type: integer
+        fastTrack:
+          type: boolean
+        status:
+          type: string
+        removalReason:
+          type: string
+          nullable: true
+    EnqueuePullRequestRequest:
+      type: object
+      required: [pullRequestId]
+      properties:
+        pullRequestId:
+          type: string
+        throughPullRequestId:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+        fastTrack:
+          type: boolean
+          default: false
+        stackMergeabilityBypass:
+          type: boolean
+          default: false
+    MergeQueueAttempt:
+      type: object
+      required: [attemptId, queueId, entryId, candidateRef, candidateSha, baseSha, stackSnapshot, requiredContextsSnapshot, status]
+      properties:
+        attemptId:
+          type: string
+        queueId:
+          type: string
+        entryId:
+          type: string
+        candidateRef:
+          type: string
+        candidateSha:
+          type: string
+        baseSha:
+          type: string
+        stackSnapshot:
+          type: array
+          items:
+            type: string
+        requiredContextsSnapshot:
+          type: array
+          items:
+            type: string
+        leaseOwner:
+          type: string
+          nullable: true
+        leaseUntil:
+          type: string
+          nullable: true
+        status:
+          type: string
+        invalidationReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    MergeQueueEvent:
+      type: object
+      additionalProperties: true
+      properties:
+        eventId:
+          type: string
+        queueId:
+          type: string
+        entryId:
+          type: string
+          nullable: true
+        attemptId:
+          type: string
+          nullable: true
+        actor:
+          type: string
+        kind:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time

@@ -1,0 +1,112 @@
+---
+title: "Pull requests"
+description: "Create, review, and stack Final Git pull requests."
+---
+
+Use Final Git pull requests to review changes before they land on a target branch. A pull request tracks the source branch, target branch, head commit, review state, checks, and stack position.
+
+Open the repository in Final and select the **Git** tab to see pull requests and merge queues.
+
+For endpoint details, see the [pull requests API reference](/api-reference/pull-requests/list).
+
+## Create a pull request
+
+Before you create a pull request, push your source branch to the repository.
+
+<Steps>
+  <Step title="Open the Git tab">
+    Open the repository in Final and select **Git**.
+  </Step>
+  <Step title="Enter the pull request details">
+    Enter a title, source branch, and target branch.
+  </Step>
+  <Step title="Choose draft or ready">
+    Use **Draft** while the branch is still changing. Use **Ready** when the pull request is ready for review.
+  </Step>
+  <Step title="Create the pull request">
+    Click **Create PR**.
+  </Step>
+</Steps>
+
+Use the [create a pull request endpoint](/api-reference/pull-requests/create) to create pull requests from automation.
+
+## Review changes
+
+Each pull request shows commits, changed files, review state, checks, and recent activity. Click **Show diff** to inspect the patch.
+
+You can leave one of three review states:
+
+| Action | Use it when |
+| --- | --- |
+| **Approve** | The pull request is ready to merge. |
+| **Comment** | You want to leave feedback without blocking the pull request. |
+| **Request changes** | The author needs to update the pull request before it merges. |
+
+Use the API to [list pull requests](/api-reference/pull-requests/list), [read pull request details](/api-reference/pull-requests/get), [fetch a diff](/api-reference/pull-requests/get-diff), or [create a review](/api-reference/pull-requests/create-review).
+
+## Use merge when ready
+
+Click **Merge when ready** when a pull request should enter the merge queue after it satisfies the queue requirements.
+
+If the target branch has an enforced merge queue, Final Git lands the pull request through the queue. It does not merge directly into the protected branch.
+
+Use the [update a pull request endpoint](/api-reference/pull-requests/update) to set `mergeWhenReady` from automation.
+
+## Work with stacked PRs
+
+A stacked PR is a pull request that depends on another pull request in the same repository and target branch. Use stacks when a large change is easier to review as smaller pull requests.
+
+Final Git validates the stack before it saves it. The parent pull request must be an ancestor of the child pull request.
+
+<Steps>
+  <Step title="Create the base pull request">
+    Create the first pull request against the target branch.
+  </Step>
+  <Step title="Create a child branch">
+    Branch from the base pull request branch, make your next change, and push the child branch.
+  </Step>
+  <Step title="Create the child pull request">
+    Create another pull request against the same target branch.
+  </Step>
+  <Step title="Set the parent">
+    Use the **Parent** menu to select the pull request that the child depends on.
+  </Step>
+</Steps>
+
+To create a stacked pull request with the API, pass `parentPullRequestId` to the [create a pull request endpoint](/api-reference/pull-requests/create).
+
+## Update a stack
+
+Use stack controls when the dependency chain changes:
+
+| Control | What it does |
+| --- | --- |
+| **Parent** | Sets or clears the pull request that this pull request depends on. |
+| **Repair stack** | Refreshes stack metadata after branch heads change. |
+| **Split** | Detaches this pull request and the pull requests above it from the lower stack. |
+| **Move earlier** | Moves a pull request closer to the stack root. |
+| **Move later** | Moves a pull request farther from the stack root. |
+
+If a stack change affects queued work, Final Git removes the affected queue entries. Enqueue the updated stack again after the stack is valid.
+
+Use these API endpoints to update stacks:
+
+| Endpoint | Description |
+| --- | --- |
+| [Set pull request parent](/api-reference/pull-requests/set-parent) | Sets or clears a parent pull request. |
+| [Detach a pull request](/api-reference/pull-requests/detach) | Detaches a pull request from its stack. |
+| [Repair a pull request stack](/api-reference/pull-requests/repair-stack) | Refreshes stack metadata. |
+| [Split a pull request stack](/api-reference/pull-requests/split-stack) | Splits a stack at a pull request. |
+| [Reorder a pull request stack](/api-reference/pull-requests/reorder-stack) | Reorders every pull request in a stack. |
+
+## Queue a stack
+
+Click **Enqueue** on the top pull request to queue the full stack. Final Git includes the open pull requests from the stack root through the selected pull request.
+
+For a partial landing, click a **Through #** button to queue only the lower part of the stack through that pull request.
+
+<Warning>
+  Final Git blocks queue entries that omit open pull requests above the selected range. This prevents landing a middle pull request while its dependent pull requests remain open.
+</Warning>
+
+Use the [enqueue a pull request endpoint](/api-reference/merge-queues/enqueue) to add a pull request or stack range to a merge queue.

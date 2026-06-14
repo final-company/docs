@@ -1,0 +1,28 @@
+---
+title: "API reference"
+description: "Reference for the Final REST API."
+---
+
+Use the API reference for endpoint details, request schemas, response schemas, and interactive examples.
+
+Every request requires a production access token:
+
+```bash
+Authorization: Bearer <access-token>
+```
+
+<Card title="Repositories" icon="folder-git-2" href="/api-reference/repositories/list">
+  Create repositories, manage repository lifecycle, and mint Git credentials.
+</Card>
+
+<Card title="Pull requests" icon="git-pull-request" href="/api-reference/pull-requests/list">
+  Create, review, update, and stack pull requests.
+</Card>
+
+<Card title="Merge queues" icon="list-checks" href="/api-reference/merge-queues/list">
+  Configure queues, enqueue pull requests, and inspect queue activity.
+</Card>
+
+<Card title="Checks" icon="badge-check" href="/api-reference/checks/create-commit-status">
+  Report commit statuses and check runs for pull request and merge queue CI.
+</Card>

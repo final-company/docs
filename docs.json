@@ -9,13 +9,79 @@
   },
   "favicon": "/favicon.png",
   "navigation": {
-    "pages": [
+    "tabs": [
       {
-        "group": "Git",
+        "tab": "Guides",
         "pages": [
-          "git/index",
-          "git/clone",
-          "git/manage"
+          {
+            "group": "Git",
+            "pages": [
+              "git/index",
+              "git/clone",
+              "git/pull-requests",
+              "git/merge-queues",
+              "git/manage"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "pages": [
+          {
+            "group": "Git",
+            "pages": [
+              "api-reference/index",
+              {
+                "group": "Repositories",
+                "pages": [
+                  "api-reference/repositories/list",
+                  "api-reference/repositories/create",
+                  "api-reference/repositories/get",
+                  "api-reference/repositories/archive",
+                  "api-reference/repositories/delete",
+                  "api-reference/repositories/mint-git-credentials"
+                ]
+              },
+              {
+                "group": "Pull requests",
+                "pages": [
+                  "api-reference/pull-requests/list",
+                  "api-reference/pull-requests/create",
+                  "api-reference/pull-requests/get",
+                  "api-reference/pull-requests/get-diff",
+                  "api-reference/pull-requests/update",
+                  "api-reference/pull-requests/create-review",
+                  "api-reference/pull-requests/set-parent",
+                  "api-reference/pull-requests/detach",
+                  "api-reference/pull-requests/repair-stack",
+                  "api-reference/pull-requests/split-stack",
+                  "api-reference/pull-requests/reorder-stack"
+                ]
+              },
+              {
+                "group": "Merge queues",
+                "pages": [
+                  "api-reference/merge-queues/list",
+                  "api-reference/merge-queues/create-or-update",
+                  "api-reference/merge-queues/enqueue",
+                  "api-reference/merge-queues/list-entries",
+                  "api-reference/merge-queues/list-attempts",
+                  "api-reference/merge-queues/list-activity",
+                  "api-reference/merge-queues/update-entry",
+                  "api-reference/merge-queues/dequeue-entry",
+                  "api-reference/merge-queues/reorder-entries"
+                ]
+              },
+              {
+                "group": "Checks",
+                "pages": [
+                  "api-reference/checks/create-commit-status",
+                  "api-reference/checks/create-check-run"
+                ]
+              }
+            ]
+          }
         ]
       }
     ]

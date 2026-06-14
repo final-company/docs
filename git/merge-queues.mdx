@@ -1,0 +1,136 @@
+---
+title: "Merge queues"
+description: "Configure Final Git merge queues and connect CI to merge candidates."
+---
+
+Use merge queues to protect target branches and land reviewed pull requests in the order Final Git has validated them. A queue creates a candidate commit for the exact pull request set that would land on the branch.
+
+<Warning>
+  CI must report checks against the merge queue candidate SHA. Do not report required queue checks only on the pull request branch SHA.
+</Warning>
+
+For endpoint details, see the [merge queues API reference](/api-reference/merge-queues/list).
+
+## Create or update a queue
+
+Open the repository in Final and select **Git**. Configured queues appear under **Merge queues**.
+
+A queue must exist for the target branch before users can enqueue pull requests. You can create or update the queue with the [create or update a merge queue endpoint](/api-reference/merge-queues/create-or-update).
+
+| Setting | Description |
+| --- | --- |
+| Target branch | The branch protected by the queue, such as `main`. |
+| Required contexts | Commit status or check run names that must pass on the candidate SHA. |
+| Required approvals | The number of approvals each pull request needs before it can land. |
+| Strategy | How Final Git lands the candidate, such as `rebase` or `squash`. |
+| Timeout | How long an attempt can wait for checks before it fails. |
+| Enforced | Requires pull requests to land through the queue. |
+| Paused | Stops the queue from starting new attempts. |
+
+You can also enable speculative processing and batching:
+
+| Setting | Description |
+| --- | --- |
+| Speculative processing | Lets Final Git prepare more than one candidate at a time. |
+| Speculative concurrency | Limits how many speculative candidates can run. |
+| Batching | Lets Final Git test multiple queue entries together. |
+| Batch max size | Limits how many entries can be tested in one batch. |
+| Batch isolation strategy | Controls how Final Git isolates a failing batch. |
+
+See [create or update a merge queue](/api-reference/merge-queues/create-or-update) for request and response fields.
+
+## Enqueue pull requests
+
+Click **Enqueue** on a pull request after it is ready for the target branch queue.
+
+For stacked PRs, Final Git queues the selected range of the stack. The queue entry records every pull request included in that range, then creates one candidate commit for that set.
+
+Queue entries can be reordered, fast-tracked, or removed before they land.
+
+Use the [enqueue a pull request endpoint](/api-reference/merge-queues/enqueue) to queue pull requests from automation.
+
+Use `stackMergeabilityBypass: true` only for emergency partial-stack landings. It requires admin access.
+
+## Inspect queues
+
+Use the API to [list queues](/api-reference/merge-queues/list), [list entries](/api-reference/merge-queues/list-entries), [list attempts](/api-reference/merge-queues/list-attempts), and [list activity](/api-reference/merge-queues/list-activity).
+
+Use the API to [update an entry](/api-reference/merge-queues/update-entry), [dequeue an entry](/api-reference/merge-queues/dequeue-entry), or [reorder entries](/api-reference/merge-queues/reorder-entries).
+
+## Run CI on a merge group
+
+When a queue starts an attempt, Final Git creates a candidate ref with this format:
+
+```text
+refs/final/mq/{queueId}/attempts/{attemptId}/candidate
+```
+
+The attempt stores the candidate ref, candidate SHA, base SHA, selected pull requests, and required contexts. Treat the attempt as the source of truth for CI.
+
+If you configure a webhook URL, Final Git sends a `merge_group` webhook when a candidate is ready:
+
+```json
+{
+  "event": "merge_group",
+  "queue_id": "mq_123",
+  "entry_id": "mqe_123",
+  "attempt_id": "mqa_123",
+  "repo_id": "repo_123",
+  "target_branch": "main",
+  "candidate_ref": "refs/final/mq/mq_123/attempts/mqa_123/candidate",
+  "candidate_sha": "abc123",
+  "base_sha": "def456",
+  "selected_pull_request_ids": ["pr_123"],
+  "batch_entry_ids": ["mqe_123"],
+  "required_contexts": ["ci/test"],
+  "strategy": "rebase",
+  "actor": "merge-queue-worker"
+}
+```
+
+Webhook requests include these headers:
+
+| Header | Description |
+| --- | --- |
+| `x-final-event` | The event name. For merge queues, this is `merge_group`. |
+| `x-final-delivery` | The attempt ID for the delivery. |
+| `x-final-signature-sha256` | An HMAC-SHA256 signature when a webhook secret is configured. |
+
+The signature is computed from the raw request body and the queue webhook secret.
+
+## Report required checks
+
+Your CI job should fetch the candidate ref, test the candidate SHA, and report every required context for that SHA.
+
+<Steps>
+  <Step title="Receive the merge group webhook">
+    Read `candidate_ref`, `candidate_sha`, `attempt_id`, and `required_contexts`.
+  </Step>
+  <Step title="Fetch the candidate">
+    Fetch `candidate_ref` from the repository and check out `candidate_sha`.
+  </Step>
+  <Step title="Run the required jobs">
+    Run the jobs named in `required_contexts`.
+  </Step>
+  <Step title="Report the result">
+    Report each required context as `success`, `failure`, or `error` for `candidate_sha`.
+  </Step>
+</Steps>
+
+Final Git lands the queue entry only after every required context passes on the candidate SHA. If a required context fails, the attempt fails and the queue entry does not land.
+
+Report results with the [create a commit status endpoint](/api-reference/checks/create-commit-status) or the [create a check run endpoint](/api-reference/checks/create-check-run).
+
+## Candidate lifecycle
+
+Queue attempts move through these states:
+
+| State | Meaning |
+| --- | --- |
+| Created | Final Git has reserved the attempt. |
+| Waiting for checks | The candidate ref exists and Final Git is waiting for CI. |
+| Merged | The candidate landed on the target branch. |
+| Failed | A required check failed or the attempt timed out. |
+| Invalidated | The candidate no longer matches the pull request, stack, or queue state. |
+
+Final Git may remove candidate refs after attempts finish. If a candidate ref disappears before an active attempt reaches a terminal state, Final Git restores it from the stored attempt record.
