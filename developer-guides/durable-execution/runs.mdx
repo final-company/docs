@@ -36,13 +36,13 @@ curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}
   }'
 ```
 
-See [trigger a workflow run](/api-reference/durable-execution/runs/trigger).
+See [trigger a workflow run](/api-references/durable-execution/runs/trigger).
 
 ## Inspect a run
 
-Use [get a run](/api-reference/durable-execution/runs/get) to read the current status, result, error, attempt count, trigger event, and timestamps.
+Use [get a run](/api-references/durable-execution/runs/get) to read the current status, result, error, attempt count, trigger event, and timestamps.
 
-Use [list run history](/api-reference/durable-execution/runs/history) to read ordered history events such as `queued`, `leased`, `step_completed`, `waiting`, `resumed`, `retry_scheduled`, `completed`, `failed`, and `cancelled`.
+Use [list run history](/api-references/durable-execution/runs/history) to read ordered history events such as `queued`, `leased`, `step_completed`, `waiting`, `resumed`, `retry_scheduled`, `completed`, `failed`, and `cancelled`.
 
 ## Signal a waiting run
 
@@ -63,7 +63,7 @@ curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}
 
 `stepId` is optional. Include it when the run has more than one waiting step.
 
-See [signal a run](/api-reference/durable-execution/runs/signal).
+See [signal a run](/api-references/durable-execution/runs/signal).
 
 ## Cancel or retry
 
@@ -81,4 +81,4 @@ curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
-See [cancel a run](/api-reference/durable-execution/runs/cancel) and [retry a run](/api-reference/durable-execution/runs/retry).
+See [cancel a run](/api-references/durable-execution/runs/cancel) and [retry a run](/api-references/durable-execution/runs/retry).

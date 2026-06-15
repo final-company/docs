@@ -27,44 +27,44 @@
           {
             "group": "Platform",
             "pages": [
-              "authentication"
+              "developer-guides/authentication"
             ]
           },
           {
             "group": "Git",
             "pages": [
-              "git/index",
-              "git/clone",
-              "git/pull-requests",
-              "git/merge-queues",
-              "git/manage"
+              "developer-guides/git/index",
+              "developer-guides/git/clone",
+              "developer-guides/git/pull-requests",
+              "developer-guides/git/merge-queues",
+              "developer-guides/git/manage"
             ]
           },
           {
             "group": "Virtual Machines",
             "pages": [
-              "virtual-machines/index",
-              "virtual-machines/rest-api",
-              "virtual-machines/quickstart",
-              "virtual-machines/sdk",
-              "virtual-machines/lifecycle",
-              "virtual-machines/networking",
-              "virtual-machines/access"
+              "developer-guides/virtual-machines/index",
+              "developer-guides/virtual-machines/rest-api",
+              "developer-guides/virtual-machines/quickstart",
+              "developer-guides/virtual-machines/sdk",
+              "developer-guides/virtual-machines/lifecycle",
+              "developer-guides/virtual-machines/networking",
+              "developer-guides/virtual-machines/access"
             ]
           },
           {
             "group": "Agent Workspaces",
             "pages": [
-              "agent-workspaces/index"
+              "developer-guides/agent-workspaces/index"
             ]
           },
           {
             "group": "Durable Execution",
             "pages": [
-              "durable-execution/index",
-              "durable-execution/quickstart",
-              "durable-execution/workflows-and-events",
-              "durable-execution/runs"
+              "developer-guides/durable-execution/index",
+              "developer-guides/durable-execution/quickstart",
+              "developer-guides/durable-execution/workflows-and-events",
+              "developer-guides/durable-execution/runs"
             ]
           }
         ]
@@ -75,53 +75,53 @@
           {
             "group": "Git",
             "pages": [
-              "api-reference/index",
+              "api-references/index",
               {
                 "group": "Repositories",
                 "pages": [
-                  "api-reference/repositories/list",
-                  "api-reference/repositories/create",
-                  "api-reference/repositories/get",
-                  "api-reference/repositories/archive",
-                  "api-reference/repositories/delete",
-                  "api-reference/repositories/mint-git-credentials"
+                  "api-references/repositories/list",
+                  "api-references/repositories/create",
+                  "api-references/repositories/get",
+                  "api-references/repositories/archive",
+                  "api-references/repositories/delete",
+                  "api-references/repositories/mint-git-credentials"
                 ]
               },
               {
                 "group": "Pull requests",
                 "pages": [
-                  "api-reference/pull-requests/list",
-                  "api-reference/pull-requests/create",
-                  "api-reference/pull-requests/get",
-                  "api-reference/pull-requests/get-diff",
-                  "api-reference/pull-requests/update",
-                  "api-reference/pull-requests/create-review",
-                  "api-reference/pull-requests/set-parent",
-                  "api-reference/pull-requests/detach",
-                  "api-reference/pull-requests/repair-stack",
-                  "api-reference/pull-requests/split-stack",
-                  "api-reference/pull-requests/reorder-stack"
+                  "api-references/pull-requests/list",
+                  "api-references/pull-requests/create",
+                  "api-references/pull-requests/get",
+                  "api-references/pull-requests/get-diff",
+                  "api-references/pull-requests/update",
+                  "api-references/pull-requests/create-review",
+                  "api-references/pull-requests/set-parent",
+                  "api-references/pull-requests/detach",
+                  "api-references/pull-requests/repair-stack",
+                  "api-references/pull-requests/split-stack",
+                  "api-references/pull-requests/reorder-stack"
                 ]
               },
               {
                 "group": "Merge queues",
                 "pages": [
-                  "api-reference/merge-queues/list",
-                  "api-reference/merge-queues/create-or-update",
-                  "api-reference/merge-queues/enqueue",
-                  "api-reference/merge-queues/list-entries",
-                  "api-reference/merge-queues/list-attempts",
-                  "api-reference/merge-queues/list-activity",
-                  "api-reference/merge-queues/update-entry",
-                  "api-reference/merge-queues/dequeue-entry",
-                  "api-reference/merge-queues/reorder-entries"
+                  "api-references/merge-queues/list",
+                  "api-references/merge-queues/create-or-update",
+                  "api-references/merge-queues/enqueue",
+                  "api-references/merge-queues/list-entries",
+                  "api-references/merge-queues/list-attempts",
+                  "api-references/merge-queues/list-activity",
+                  "api-references/merge-queues/update-entry",
+                  "api-references/merge-queues/dequeue-entry",
+                  "api-references/merge-queues/reorder-entries"
                 ]
               },
               {
                 "group": "Checks",
                 "pages": [
-                  "api-reference/checks/create-commit-status",
-                  "api-reference/checks/create-check-run"
+                  "api-references/checks/create-commit-status",
+                  "api-references/checks/create-check-run"
                 ]
               }
             ]
@@ -132,7 +132,7 @@
               {
                 "group": "API keys",
                 "pages": [
-                  "api-reference/api-keys/create"
+                  "api-references/api-keys/create"
                 ]
               }
             ]
@@ -140,34 +140,34 @@
           {
             "group": "Agent Workspaces",
             "pages": [
-              "api-reference/agent-workspaces/index",
+              "api-references/agent-workspaces/index",
               {
                 "group": "Workspaces",
                 "pages": [
-                  "api-reference/agent-workspaces/workspaces/list",
-                  "api-reference/agent-workspaces/workspaces/create",
-                  "api-reference/agent-workspaces/workspaces/get",
-                  "api-reference/agent-workspaces/workspaces/update",
-                  "api-reference/agent-workspaces/workspaces/archive"
+                  "api-references/agent-workspaces/workspaces/list",
+                  "api-references/agent-workspaces/workspaces/create",
+                  "api-references/agent-workspaces/workspaces/get",
+                  "api-references/agent-workspaces/workspaces/update",
+                  "api-references/agent-workspaces/workspaces/archive"
                 ]
               },
               {
                 "group": "Sessions",
                 "pages": [
-                  "api-reference/agent-workspaces/sessions/list",
-                  "api-reference/agent-workspaces/sessions/create",
-                  "api-reference/agent-workspaces/sessions/get",
-                  "api-reference/agent-workspaces/sessions/update",
-                  "api-reference/agent-workspaces/sessions/state",
-                  "api-reference/agent-workspaces/sessions/stop",
-                  "api-reference/agent-workspaces/sessions/archive"
+                  "api-references/agent-workspaces/sessions/list",
+                  "api-references/agent-workspaces/sessions/create",
+                  "api-references/agent-workspaces/sessions/get",
+                  "api-references/agent-workspaces/sessions/update",
+                  "api-references/agent-workspaces/sessions/state",
+                  "api-references/agent-workspaces/sessions/stop",
+                  "api-references/agent-workspaces/sessions/archive"
                 ]
               },
               {
                 "group": "Messages",
                 "pages": [
-                  "api-reference/agent-workspaces/messages/list",
-                  "api-reference/agent-workspaces/messages/send"
+                  "api-references/agent-workspaces/messages/list",
+                  "api-references/agent-workspaces/messages/send"
                 ]
               }
             ]
@@ -175,72 +175,72 @@
           {
             "group": "Virtual Machines",
             "pages": [
-              "api-reference/virtual-machines/index",
+              "api-references/virtual-machines/index",
               {
                 "group": "VMs",
                 "pages": [
-                  "api-reference/virtual-machines/vms/list",
-                  "api-reference/virtual-machines/vms/create",
-                  "api-reference/virtual-machines/vms/get",
-                  "api-reference/virtual-machines/vms/update",
-                  "api-reference/virtual-machines/vms/update-visibility",
-                  "api-reference/virtual-machines/vms/action",
-                  "api-reference/virtual-machines/vms/list-events",
-                  "api-reference/virtual-machines/vms/delete"
+                  "api-references/virtual-machines/vms/list",
+                  "api-references/virtual-machines/vms/create",
+                  "api-references/virtual-machines/vms/get",
+                  "api-references/virtual-machines/vms/update",
+                  "api-references/virtual-machines/vms/update-visibility",
+                  "api-references/virtual-machines/vms/action",
+                  "api-references/virtual-machines/vms/list-events",
+                  "api-references/virtual-machines/vms/delete"
                 ]
               },
               {
                 "group": "Execution",
                 "pages": [
-                  "api-reference/virtual-machines/execution/execute",
-                  "api-reference/virtual-machines/execution/stream",
-                  "api-reference/virtual-machines/execution/list-processes",
-                  "api-reference/virtual-machines/execution/run-cli-command"
+                  "api-references/virtual-machines/execution/execute",
+                  "api-references/virtual-machines/execution/stream",
+                  "api-references/virtual-machines/execution/list-processes",
+                  "api-references/virtual-machines/execution/run-cli-command"
                 ]
               },
               {
                 "group": "Files",
                 "pages": [
-                  "api-reference/virtual-machines/files/read",
-                  "api-reference/virtual-machines/files/write"
+                  "api-references/virtual-machines/files/read",
+                  "api-references/virtual-machines/files/write"
                 ]
               },
               {
                 "group": "Shares",
                 "pages": [
-                  "api-reference/virtual-machines/shares/list",
-                  "api-reference/virtual-machines/shares/create",
-                  "api-reference/virtual-machines/shares/delete"
+                  "api-references/virtual-machines/shares/list",
+                  "api-references/virtual-machines/shares/create",
+                  "api-references/virtual-machines/shares/delete"
                 ]
               },
               {
                 "group": "Domains",
                 "pages": [
-                  "api-reference/virtual-machines/domains/list",
-                  "api-reference/virtual-machines/domains/add",
-                  "api-reference/virtual-machines/domains/delete"
+                  "api-references/virtual-machines/domains/list",
+                  "api-references/virtual-machines/domains/add",
+                  "api-references/virtual-machines/domains/delete"
                 ]
               },
               {
                 "group": "Tokens",
                 "pages": [
-                  "api-reference/virtual-machines/tokens/list",
-                  "api-reference/virtual-machines/tokens/create",
-                  "api-reference/virtual-machines/tokens/delete"
+                  "api-references/virtual-machines/tokens/list",
+                  "api-references/virtual-machines/tokens/create",
+                  "api-references/virtual-machines/tokens/delete"
                 ]
               },
               {
                 "group": "SSH keys",
                 "pages": [
-                  "api-reference/virtual-machines/ssh-keys/list",
-                  "api-reference/virtual-machines/ssh-keys/add",
-                  "api-reference/virtual-machines/ssh-keys/delete"
+                  "api-references/virtual-machines/ssh-keys/list",
+                  "api-references/virtual-machines/ssh-keys/add",
+                  "api-references/virtual-machines/ssh-keys/delete"
                 ]
               },
               {
                 "group": "Regions",
                 "pages": [
-                  "api-reference/virtual-machines/regions/list"
+                  "api-references/virtual-machines/regions/list"
                 ]
               }
             ]
@@ -248,35 +248,35 @@
           {
             "group": "Durable Execution",
             "pages": [
-              "api-reference/durable-execution/index",
+              "api-references/durable-execution/index",
               {
                 "group": "Apps",
                 "pages": [
-                  "api-reference/durable-execution/apps/get-meta"
+                  "api-references/durable-execution/apps/get-meta"
                 ]
               },
               {
                 "group": "Workflows",
                 "pages": [
-                  "api-reference/durable-execution/workflows/list",
-                  "api-reference/durable-execution/workflows/register"
+                  "api-references/durable-execution/workflows/list",
+                  "api-references/durable-execution/workflows/register"
                 ]
               },
               {
                 "group": "Events",
                 "pages": [
-                  "api-reference/durable-execution/events/send"
+                  "api-references/durable-execution/events/send"
                 ]
               },
               {
                 "group": "Runs",
                 "pages": [
-                  "api-reference/durable-execution/runs/trigger",
-                  "api-reference/durable-execution/runs/get",
-                  "api-reference/durable-execution/runs/history",
-                  "api-reference/durable-execution/runs/cancel",
-                  "api-reference/durable-execution/runs/retry",
-                  "api-reference/durable-execution/runs/signal"
+                  "api-references/durable-execution/runs/trigger",
+                  "api-references/durable-execution/runs/get",
+                  "api-references/durable-execution/runs/history",
+                  "api-references/durable-execution/runs/cancel",
+                  "api-references/durable-execution/runs/retry",
+                  "api-references/durable-execution/runs/signal"
                 ]
               }
             ]
@@ -287,12 +287,424 @@
   },
   "redirects": [
     {
+      "source": "/agent-workspaces",
+      "destination": "/developer-guides/agent-workspaces"
+    },
+    {
+      "source": "/api-reference",
+      "destination": "/api-references"
+    },
+    {
+      "source": "/api-reference/agent-workspaces",
+      "destination": "/api-references/agent-workspaces"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/messages/list",
+      "destination": "/api-references/agent-workspaces/messages/list"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/messages/send",
+      "destination": "/api-references/agent-workspaces/messages/send"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/sessions/archive",
+      "destination": "/api-references/agent-workspaces/sessions/archive"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/sessions/create",
+      "destination": "/api-references/agent-workspaces/sessions/create"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/sessions/get",
+      "destination": "/api-references/agent-workspaces/sessions/get"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/sessions/list",
+      "destination": "/api-references/agent-workspaces/sessions/list"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/sessions/state",
+      "destination": "/api-references/agent-workspaces/sessions/state"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/sessions/stop",
+      "destination": "/api-references/agent-workspaces/sessions/stop"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/sessions/update",
+      "destination": "/api-references/agent-workspaces/sessions/update"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/workspaces/archive",
+      "destination": "/api-references/agent-workspaces/workspaces/archive"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/workspaces/create",
+      "destination": "/api-references/agent-workspaces/workspaces/create"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/workspaces/get",
+      "destination": "/api-references/agent-workspaces/workspaces/get"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/workspaces/list",
+      "destination": "/api-references/agent-workspaces/workspaces/list"
+    },
+    {
+      "source": "/api-reference/agent-workspaces/workspaces/update",
+      "destination": "/api-references/agent-workspaces/workspaces/update"
+    },
+    {
+      "source": "/api-reference/api-keys/create",
+      "destination": "/api-references/api-keys/create"
+    },
+    {
+      "source": "/api-reference/checks/create-check-run",
+      "destination": "/api-references/checks/create-check-run"
+    },
+    {
+      "source": "/api-reference/checks/create-commit-status",
+      "destination": "/api-references/checks/create-commit-status"
+    },
+    {
+      "source": "/api-reference/durable-execution",
+      "destination": "/api-references/durable-execution"
+    },
+    {
+      "source": "/api-reference/durable-execution/apps/get-meta",
+      "destination": "/api-references/durable-execution/apps/get-meta"
+    },
+    {
+      "source": "/api-reference/durable-execution/events/send",
+      "destination": "/api-references/durable-execution/events/send"
+    },
+    {
+      "source": "/api-reference/durable-execution/runs/cancel",
+      "destination": "/api-references/durable-execution/runs/cancel"
+    },
+    {
+      "source": "/api-reference/durable-execution/runs/get",
+      "destination": "/api-references/durable-execution/runs/get"
+    },
+    {
+      "source": "/api-reference/durable-execution/runs/history",
+      "destination": "/api-references/durable-execution/runs/history"
+    },
+    {
+      "source": "/api-reference/durable-execution/runs/retry",
+      "destination": "/api-references/durable-execution/runs/retry"
+    },
+    {
+      "source": "/api-reference/durable-execution/runs/signal",
+      "destination": "/api-references/durable-execution/runs/signal"
+    },
+    {
+      "source": "/api-reference/durable-execution/runs/trigger",
+      "destination": "/api-references/durable-execution/runs/trigger"
+    },
+    {
+      "source": "/api-reference/durable-execution/workflows/list",
+      "destination": "/api-references/durable-execution/workflows/list"
+    },
+    {
+      "source": "/api-reference/durable-execution/workflows/register",
+      "destination": "/api-references/durable-execution/workflows/register"
+    },
+    {
+      "source": "/api-reference/merge-queues/create-or-update",
+      "destination": "/api-references/merge-queues/create-or-update"
+    },
+    {
+      "source": "/api-reference/merge-queues/dequeue-entry",
+      "destination": "/api-references/merge-queues/dequeue-entry"
+    },
+    {
+      "source": "/api-reference/merge-queues/enqueue",
+      "destination": "/api-references/merge-queues/enqueue"
+    },
+    {
+      "source": "/api-reference/merge-queues/list",
+      "destination": "/api-references/merge-queues/list"
+    },
+    {
+      "source": "/api-reference/merge-queues/list-activity",
+      "destination": "/api-references/merge-queues/list-activity"
+    },
+    {
+      "source": "/api-reference/merge-queues/list-attempts",
+      "destination": "/api-references/merge-queues/list-attempts"
+    },
+    {
+      "source": "/api-reference/merge-queues/list-entries",
+      "destination": "/api-references/merge-queues/list-entries"
+    },
+    {
+      "source": "/api-reference/merge-queues/reorder-entries",
+      "destination": "/api-references/merge-queues/reorder-entries"
+    },
+    {
+      "source": "/api-reference/merge-queues/update-entry",
+      "destination": "/api-references/merge-queues/update-entry"
+    },
+    {
+      "source": "/api-reference/pull-requests/create",
+      "destination": "/api-references/pull-requests/create"
+    },
+    {
+      "source": "/api-reference/pull-requests/create-review",
+      "destination": "/api-references/pull-requests/create-review"
+    },
+    {
+      "source": "/api-reference/pull-requests/detach",
+      "destination": "/api-references/pull-requests/detach"
+    },
+    {
+      "source": "/api-reference/pull-requests/get",
+      "destination": "/api-references/pull-requests/get"
+    },
+    {
+      "source": "/api-reference/pull-requests/get-diff",
+      "destination": "/api-references/pull-requests/get-diff"
+    },
+    {
+      "source": "/api-reference/pull-requests/list",
+      "destination": "/api-references/pull-requests/list"
+    },
+    {
+      "source": "/api-reference/pull-requests/reorder-stack",
+      "destination": "/api-references/pull-requests/reorder-stack"
+    },
+    {
+      "source": "/api-reference/pull-requests/repair-stack",
+      "destination": "/api-references/pull-requests/repair-stack"
+    },
+    {
+      "source": "/api-reference/pull-requests/set-parent",
+      "destination": "/api-references/pull-requests/set-parent"
+    },
+    {
+      "source": "/api-reference/pull-requests/split-stack",
+      "destination": "/api-references/pull-requests/split-stack"
+    },
+    {
+      "source": "/api-reference/pull-requests/update",
+      "destination": "/api-references/pull-requests/update"
+    },
+    {
+      "source": "/api-reference/repositories/archive",
+      "destination": "/api-references/repositories/archive"
+    },
+    {
+      "source": "/api-reference/repositories/create",
+      "destination": "/api-references/repositories/create"
+    },
+    {
+      "source": "/api-reference/repositories/delete",
+      "destination": "/api-references/repositories/delete"
+    },
+    {
+      "source": "/api-reference/repositories/get",
+      "destination": "/api-references/repositories/get"
+    },
+    {
+      "source": "/api-reference/repositories/list",
+      "destination": "/api-references/repositories/list"
+    },
+    {
+      "source": "/api-reference/repositories/mint-git-credentials",
+      "destination": "/api-references/repositories/mint-git-credentials"
+    },
+    {
+      "source": "/api-reference/virtual-machines",
+      "destination": "/api-references/virtual-machines"
+    },
+    {
+      "source": "/api-reference/virtual-machines/domains/add",
+      "destination": "/api-references/virtual-machines/domains/add"
+    },
+    {
+      "source": "/api-reference/virtual-machines/domains/delete",
+      "destination": "/api-references/virtual-machines/domains/delete"
+    },
+    {
+      "source": "/api-reference/virtual-machines/domains/list",
+      "destination": "/api-references/virtual-machines/domains/list"
+    },
+    {
+      "source": "/api-reference/virtual-machines/execution/execute",
+      "destination": "/api-references/virtual-machines/execution/execute"
+    },
+    {
+      "source": "/api-reference/virtual-machines/execution/list-processes",
+      "destination": "/api-references/virtual-machines/execution/list-processes"
+    },
+    {
+      "source": "/api-reference/virtual-machines/execution/run-cli-command",
+      "destination": "/api-references/virtual-machines/execution/run-cli-command"
+    },
+    {
+      "source": "/api-reference/virtual-machines/execution/stream",
+      "destination": "/api-references/virtual-machines/execution/stream"
+    },
+    {
+      "source": "/api-reference/virtual-machines/files/read",
+      "destination": "/api-references/virtual-machines/files/read"
+    },
+    {
+      "source": "/api-reference/virtual-machines/files/write",
+      "destination": "/api-references/virtual-machines/files/write"
+    },
+    {
+      "source": "/api-reference/virtual-machines/regions/list",
+      "destination": "/api-references/virtual-machines/regions/list"
+    },
+    {
+      "source": "/api-reference/virtual-machines/shares/create",
+      "destination": "/api-references/virtual-machines/shares/create"
+    },
+    {
+      "source": "/api-reference/virtual-machines/shares/delete",
+      "destination": "/api-references/virtual-machines/shares/delete"
+    },
+    {
+      "source": "/api-reference/virtual-machines/shares/list",
+      "destination": "/api-references/virtual-machines/shares/list"
+    },
+    {
+      "source": "/api-reference/virtual-machines/ssh-keys/add",
+      "destination": "/api-references/virtual-machines/ssh-keys/add"
+    },
+    {
+      "source": "/api-reference/virtual-machines/ssh-keys/delete",
+      "destination": "/api-references/virtual-machines/ssh-keys/delete"
+    },
+    {
+      "source": "/api-reference/virtual-machines/ssh-keys/list",
+      "destination": "/api-references/virtual-machines/ssh-keys/list"
+    },
+    {
+      "source": "/api-reference/virtual-machines/tokens/create",
+      "destination": "/api-references/virtual-machines/tokens/create"
+    },
+    {
+      "source": "/api-reference/virtual-machines/tokens/delete",
+      "destination": "/api-references/virtual-machines/tokens/delete"
+    },
+    {
+      "source": "/api-reference/virtual-machines/tokens/list",
+      "destination": "/api-references/virtual-machines/tokens/list"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/action",
+      "destination": "/api-references/virtual-machines/vms/action"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/create",
+      "destination": "/api-references/virtual-machines/vms/create"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/delete",
+      "destination": "/api-references/virtual-machines/vms/delete"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/get",
+      "destination": "/api-references/virtual-machines/vms/get"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/list",
+      "destination": "/api-references/virtual-machines/vms/list"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/list-events",
+      "destination": "/api-references/virtual-machines/vms/list-events"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/update",
+      "destination": "/api-references/virtual-machines/vms/update"
+    },
+    {
+      "source": "/api-reference/virtual-machines/vms/update-visibility",
+      "destination": "/api-references/virtual-machines/vms/update-visibility"
+    },
+    {
+      "source": "/authentication",
+      "destination": "/developer-guides/authentication"
+    },
+    {
+      "source": "/durable-execution",
+      "destination": "/developer-guides/durable-execution"
+    },
+    {
+      "source": "/durable-execution/quickstart",
+      "destination": "/developer-guides/durable-execution/quickstart"
+    },
+    {
+      "source": "/durable-execution/runs",
+      "destination": "/developer-guides/durable-execution/runs"
+    },
+    {
+      "source": "/durable-execution/workflows-and-events",
+      "destination": "/developer-guides/durable-execution/workflows-and-events"
+    },
+    {
+      "source": "/git",
+      "destination": "/developer-guides/git"
+    },
+    {
+      "source": "/git/clone",
+      "destination": "/developer-guides/git/clone"
+    },
+    {
+      "source": "/git/manage",
+      "destination": "/developer-guides/git/manage"
+    },
+    {
+      "source": "/git/merge-queues",
+      "destination": "/developer-guides/git/merge-queues"
+    },
+    {
+      "source": "/git/pull-requests",
+      "destination": "/developer-guides/git/pull-requests"
+    },
+    {
       "source": "/git/quickstart",
-      "destination": "/git"
+      "destination": "/developer-guides/git"
     },
     {
       "source": "/git/reference",
-      "destination": "/git"
+      "destination": "/developer-guides/git"
+    },
+    {
+      "source": "/quickstart",
+      "destination": "/developer-guides/quickstart"
+    },
+    {
+      "source": "/virtual-machines",
+      "destination": "/developer-guides/virtual-machines"
+    },
+    {
+      "source": "/virtual-machines/access",
+      "destination": "/developer-guides/virtual-machines/access"
+    },
+    {
+      "source": "/virtual-machines/lifecycle",
+      "destination": "/developer-guides/virtual-machines/lifecycle"
+    },
+    {
+      "source": "/virtual-machines/networking",
+      "destination": "/developer-guides/virtual-machines/networking"
+    },
+    {
+      "source": "/virtual-machines/quickstart",
+      "destination": "/developer-guides/virtual-machines/quickstart"
+    },
+    {
+      "source": "/virtual-machines/rest-api",
+      "destination": "/developer-guides/virtual-machines/rest-api"
+    },
+    {
+      "source": "/virtual-machines/sdk",
+      "destination": "/developer-guides/virtual-machines/sdk"
     }
   ],
   "logo": {

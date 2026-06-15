@@ -1,0 +1,45 @@
+---
+title: "API reference"
+description: "Reference for the Final REST API."
+---
+
+Use the API reference for endpoint details, request schemas, response schemas, and interactive examples.
+
+Git endpoints use a production access token. Platform, Agent Workspaces, Virtual Machines, and Durable Execution endpoints use an API key. See [authentication](/developer-guides/authentication) for credential types and examples.
+
+```bash
+Authorization: Bearer <token>
+Authorization: Bearer <api-key>
+```
+
+<Card title="Repositories" icon="folder-git-2" href="/api-references/repositories/list">
+  Create repositories, manage repository lifecycle, and mint Git credentials.
+</Card>
+
+<Card title="Pull requests" icon="git-pull-request" href="/api-references/pull-requests/list">
+  Create, review, update, and stack pull requests.
+</Card>
+
+<Card title="Merge queues" icon="list-checks" href="/api-references/merge-queues/list">
+  Configure queues, enqueue pull requests, and inspect queue activity.
+</Card>
+
+<Card title="Checks" icon="badge-check" href="/api-references/checks/create-commit-status">
+  Report commit statuses and check runs for pull request and merge queue CI.
+</Card>
+
+<Card title="API keys" icon="key-round" href="/api-references/api-keys/create">
+  Create organization API keys for automation.
+</Card>
+
+<Card title="Agent Workspaces" icon="folder-code" href="/api-references/agent-workspaces">
+  Create workspaces, send messages, poll state, and archive agent work.
+</Card>
+
+<Card title="Virtual Machines" icon="server" href="/api-references/virtual-machines">
+  Create VMs, run commands, manage files, attach domains, and control access.
+</Card>
+
+<Card title="Durable Execution" icon="workflow" href="/api-references/durable-execution">
+  Register workflows, send events, inspect runs, and signal waiting work.
+</Card>

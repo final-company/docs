@@ -3,7 +3,7 @@ title: "Manage repositories"
 description: "Create Final Git repositories and mint short-lived Git credentials."
 ---
 
-Use the console API to manage Git-backed file systems. Every request requires a production access token. For complete endpoint details, see the [API reference](/api-reference).
+Use the console API to manage Git-backed file systems. Every request requires a production access token. For complete endpoint details, see the [API reference](/api-references).
 
 ```bash
 access_token="<access-token>"
@@ -32,11 +32,11 @@ curl -X POST "https://api.final.ai/api/file-systems" \
 }
 ```
 
-Use the returned `fileSystem.id` when minting Git credentials. See [create a repository](/api-reference/repositories/create) for request and response fields.
+Use the returned `fileSystem.id` when minting Git credentials. See [create a repository](/api-references/repositories/create) for request and response fields.
 
 ## List repositories
 
-See [list repositories](/api-reference/repositories/list) for query parameters and response fields.
+See [list repositories](/api-references/repositories/list) for query parameters and response fields.
 
 ```bash
 curl "https://api.final.ai/api/file-systems" \
@@ -45,7 +45,7 @@ curl "https://api.final.ai/api/file-systems" \
 
 ## Get a repository
 
-See [get a repository](/api-reference/repositories/get) for response fields.
+See [get a repository](/api-references/repositories/get) for response fields.
 
 ```bash
 file_system_id="<file-system-id>"
@@ -56,7 +56,7 @@ curl "https://api.final.ai/api/file-systems/${file_system_id}" \
 
 ## Mint Git credentials
 
-See [mint Git credentials](/api-reference/repositories/mint-git-credentials) for request and response fields.
+See [mint Git credentials](/api-references/repositories/mint-git-credentials) for request and response fields.
 
 ```bash
 file_system_id="<file-system-id>"
@@ -83,7 +83,7 @@ The `username` and `password` fields are HTTPS Git credentials.
 
 ## Delete a repository
 
-See [archive a repository](/api-reference/repositories/archive) and [delete a repository](/api-reference/repositories/delete) for response fields.
+See [archive a repository](/api-references/repositories/archive) and [delete a repository](/api-references/repositories/delete) for response fields.
 
 Archive marks the repository as archived:
 

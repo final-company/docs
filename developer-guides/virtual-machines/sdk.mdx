@@ -18,7 +18,7 @@ const client = createVmClient({
 });
 ```
 
-Every SDK call uses the same public REST API documented in the [Virtual Machines API reference](/api-reference/virtual-machines).
+Every SDK call uses the same public REST API documented in the [Virtual Machines API reference](/api-references/virtual-machines).
 
 ## Create a VM
 
@@ -39,7 +39,7 @@ const vm = orThrow(
 console.log(vm.getInfo().hostname);
 ```
 
-The SDK sends `idempotencyKey` as the `Idempotency-Key` header on the [create a VM endpoint](/api-reference/virtual-machines/vms/create).
+The SDK sends `idempotencyKey` as the `Idempotency-Key` header on the [create a VM endpoint](/api-references/virtual-machines/vms/create).
 
 ## Run commands
 
@@ -65,7 +65,7 @@ await vm.commands.run("npm test", {
 });
 ```
 
-Buffered execution uses [execute a command](/api-reference/virtual-machines/execution/execute). Streaming execution uses the [exec WebSocket](/api-reference/virtual-machines/execution/stream).
+Buffered execution uses [execute a command](/api-references/virtual-machines/execution/execute). Streaming execution uses the [exec WebSocket](/api-references/virtual-machines/execution/stream).
 
 ## Read and write files
 
@@ -76,7 +76,7 @@ const configText = orThrow(await vm.files.read("/srv/app/config.json"));
 console.log(configText);
 ```
 
-See [read a file](/api-reference/virtual-machines/files/read) and [write a file](/api-reference/virtual-machines/files/write) for request details.
+See [read a file](/api-references/virtual-machines/files/read) and [write a file](/api-references/virtual-machines/files/write) for request details.
 
 ## Use ephemeral VMs
 
@@ -111,4 +111,4 @@ await vm.settings({
 await vm.kill();
 ```
 
-These helpers call the [perform a VM action](/api-reference/virtual-machines/vms/action) and [update a VM](/api-reference/virtual-machines/vms/update) endpoints.
+These helpers call the [perform a VM action](/api-references/virtual-machines/vms/action) and [update a VM](/api-references/virtual-machines/vms/update) endpoints.

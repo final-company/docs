@@ -3,7 +3,7 @@ title: "Virtual Machines quickstart"
 description: "Create, inspect, connect to, and delete a VM with the final-vm CLI."
 ---
 
-Use the `final-vm` CLI for day-to-day VM work. The CLI is a thin client over the public Virtual Machines REST API. If you want to call the API directly, see [use the REST API](/virtual-machines/rest-api).
+Use the `final-vm` CLI for day-to-day VM work. The CLI is a thin client over the public Virtual Machines REST API. If you want to call the API directly, see [use the REST API](/developer-guides/virtual-machines/rest-api).
 
 The CLI stores credentials in `~/.config/final-vm/config.json`. You can also set `FINAL_VM_API_KEY` and `FINAL_VM_API_URL` in your environment.
 
@@ -50,7 +50,7 @@ final-vm new docker.io/library/node:22-slim \
   --command "node server.js"
 ```
 
-The CLI prints the VM hostname after creation. To create VMs from the API, use the [create a VM endpoint](/api-reference/virtual-machines/vms/create).
+The CLI prints the VM hostname after creation. To create VMs from the API, use the [create a VM endpoint](/api-references/virtual-machines/vms/create).
 
 ## List and inspect VMs
 
@@ -65,7 +65,7 @@ Use `--json` with any command when you need machine-readable output:
 final-vm stat docs-demo --json
 ```
 
-The matching REST endpoints are [list VMs](/api-reference/virtual-machines/vms/list) and [get a VM](/api-reference/virtual-machines/vms/get).
+The matching REST endpoints are [list VMs](/api-references/virtual-machines/vms/list) and [get a VM](/api-references/virtual-machines/vms/get).
 
 ## Connect with SSH
 
@@ -87,7 +87,7 @@ You can pass extra SSH flags after the VM name:
 final-vm ssh docs-demo -L 8080:localhost:3000
 ```
 
-For API details, see [add an SSH key](/api-reference/virtual-machines/ssh-keys/add).
+For API details, see [add an SSH key](/api-references/virtual-machines/ssh-keys/add).
 
 ## Copy files
 
@@ -98,7 +98,7 @@ final-vm cp ./app.tar.gz docs-demo:/tmp/app.tar.gz
 final-vm cp docs-demo:/var/log/app.log ./app.log
 ```
 
-The REST API also supports direct file reads and writes. See [read a file](/api-reference/virtual-machines/files/read) and [write a file](/api-reference/virtual-machines/files/write).
+The REST API also supports direct file reads and writes. See [read a file](/api-references/virtual-machines/files/read) and [write a file](/api-references/virtual-machines/files/write).
 
 ## Delete the VM
 
@@ -106,4 +106,4 @@ The REST API also supports direct file reads and writes. See [read a file](/api-
 final-vm rm docs-demo
 ```
 
-You can also delete a VM with the [delete a VM endpoint](/api-reference/virtual-machines/vms/delete).
+You can also delete a VM with the [delete a VM endpoint](/api-references/virtual-machines/vms/delete).

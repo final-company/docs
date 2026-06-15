@@ -44,7 +44,7 @@ curl "https://api.final.ai/v1/agent-workspaces" \
 
 ## Create API keys from the API
 
-You can create organization API keys from automation with [create an API key](/api-reference/api-keys/create).
+You can create organization API keys from automation with [create an API key](/api-references/api-keys/create).
 
 The caller key must be organization-owned and must have the `api_keys:write` permission. A new key cannot request permissions that the caller key does not already have.
 
@@ -69,7 +69,7 @@ Organization-owned keys create workspaces through an agent profile. Include `age
 
 User-owned keys create workspaces as the key owner and do not require `agentProfileId`.
 
-See [Agent Workspaces](/agent-workspaces) and the [Agent Workspaces API reference](/api-reference/agent-workspaces).
+See [Agent Workspaces](/developer-guides/agent-workspaces) and the [Agent Workspaces API reference](/api-references/agent-workspaces).
 
 ## Authenticate Git operations
 
@@ -80,7 +80,7 @@ curl "https://api.final.ai/api/file-systems" \
   -H "Authorization: Bearer ${access_token}"
 ```
 
-For Git clone, fetch, and push, first mint short-lived Git credentials with [mint Git credentials](/api-reference/repositories/mint-git-credentials). Use those credentials with the Git remote URL instead of sending your API key to Git.
+For Git clone, fetch, and push, first mint short-lived Git credentials with [mint Git credentials](/api-references/repositories/mint-git-credentials). Use those credentials with the Git remote URL instead of sending your API key to Git.
 
 ## Handle auth errors
 

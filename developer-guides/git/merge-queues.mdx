@@ -9,13 +9,13 @@ Use merge queues to protect target branches and land reviewed pull requests in t
   CI must report checks against the merge queue candidate SHA. Do not report required queue checks only on the pull request branch SHA.
 </Warning>
 
-For endpoint details, see the [merge queues API reference](/api-reference/merge-queues/list).
+For endpoint details, see the [merge queues API reference](/api-references/merge-queues/list).
 
 ## Create or update a queue
 
 Open the repository in Final and select **Git**. Configured queues appear under **Merge queues**.
 
-A queue must exist for the target branch before users can enqueue pull requests. You can create or update the queue with the [create or update a merge queue endpoint](/api-reference/merge-queues/create-or-update).
+A queue must exist for the target branch before users can enqueue pull requests. You can create or update the queue with the [create or update a merge queue endpoint](/api-references/merge-queues/create-or-update).
 
 | Setting | Description |
 | --- | --- |
@@ -37,7 +37,7 @@ You can also enable speculative processing and batching:
 | Batch max size | Limits how many entries can be tested in one batch. |
 | Batch isolation strategy | Controls how Final Git isolates a failing batch. |
 
-See [create or update a merge queue](/api-reference/merge-queues/create-or-update) for request and response fields.
+See [create or update a merge queue](/api-references/merge-queues/create-or-update) for request and response fields.
 
 ## Enqueue pull requests
 
@@ -47,15 +47,15 @@ For stacked PRs, Final Git queues the selected range of the stack. The queue ent
 
 Queue entries can be reordered, fast-tracked, or removed before they land.
 
-Use the [enqueue a pull request endpoint](/api-reference/merge-queues/enqueue) to queue pull requests from automation.
+Use the [enqueue a pull request endpoint](/api-references/merge-queues/enqueue) to queue pull requests from automation.
 
 Use `stackMergeabilityBypass: true` only for emergency partial-stack landings. It requires admin access.
 
 ## Inspect queues
 
-Use the API to [list queues](/api-reference/merge-queues/list), [list entries](/api-reference/merge-queues/list-entries), [list attempts](/api-reference/merge-queues/list-attempts), and [list activity](/api-reference/merge-queues/list-activity).
+Use the API to [list queues](/api-references/merge-queues/list), [list entries](/api-references/merge-queues/list-entries), [list attempts](/api-references/merge-queues/list-attempts), and [list activity](/api-references/merge-queues/list-activity).
 
-Use the API to [update an entry](/api-reference/merge-queues/update-entry), [dequeue an entry](/api-reference/merge-queues/dequeue-entry), or [reorder entries](/api-reference/merge-queues/reorder-entries).
+Use the API to [update an entry](/api-references/merge-queues/update-entry), [dequeue an entry](/api-references/merge-queues/dequeue-entry), or [reorder entries](/api-references/merge-queues/reorder-entries).
 
 ## Run CI on a merge group
 
@@ -119,7 +119,7 @@ Your CI job should fetch the candidate ref, test the candidate SHA, and report e
 
 Final Git lands the queue entry only after every required context passes on the candidate SHA. If a required context fails, the attempt fails and the queue entry does not land.
 
-Report results with the [create a commit status endpoint](/api-reference/checks/create-commit-status) or the [create a check run endpoint](/api-reference/checks/create-check-run).
+Report results with the [create a commit status endpoint](/api-references/checks/create-commit-status) or the [create a check run endpoint](/api-references/checks/create-check-run).
 
 ## Candidate lifecycle
 

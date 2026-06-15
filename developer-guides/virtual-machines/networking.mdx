@@ -25,7 +25,7 @@ final-vm new docker.io/library/node:22-slim \
   --public
 ```
 
-You can toggle public HTTP access with [update VM visibility](/api-reference/virtual-machines/vms/update-visibility).
+You can toggle public HTTP access with [update VM visibility](/api-references/virtual-machines/vms/update-visibility).
 
 ## Use custom domains
 
@@ -40,7 +40,7 @@ curl -X POST "https://api.final.ai/v1/vms/preview-app/domains" \
 
 Then point a `CNAME` or `A` record for the domain at the VM hostname. Final verifies DNS and issues the certificate automatically.
 
-Use [add a custom domain](/api-reference/virtual-machines/domains/add), [list custom domains](/api-reference/virtual-machines/domains/list), and [delete a custom domain](/api-reference/virtual-machines/domains/delete) to manage domains from automation.
+Use [add a custom domain](/api-references/virtual-machines/domains/add), [list custom domains](/api-references/virtual-machines/domains/list), and [delete a custom domain](/api-references/virtual-machines/domains/delete) to manage domains from automation.
 
 ## Share a VM
 
@@ -64,7 +64,7 @@ Remove an email share:
 final-vm share preview-app --user teammate@example.com --remove
 ```
 
-For API-based sharing, use [create a share](/api-reference/virtual-machines/shares/create) and [delete a share](/api-reference/virtual-machines/shares/delete).
+For API-based sharing, use [create a share](/api-references/virtual-machines/shares/create) and [delete a share](/api-references/virtual-machines/shares/delete).
 
 ## Choose access levels
 

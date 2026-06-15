@@ -7,7 +7,7 @@ Use Final Git pull requests to review changes before they land on a target branc
 
 Open the repository in Final and select the **Git** tab to see pull requests and merge queues.
 
-For endpoint details, see the [pull requests API reference](/api-reference/pull-requests/list).
+For endpoint details, see the [pull requests API reference](/api-references/pull-requests/list).
 
 ## Create a pull request
 
@@ -28,7 +28,7 @@ Before you create a pull request, push your source branch to the repository.
   </Step>
 </Steps>
 
-Use the [create a pull request endpoint](/api-reference/pull-requests/create) to create pull requests from automation.
+Use the [create a pull request endpoint](/api-references/pull-requests/create) to create pull requests from automation.
 
 ## Review changes
 
@@ -42,7 +42,7 @@ You can leave one of three review states:
 | **Comment** | You want to leave feedback without blocking the pull request. |
 | **Request changes** | The author needs to update the pull request before it merges. |
 
-Use the API to [list pull requests](/api-reference/pull-requests/list), [read pull request details](/api-reference/pull-requests/get), [fetch a diff](/api-reference/pull-requests/get-diff), or [create a review](/api-reference/pull-requests/create-review).
+Use the API to [list pull requests](/api-references/pull-requests/list), [read pull request details](/api-references/pull-requests/get), [fetch a diff](/api-references/pull-requests/get-diff), or [create a review](/api-references/pull-requests/create-review).
 
 ## Use merge when ready
 
@@ -50,7 +50,7 @@ Click **Merge when ready** when a pull request should enter the merge queue afte
 
 If the target branch has an enforced merge queue, Final Git lands the pull request through the queue. It does not merge directly into the protected branch.
 
-Use the [update a pull request endpoint](/api-reference/pull-requests/update) to set `mergeWhenReady` from automation.
+Use the [update a pull request endpoint](/api-references/pull-requests/update) to set `mergeWhenReady` from automation.
 
 ## Work with stacked PRs
 
@@ -73,7 +73,7 @@ Final Git validates the stack before it saves it. The parent pull request must b
   </Step>
 </Steps>
 
-To create a stacked pull request with the API, pass `parentPullRequestId` to the [create a pull request endpoint](/api-reference/pull-requests/create).
+To create a stacked pull request with the API, pass `parentPullRequestId` to the [create a pull request endpoint](/api-references/pull-requests/create).
 
 ## Update a stack
 
@@ -93,11 +93,11 @@ Use these API endpoints to update stacks:
 
 | Endpoint | Description |
 | --- | --- |
-| [Set pull request parent](/api-reference/pull-requests/set-parent) | Sets or clears a parent pull request. |
-| [Detach a pull request](/api-reference/pull-requests/detach) | Detaches a pull request from its stack. |
-| [Repair a pull request stack](/api-reference/pull-requests/repair-stack) | Refreshes stack metadata. |
-| [Split a pull request stack](/api-reference/pull-requests/split-stack) | Splits a stack at a pull request. |
-| [Reorder a pull request stack](/api-reference/pull-requests/reorder-stack) | Reorders every pull request in a stack. |
+| [Set pull request parent](/api-references/pull-requests/set-parent) | Sets or clears a parent pull request. |
+| [Detach a pull request](/api-references/pull-requests/detach) | Detaches a pull request from its stack. |
+| [Repair a pull request stack](/api-references/pull-requests/repair-stack) | Refreshes stack metadata. |
+| [Split a pull request stack](/api-references/pull-requests/split-stack) | Splits a stack at a pull request. |
+| [Reorder a pull request stack](/api-references/pull-requests/reorder-stack) | Reorders every pull request in a stack. |
 
 ## Queue a stack
 
@@ -109,4 +109,4 @@ For a partial landing, click a **Through #** button to queue only the lower part
   Final Git blocks queue entries that omit open pull requests above the selected range. This prevents landing a middle pull request while its dependent pull requests remain open.
 </Warning>
 
-Use the [enqueue a pull request endpoint](/api-reference/merge-queues/enqueue) to add a pull request or stack range to a merge queue.
+Use the [enqueue a pull request endpoint](/api-references/merge-queues/enqueue) to add a pull request or stack range to a merge queue.

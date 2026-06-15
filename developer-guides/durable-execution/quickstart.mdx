@@ -22,7 +22,7 @@ Durable Execution uses bearer authentication:
 Authorization: Bearer <api-key>
 ```
 
-For cross-product auth details, see [authentication](/authentication).
+For cross-product auth details, see [authentication](/developer-guides/authentication).
 
 ## Choose an app
 
@@ -59,7 +59,7 @@ curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}
   }'
 ```
 
-See [register a workflow](/api-reference/durable-execution/workflows/register).
+See [register a workflow](/api-references/durable-execution/workflows/register).
 
 ## Send an event
 
@@ -81,7 +81,7 @@ curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}
 
 The response includes `scheduledRunIds` for new runs and `resumedRunIds` for waiting runs that the event resumed.
 
-See [send events](/api-reference/durable-execution/events/send).
+See [send events](/api-references/durable-execution/events/send).
 
 ## Read a run
 
@@ -99,4 +99,4 @@ curl "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<r
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
-See [get a run](/api-reference/durable-execution/runs/get) and [list run history](/api-reference/durable-execution/runs/history).
+See [get a run](/api-references/durable-execution/runs/get) and [list run history](/api-references/durable-execution/runs/history).

@@ -17,7 +17,7 @@ Every request uses bearer authentication with an organization API key:
 Authorization: Bearer <api-key>
 ```
 
-For every endpoint, schema, and response, see the [Virtual Machines API reference](/api-reference/virtual-machines).
+For every endpoint, schema, and response, see the [Virtual Machines API reference](/api-references/virtual-machines).
 
 ## Create a VM
 
@@ -37,7 +37,7 @@ curl -X POST "https://api.final.ai/v1/vms" \
 
 Use the `Idempotency-Key` header when retrying create requests. If Final replays a previous create response, the response includes `Idempotency-Replayed: true`.
 
-See [create a VM](/api-reference/virtual-machines/vms/create).
+See [create a VM](/api-references/virtual-machines/vms/create).
 
 ## List and inspect VMs
 
@@ -51,7 +51,7 @@ curl "https://api.final.ai/v1/vms/docs-demo" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
 ```
 
-See [list VMs](/api-reference/virtual-machines/vms/list) and [get a VM](/api-reference/virtual-machines/vms/get).
+See [list VMs](/api-references/virtual-machines/vms/list) and [get a VM](/api-references/virtual-machines/vms/get).
 
 ## Update a VM
 
@@ -68,7 +68,7 @@ curl -X PATCH "https://api.final.ai/v1/vms/docs-demo" \
 
 Disk size is grow-only. You can also update HTTP settings, idle behavior, tags, comments, and environment variables.
 
-See [update a VM](/api-reference/virtual-machines/vms/update).
+See [update a VM](/api-references/virtual-machines/vms/update).
 
 ## Run a command
 
@@ -82,9 +82,9 @@ curl -X POST "https://api.final.ai/v1/vms/docs-demo/exec" \
   }'
 ```
 
-Use the buffered command endpoint for short commands. Use the [exec WebSocket](/api-reference/virtual-machines/execution/stream) for streaming output.
+Use the buffered command endpoint for short commands. Use the [exec WebSocket](/api-references/virtual-machines/execution/stream) for streaming output.
 
-See [execute a command](/api-reference/virtual-machines/execution/execute).
+See [execute a command](/api-references/virtual-machines/execution/execute).
 
 ## Delete a VM
 
@@ -93,4 +93,4 @@ curl -X DELETE "https://api.final.ai/v1/vms/docs-demo" \
   -H "Authorization: Bearer ${FINAL_VM_API_KEY}"
 ```
 
-See [delete a VM](/api-reference/virtual-machines/vms/delete).
+See [delete a VM](/api-references/virtual-machines/vms/delete).

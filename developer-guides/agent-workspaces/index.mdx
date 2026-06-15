@@ -5,11 +5,11 @@ description: "Create agent workspaces, send messages, and poll session state wit
 
 Agent Workspaces let you start agent work from the public API. A workspace contains one or more sessions. A session receives messages, runs work, and exposes state you can poll.
 
-Use the [Agent Workspaces API reference](/api-reference/agent-workspaces) for endpoint details.
+Use the [Agent Workspaces API reference](/api-references/agent-workspaces) for endpoint details.
 
 ## Before you begin
 
-You need an API key. See [authentication](/authentication) for credential types and bearer auth examples.
+You need an API key. See [authentication](/developer-guides/authentication) for credential types and bearer auth examples.
 
 Organization-owned keys can create workspaces for an agent profile. User-owned keys create workspaces as the key owner.
 
@@ -33,7 +33,7 @@ curl -X POST "https://api.final.ai/v1/agent-workspaces" \
 
 The response includes a `workspace`, its main `session`, and a `command` when you include `message`.
 
-See [create an agent workspace](/api-reference/agent-workspaces/workspaces/create).
+See [create an agent workspace](/api-references/agent-workspaces/workspaces/create).
 
 ## Send another message
 
@@ -48,7 +48,7 @@ curl -X POST "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/
   }'
 ```
 
-See [send a session message](/api-reference/agent-workspaces/messages/send).
+See [send a session message](/api-references/agent-workspaces/messages/send).
 
 ## Poll state and messages
 
@@ -66,7 +66,7 @@ curl "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/${SESSIO
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
-See [get session state](/api-reference/agent-workspaces/sessions/state) and [list session messages](/api-reference/agent-workspaces/messages/list).
+See [get session state](/api-references/agent-workspaces/sessions/state) and [list session messages](/api-references/agent-workspaces/messages/list).
 
 ## Stop or archive work
 
@@ -79,4 +79,4 @@ curl -X POST "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/
 
 Archive completed workspaces to remove them from active lists.
 
-See [stop a running session](/api-reference/agent-workspaces/sessions/stop) and [archive an agent workspace](/api-reference/agent-workspaces/workspaces/archive).
+See [stop a running session](/api-references/agent-workspaces/sessions/stop) and [archive an agent workspace](/api-references/agent-workspaces/workspaces/archive).

@@ -24,7 +24,7 @@ Run an action with the CLI:
 final-vm restart docs-demo
 ```
 
-Or call the [perform a VM action endpoint](/api-reference/virtual-machines/vms/action).
+Or call the [perform a VM action endpoint](/api-references/virtual-machines/vms/action).
 
 ## Resize a VM
 
@@ -36,7 +36,7 @@ final-vm resize docs-demo --vcpu 4 --memory 8192 --disk 40
 
 Disk size is grow-only. Plan disk reductions by creating a new VM and copying the data you need.
 
-Use the [update a VM endpoint](/api-reference/virtual-machines/vms/update) for API-based resizing.
+Use the [update a VM endpoint](/api-references/virtual-machines/vms/update) for API-based resizing.
 
 ## Rename, tag, and comment
 
@@ -61,7 +61,7 @@ await vm.settings({
 });
 ```
 
-Environment variables are part of the VM settings payload on [update a VM](/api-reference/virtual-machines/vms/update).
+Environment variables are part of the VM settings payload on [update a VM](/api-references/virtual-machines/vms/update).
 
 ## Configure idle behavior
 
