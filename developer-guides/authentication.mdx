@@ -19,7 +19,7 @@ https://api.final.ai
 
 | Credential | Use it for |
 | --- | --- |
-| Organization API key | Public REST APIs for Agent Workspaces, Virtual Machines, Durable Execution, and API key management. |
+| Organization API key | Public REST APIs for Agent Workspaces, WebSocket Gateway, Virtual Machines, Durable Execution, and API key management. |
 | User API key | User-attributed Agent Workspaces requests. |
 | Production access token | Git repository management endpoints. |
 | Minted Git credentials | Short-lived Git HTTPS clone, fetch, and push operations. |
@@ -70,6 +70,14 @@ Organization-owned keys create workspaces through an agent profile. Include `age
 User-owned keys create workspaces as the key owner and do not require `agentProfileId`.
 
 See [Agent Workspaces](/developer-guides/agent-workspaces) and the [Agent Workspaces API reference](/api-references/agent-workspaces).
+
+## Authenticate WebSocket Gateway requests
+
+Use an API key to create short-lived WebSocket Gateway session tokens and to publish server-side channel or work queue events.
+
+Gateway session tokens are scoped to tenant-local resources and expire quickly. Do not send your API key to browser or worker clients. Create a session token from your server, then pass the returned token and gateway URL to the client.
+
+See [WebSocket Gateway](/developer-guides/websocket-gateway) and the [WebSocket Gateway API reference](/api-references/websocket-gateway).
 
 ## Authenticate Git operations
 

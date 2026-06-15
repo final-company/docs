@@ -1,0 +1,183 @@
+---
+title: "WebSocket Gateway"
+description: "Create scoped realtime sessions, publish channel events, and dispatch work over the hosted WebSocket gateway."
+---
+
+The WebSocket Gateway gives your applications a hosted realtime connection layer. Use it to connect browser clients, backend services, and workers without exposing long-lived API keys to WebSocket clients.
+
+Your server creates a short-lived gateway session token with the public REST API. The client then connects to the returned WebSocket URL with that token.
+
+<Card title="WebSocket Gateway API reference" icon="book-open" href="/api-references/websocket-gateway">
+  Browse the REST endpoints for gateway metadata, session tokens, channel publishing, and work offers.
+</Card>
+
+## Before you begin
+
+You need an API key for `https://api.final.ai`. See [authentication](/developer-guides/authentication) for bearer auth examples.
+
+The API key must have the gateway permissions required by the grants or operation you request.
+
+| Permission | Enables |
+| --- | --- |
+| `websocket_gateway:connect` | Create gateway session tokens. |
+| `websocket_gateway:publish` | Grant channel publish access or publish channel events through the REST API. |
+| `websocket_gateway:history` | Grant channel history access. |
+| `websocket_gateway:presence` | Grant channel presence access. |
+| `websocket_gateway:rpc` | Grant RPC send or receive access. |
+| `websocket_gateway:bridge` | Grant bridge join, send, or receive access. |
+| `websocket_gateway:work` | Grant work queue access or offer work through the REST API. |
+
+## Get gateway metadata
+
+Read the active protocol version and WebSocket URL:
+
+```bash
+curl "https://api.final.ai/v1/websocket-gateway/meta" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+The response includes the gateway URL clients should connect to:
+
+```json
+{
+  "protocolVersion": 1,
+  "url": "wss://gateway.final.ai/connect"
+}
+```
+
+## Create a session token
+
+Create a short-lived token with the least access the client needs.
+
+Set `CHANNEL_NAME` to the channel your application uses for chat messages. Channel names are tenant-local. Final scopes them to the caller organization when it mints the gateway token.
+
+```bash
+CHANNEL_NAME="chat"
+
+curl -X POST "https://api.final.ai/v1/websocket-gateway/sessions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "clientId": "browser_1",
+  "ttlMs": 600000,
+  "grants": {
+    "channels": [
+      {
+        "name": "${CHANNEL_NAME}",
+        "access": ["subscribe", "publish"]
+      }
+    ]
+  },
+  "metadata": {
+    "app": "customer-portal"
+  }
+}
+EOF
+```
+
+The response includes `url`, `protocolVersion`, `token`, `expiresAt`, and `jti`.
+
+Send `chat`, `room:123`, or another app-defined channel name. Do not send `org:<id>:channel:chat`.
+
+## Connect over WebSocket
+
+Pass the token and protocol version as query parameters:
+
+```js
+const channelName = "chat";
+
+const socket = new WebSocket(
+  `${session.url}?token=${encodeURIComponent(session.token)}&protocolVersion=${session.protocolVersion}`,
+);
+
+socket.addEventListener("open", () => {
+  socket.send(JSON.stringify({
+    type: "channel.subscribe",
+    channel: channelName,
+  }));
+});
+
+socket.addEventListener("message", (event) => {
+  const frame = JSON.parse(event.data);
+
+  if (frame.type === "channel.message") {
+    console.log(frame.message.name, frame.message.data);
+  }
+});
+```
+
+## Publish a channel event from your server
+
+For server-originated events, publish through the REST API. The API creates the gateway-scoped publish token internally, so you do not need to hold a WebSocket connection open.
+
+Set `CHANNEL_NAME` to the same app-defined channel name used in the session grant.
+
+```bash
+CHANNEL_NAME="chat"
+
+curl -X POST "https://api.final.ai/v1/websocket-gateway/channels/${CHANNEL_NAME}/events" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "message.created",
+    "data": {
+      "text": "hello"
+    },
+    "idempotencyKey": "message_001"
+  }'
+```
+
+See [publish a channel event](/api-references/websocket-gateway/channels/publish).
+
+## Dispatch work to connected workers
+
+Use work queues when you need connected workers to lease and complete jobs.
+
+Create a worker session token with work queue access:
+
+```bash
+curl -X POST "https://api.final.ai/v1/websocket-gateway/sessions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "worker_1",
+    "grants": {
+      "workQueues": [
+        {
+          "name": "customer-jobs",
+          "access": ["lease", "heartbeat", "complete", "fail"]
+        }
+      ]
+    }
+  }'
+```
+
+Offer work through the REST API:
+
+```bash
+curl -X POST "https://api.final.ai/v1/websocket-gateway/work-queues/customer-jobs/offers" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leaseId": "lease_001",
+    "payload": {
+      "jobId": "job_001"
+    }
+  }'
+```
+
+Connected workers receive a `work.offer` frame. They should accept the lease, send heartbeats while processing, and complete or fail the lease when finished.
+
+See [offer work](/api-references/websocket-gateway/work-queues/offer).
+
+## Grant types
+
+| Grant | Access values |
+| --- | --- |
+| `channels` | `subscribe`, `publish`, `history`, `presence` |
+| `rpc` | `send`, `receive` |
+| `bridges` | `join`, `send`, `receive` |
+| `workQueues` | `lease`, `heartbeat`, `complete`, `fail` |
+
+Use `limits` on a grant to restrict `maxFrameBytes`, `maxFramesPerMinute`, or `maxSubscriptions`.

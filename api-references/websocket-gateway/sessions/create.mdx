@@ -1,0 +1,76 @@
+---
+title: "Create a WebSocket Gateway session"
+description: "Mint a short-lived gateway token with scoped realtime grants."
+api: "POST /v1/websocket-gateway/sessions"
+---
+
+Creates a short-lived token for connecting to the hosted WebSocket Gateway.
+
+Set `CHANNEL_NAME` to the channel your application uses. Channel names are tenant-local resource names. Send `chat`, `room:123`, or another app-defined name, not `org:<id>:channel:chat`.
+
+```bash
+CHANNEL_NAME="chat"
+
+curl -X POST "https://api.final.ai/v1/websocket-gateway/sessions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "clientId": "browser_1",
+  "ttlMs": 600000,
+  "grants": {
+    "channels": [
+      {
+        "name": "${CHANNEL_NAME}",
+        "access": ["subscribe", "publish"]
+      }
+    ]
+  }
+}
+EOF
+```
+
+## Request body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `subject` | string | No | Subject for the gateway token. Defaults to the authenticated user, API key, or organization. |
+| `clientId` | string | No | Client identifier. Defaults to the API key ID or organization ID. |
+| `ttlMs` | integer | No | Token lifetime in milliseconds. Maximum `600000`. |
+| `grants` | object | Yes | Scoped access grants. At least one grant is required. |
+| `metadata` | object | No | Additional token metadata. |
+
+## Grants
+
+| Grant | Access values |
+| --- | --- |
+| `channels` | `subscribe`, `publish`, `history`, `presence` |
+| `rpc` | `send`, `receive` |
+| `bridges` | `join`, `send`, `receive` |
+| `workQueues` | `lease`, `heartbeat`, `complete`, `fail` |
+
+Each grant item has:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Tenant-local resource name, such as a channel name, RPC name, bridge name, or work queue name. Do not prefix with `org:`. |
+| `access` | string[] | Yes | Access values for the grant type. |
+| `limits` | object | No | Optional `maxFrameBytes`, `maxFramesPerMinute`, and `maxSubscriptions` limits. |
+
+## Response
+
+```json
+{
+  "protocolVersion": 1,
+  "url": "wss://gateway.final.ai/connect",
+  "token": "<gateway-token>",
+  "expiresAt": "2026-06-15T12:10:00.000Z",
+  "jti": "issued-token-1"
+}
+```
+
+Connect with the returned `url`, `token`, and `protocolVersion`:
+
+```text
+wss://gateway.final.ai/connect?token=<gateway-token>&protocolVersion=1
+```

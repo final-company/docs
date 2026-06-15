@@ -1,0 +1,26 @@
+---
+title: "Get WebSocket Gateway metadata"
+description: "Read the active gateway protocol version and WebSocket URL."
+api: "GET /v1/websocket-gateway/meta"
+---
+
+Returns the hosted WebSocket Gateway connection URL and protocol version.
+
+```bash
+curl "https://api.final.ai/v1/websocket-gateway/meta" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Response
+
+```json
+{
+  "protocolVersion": 1,
+  "url": "wss://gateway.final.ai/connect"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `protocolVersion` | integer | Gateway protocol version to pass when opening a WebSocket connection. |
+| `url` | string | WebSocket URL for gateway clients. |

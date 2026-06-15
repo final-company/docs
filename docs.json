@@ -59,6 +59,12 @@
             ]
           },
           {
+            "group": "WebSocket Gateway",
+            "pages": [
+              "developer-guides/websocket-gateway/index"
+            ]
+          },
+          {
             "group": "Durable Execution",
             "pages": [
               "developer-guides/durable-execution/index",
@@ -168,6 +174,31 @@
                 "pages": [
                   "api-references/agent-workspaces/messages/list",
                   "api-references/agent-workspaces/messages/send"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "WebSocket Gateway",
+            "pages": [
+              "api-references/websocket-gateway/index",
+              "api-references/websocket-gateway/meta",
+              {
+                "group": "Sessions",
+                "pages": [
+                  "api-references/websocket-gateway/sessions/create"
+                ]
+              },
+              {
+                "group": "Channels",
+                "pages": [
+                  "api-references/websocket-gateway/channels/publish"
+                ]
+              },
+              {
+                "group": "Work queues",
+                "pages": [
+                  "api-references/websocket-gateway/work-queues/offer"
                 ]
               }
             ]

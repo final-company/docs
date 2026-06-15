@@ -1,0 +1,46 @@
+---
+title: "WebSocket Gateway API"
+description: "Reference for the public WebSocket Gateway REST API."
+---
+
+Use the WebSocket Gateway API to discover the hosted gateway URL, create short-lived session tokens, publish channel events, and offer work to connected workers.
+
+Every request uses API key authentication:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+The public base URL is:
+
+```text
+https://api.final.ai/v1/websocket-gateway
+```
+
+<Card title="Get metadata" icon="info" href="/api-references/websocket-gateway/meta">
+  Read the gateway protocol version and WebSocket URL.
+</Card>
+
+<Card title="Create a session" icon="key-round" href="/api-references/websocket-gateway/sessions/create">
+  Mint a short-lived token with scoped channel, RPC, bridge, or work queue grants.
+</Card>
+
+<Card title="Publish a channel event" icon="send" href="/api-references/websocket-gateway/channels/publish">
+  Publish an event to a gateway channel from the REST API.
+</Card>
+
+<Card title="Offer work" icon="briefcase-business" href="/api-references/websocket-gateway/work-queues/offer">
+  Offer a work lease to workers connected to a queue.
+</Card>
+
+## Permissions
+
+| Permission | Required for |
+| --- | --- |
+| `websocket_gateway:connect` | `POST /sessions` |
+| `websocket_gateway:publish` | Channel publish grants and `POST /channels/{channel}/events` |
+| `websocket_gateway:history` | Channel history grants |
+| `websocket_gateway:presence` | Channel presence grants |
+| `websocket_gateway:rpc` | RPC grants |
+| `websocket_gateway:bridge` | Bridge grants |
+| `websocket_gateway:work` | Work queue grants and `POST /work-queues/{queue}/offers` |

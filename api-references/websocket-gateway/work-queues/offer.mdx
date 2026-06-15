@@ -1,0 +1,44 @@
+---
+title: "Offer work"
+description: "Offer a work lease to WebSocket Gateway workers."
+api: "POST /v1/websocket-gateway/work-queues/{queue}/offers"
+---
+
+Offers a work lease to workers connected to a gateway work queue.
+
+The API also accepts `POST /v1/websocket-gateway/work-queues/offers` when you provide `queue` in the request body.
+
+```bash
+curl -X POST "https://api.final.ai/v1/websocket-gateway/work-queues/customer-jobs/offers" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leaseId": "lease_001",
+    "payload": {
+      "jobId": "job_001"
+    }
+  }'
+```
+
+## Path parameters
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `queue` | string | Tenant-local work queue name. Do not prefix with `org:`. |
+
+## Request body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `queue` | string | No | Queue name when using `/work-queues/offers`. |
+| `leaseId` | string | Yes | Unique lease ID for this offered work item. |
+| `payload` | any | Yes | JSON payload sent to workers. |
+
+## Response
+
+```json
+{
+  "offered": true,
+  "jti": "issued-token-1"
+}
+```
