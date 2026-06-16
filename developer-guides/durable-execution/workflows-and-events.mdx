@@ -5,6 +5,8 @@ description: "Register durable workflows and send events that start or resume ru
 
 A durable workflow is registered under one app. Final injects tenant scope from the API key and URL, so request bodies do not include `scope`.
 
+The SDK registers function manifests when a worker connects. Use direct workflow registration only for lower-level integrations.
+
 ## Register workflow versions
 
 Register each deployable workflow version with:
@@ -14,21 +16,24 @@ Register each deployable workflow version with:
 | `workflowId` | Stable workflow ID, such as `send-receipt`. |
 | `version` | Workflow version to execute, such as `1` or a build ID. |
 | `displayName` | Human-readable workflow name. |
-| `runtime` | HTTP worker endpoint Final calls to execute work. |
+| `runtime` | WebSocket worker runtime assigned to the app worker queue. |
 | `triggers` | Event or cron triggers that schedule runs. |
 | `retryPolicy` | Retry limit and backoff settings. Defaults to three exponential attempts. |
 | `metadata` | App-defined metadata attached to the workflow registration. |
 
-The runtime defaults to:
+The runtime uses the WebSocket worker transport:
 
 ```json
 {
-  "transport": "http",
-  "path": "/v1/execute"
+  "transport": "websocket",
+  "gatewayUrl": "wss://gateway.final.ai/connect",
+  "queue": "durable-execution:billing"
 }
 ```
 
-Register workflows with the [register a workflow endpoint](/api-references/durable-execution/workflows/register).
+In normal SDK usage, `connect()` creates the worker session and fills the registered runtime. See [TypeScript SDK and workers](/developer-guides/durable-execution/typescript-sdk).
+
+Register workflows manually with the [register a workflow endpoint](/api-references/durable-execution/workflows/register).
 
 ## Event triggers
 

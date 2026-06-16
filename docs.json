@@ -69,6 +69,7 @@
             "pages": [
               "developer-guides/durable-execution/index",
               "developer-guides/durable-execution/quickstart",
+              "developer-guides/durable-execution/typescript-sdk",
               "developer-guides/durable-execution/workflows-and-events",
               "developer-guides/durable-execution/runs"
             ]

@@ -79,6 +79,14 @@ Gateway session tokens are scoped to tenant-local resources and expire quickly. 
 
 See [WebSocket Gateway](/developer-guides/websocket-gateway) and the [WebSocket Gateway API reference](/api-references/websocket-gateway).
 
+## Authenticate Durable Execution workers
+
+Use an organization API key for Durable Execution REST API requests, including sending events, triggering runs, and reading history.
+
+Use a Durable Execution connect key for SDK workers. A connect key is scoped to one durable app and is exchanged for short-lived WebSocket worker session tokens by `connect()`. Store connect keys as server-side secrets and do not send them to browsers or untrusted clients.
+
+See [TypeScript SDK and workers](/developer-guides/durable-execution/typescript-sdk).
+
 ## Authenticate Git operations
 
 Git repository management endpoints currently use a production access token:

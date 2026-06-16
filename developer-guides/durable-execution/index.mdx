@@ -8,7 +8,11 @@ Durable Execution runs long-lived workflows that can retry, sleep, wait for corr
 Use it when a workflow needs to survive process restarts, external callbacks, human approval, or delayed work.
 
 <Card title="Quickstart" icon="rocket" href="/developer-guides/durable-execution/quickstart">
-  Register a workflow, send an event, inspect the run, and read history.
+  Define a workflow, connect a worker, send an event, and inspect the run.
+</Card>
+
+<Card title="TypeScript SDK and workers" icon="code" href="/developer-guides/durable-execution/typescript-sdk">
+  Create typed functions and run WebSocket workers with the Durable Execution SDK.
 </Card>
 
 <Card title="Workflows and events" icon="workflow" href="/developer-guides/durable-execution/workflows-and-events">
@@ -28,7 +32,10 @@ Use it when a workflow needs to survive process restarts, external callbacks, hu
 | Concept | Description |
 | --- | --- |
 | App | A durable execution namespace. The `appId` path segment identifies the app, such as `billing`. |
-| Workflow | A registered durable workflow version with a runtime endpoint and one or more triggers. |
+| Function | SDK code that implements a durable workflow. |
+| Workflow | A registered durable workflow version with a WebSocket worker runtime and one or more triggers. |
+| Worker | Your process that connects to Final over WebSocket, leases work, and drains on shutdown. |
+| Connect key | An app-scoped secret that lets a worker create a WebSocket session. |
 | Event | A named payload that can schedule matching workflows or resume waiting runs. |
 | Run | One execution of a workflow. Runs can be `queued`, `running`, `waiting`, `completed`, `failed`, or `cancelled`. |
 | Signal | A payload sent to a waiting run, optionally targeting a specific step. |

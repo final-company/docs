@@ -1,0 +1,166 @@
+---
+title: "TypeScript SDK and workers"
+description: "Use the Durable Execution SDK to define typed functions and run WebSocket workers."
+---
+
+The Durable Execution SDK is the recommended way to define workflow functions and run workers.
+
+Workers connect to Final over WebSocket with an app-scoped connect key. You do not expose a worker HTTP endpoint, and you do not pass an `environment` field to the SDK.
+
+## Install
+
+```bash
+npm install @finalai/durable-execution zod
+```
+
+## Create a durable app
+
+Define your app once with an app ID, tenant ID, version, event schemas, and API base URL:
+
+```ts
+import { createDurableExecution } from '@finalai/durable-execution';
+import { z } from 'zod';
+
+export const durable = createDurableExecution({
+  id: 'billing',
+  tenantId: process.env.FINAL_TENANT_ID!,
+  version: '2026-06-15',
+  schemas: {
+    'orders/created': z.object({
+      orderId: z.string(),
+    }),
+    'orders/approved': z.object({
+      orderId: z.string(),
+      approvedBy: z.string(),
+    }),
+  },
+  api: {
+    baseUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
+  },
+});
+```
+
+The SDK does not read environment variables implicitly. Read your own configuration and pass values into `createDurableExecution()` and `connect()`.
+
+## Define functions
+
+Use `durable.createFunction()` for each workflow function:
+
+```ts
+export const approvalWorkflow = durable.createFunction(
+  {
+    id: 'approval-workflow',
+    name: 'Approval workflow',
+    triggers: [durable.on('orders/created')],
+    retries: 3,
+  },
+  async ({ event, step }) => {
+    const order = await step.run('load-order', async () => {
+      return {
+        id: event.data.orderId,
+      };
+    });
+
+    const approval = await step.waitForEvent('approval', {
+      event: 'orders/approved',
+      match: {
+        orderId: order.id,
+      },
+      timeout: '24h',
+    });
+
+    return {
+      orderId: order.id,
+      approvedBy: approval.approvedBy,
+    };
+  },
+);
+```
+
+`step.run()` stores completed step output so retries do not repeat completed work. `step.waitForEvent()` pauses the run until a matching event arrives or the timeout is reached.
+
+## Connect a worker
+
+Run a worker process with `connect()`:
+
+```ts
+import { connect } from '@finalai/durable-execution';
+import { durable, approvalWorkflow } from './durable';
+
+const connection = await connect({
+  client: durable,
+  functions: [approvalWorkflow],
+  apiUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
+  connectKey: process.env.FINAL_DURABLE_CONNECT_KEY!,
+  instanceId: `worker-${crypto.randomUUID()}`,
+  appVersion: '2026-06-15',
+  maxWorkerConcurrency: 10,
+});
+```
+
+`connect()` performs the worker setup:
+
+1. It builds function manifests from your SDK definitions.
+2. It creates a worker session with your app connect key.
+3. It receives the WebSocket gateway URL, worker queues, and a short-lived gateway token.
+4. It opens the WebSocket worker connection and refreshes tokens as needed.
+5. It drains in-flight work on `SIGTERM` and `SIGINT` by default.
+
+Keep the process alive for as long as the worker should accept work:
+
+```ts
+await connection.closed;
+```
+
+To stop accepting new work and close the connection yourself:
+
+```ts
+await connection.close('deploying new worker version');
+```
+
+## Send events
+
+Send events with the SDK:
+
+```ts
+await durable.send({
+  id: 'evt_order_created_123',
+  name: 'orders/created',
+  data: {
+    orderId: 'ord_123',
+  },
+});
+```
+
+You can also send events through the [send events endpoint](/api-references/durable-execution/events/send).
+
+## Trigger a function directly
+
+Start one function without using the trigger matcher:
+
+```ts
+const run = await durable.triggerFunction({
+  functionId: 'approval-workflow',
+  event: 'orders/created',
+  data: {
+    orderId: 'ord_123',
+  },
+  idempotencyKey: 'ord_123',
+});
+```
+
+The returned `run` has the same shape as [get a run](/api-references/durable-execution/runs/get).
+
+## Worker credentials
+
+Use an organization API key for REST API calls such as sending events, triggering runs, and reading run history.
+
+Use a Durable Execution connect key only for worker connections. Connect keys are app-scoped secrets. Store them in your secret manager and load them into worker processes as `FINAL_DURABLE_CONNECT_KEY`.
+
+The SDK exchanges the connect key for short-lived WebSocket gateway tokens. Do not send connect keys to browsers or untrusted clients.
+
+## Runtime model
+
+Durable Execution workers are WebSocket-only. New workflow registrations use the `websocket` runtime, with the gateway URL and queue assigned during worker connection.
+
+For the raw endpoint shape, see [register a workflow](/api-references/durable-execution/workflows/register).

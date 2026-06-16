@@ -63,7 +63,7 @@ paths:
       operationId: registerDurableWorkflow
       tags: [Workflows]
       summary: Register a workflow
-      description: Register or update a durable workflow version.
+      description: Register or update a durable workflow version. New workflow registrations use the WebSocket worker runtime.
       parameters:
         - $ref: "#/components/parameters/AppId"
       requestBody:
@@ -399,19 +399,19 @@ components:
           additionalProperties: true
     Runtime:
       type: object
-      required: [url]
+      required: [transport, gatewayUrl, queue]
       properties:
         transport:
           type: string
-          enum: [http]
-          default: http
-        url:
+          enum: [websocket]
+          default: websocket
+        gatewayUrl:
           type: string
           format: uri
-          example: https://worker.example.com
-        path:
+          example: wss://gateway.final.ai/connect
+        queue:
           type: string
-          default: /v1/execute
+          example: durable-execution:billing
     Trigger:
       oneOf:
         - $ref: "#/components/schemas/EventTrigger"

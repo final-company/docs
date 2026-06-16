@@ -1,19 +1,28 @@
 ---
 title: "Durable Execution quickstart"
-description: "Register a durable workflow and start runs with the public REST API."
+description: "Define a durable function, connect a WebSocket worker, send an event, and inspect the run."
 ---
 
-Use the Durable Execution REST API to register workflows, emit events, start runs, and inspect results.
+Use the Durable Execution TypeScript SDK to define functions and connect workers. Use the public REST API or SDK helpers to send events, start runs, and inspect results.
 
 ## Before you begin
 
-You need an organization API key. Organization admins can create one in Final under **Settings** > **API Keys**.
+You need:
 
-Set the base URL and API key:
+- An organization API key for public REST API calls.
+- A Durable Execution connect key for the app worker.
+- Your Final tenant ID.
+
+Organization admins can create API keys in Final under **Settings** > **API Keys**.
+
+Set the base URL, API key, app ID, tenant ID, and connect key:
 
 ```bash
 export FINAL_API_URL="https://api.final.ai"
 export FINAL_API_KEY="<api-key>"
+export FINAL_DURABLE_APP_ID="billing"
+export FINAL_TENANT_ID="<tenant-id>"
+export FINAL_DURABLE_CONNECT_KEY="<connect-key>"
 ```
 
 Durable Execution uses bearer authentication:
@@ -24,46 +33,113 @@ Authorization: Bearer <api-key>
 
 For cross-product auth details, see [authentication](/developer-guides/authentication).
 
-## Choose an app
+## Install the SDK
 
-The app ID is the durable namespace in the URL:
-
-```bash
-export FINAL_DURABLE_APP_ID="billing"
-```
-
-## Register a workflow
-
-Register a workflow version with an HTTP worker runtime and an event trigger:
+Install the Durable Execution SDK:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/workflows" \
-  -H "Authorization: Bearer ${FINAL_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "workflowId": "send-receipt",
-    "version": "1",
-    "displayName": "Send receipt",
-    "runtime": {
-      "transport": "http",
-      "url": "https://worker.example.com",
-      "path": "/v1/execute"
-    },
-    "triggers": [
-      {
-        "kind": "event",
-        "eventName": "invoice.paid",
-        "expression": null
-      }
-    ]
-  }'
+npm install @finalai/durable-execution zod
 ```
 
-See [register a workflow](/api-references/durable-execution/workflows/register).
+## Define an app and function
+
+Create a typed durable app and function:
+
+```ts
+import { createDurableExecution } from '@finalai/durable-execution';
+import { z } from 'zod';
+
+export const durable = createDurableExecution({
+  id: process.env.FINAL_DURABLE_APP_ID!,
+  tenantId: process.env.FINAL_TENANT_ID!,
+  version: '2026-06-15',
+  schemas: {
+    'invoice.paid': z.object({
+      invoiceId: z.string(),
+      customerId: z.string(),
+    }),
+    'receipt.approved': z.object({
+      invoiceId: z.string(),
+      approvedBy: z.string(),
+    }),
+  },
+  api: {
+    baseUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
+  },
+});
+
+export const sendReceipt = durable.createFunction(
+  {
+    id: 'send-receipt',
+    name: 'Send receipt',
+    triggers: [durable.on('invoice.paid')],
+    retries: 3,
+  },
+  async ({ event, step }) => {
+    const invoice = await step.run('load-invoice', async () => {
+      return {
+        id: event.data.invoiceId,
+        customerId: event.data.customerId,
+      };
+    });
+
+    const approval = await step.waitForEvent('wait-for-approval', {
+      event: 'receipt.approved',
+      match: {
+        invoiceId: invoice.id,
+      },
+      timeout: '24h',
+    });
+
+    return {
+      invoiceId: invoice.id,
+      approvedBy: approval.approvedBy,
+    };
+  },
+);
+```
+
+## Connect a worker
+
+Start a worker with `connect()`:
+
+```ts
+import { connect } from '@finalai/durable-execution';
+import { durable, sendReceipt } from './durable';
+
+const connection = await connect({
+  client: durable,
+  functions: [sendReceipt],
+  apiUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
+  connectKey: process.env.FINAL_DURABLE_CONNECT_KEY!,
+  instanceId: `worker-${crypto.randomUUID()}`,
+  appVersion: '2026-06-15',
+  maxWorkerConcurrency: 10,
+});
+
+await connection.closed;
+```
+
+`connect()` registers function manifests, creates a short-lived WebSocket session, opens the worker connection, refreshes tokens, and drains in-flight work during shutdown.
+
+See [TypeScript SDK and workers](/developer-guides/durable-execution/typescript-sdk).
 
 ## Send an event
 
-Send an event that matches the registered trigger:
+Send an event with the SDK:
+
+```ts
+await durable.send({
+  id: 'evt_invoice_paid_123',
+  name: 'invoice.paid',
+  data: {
+    invoiceId: 'inv_123',
+    customerId: 'cus_123',
+  },
+});
+```
+
+Or send the same event through the public REST API:
 
 ```bash
 curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/events" \
@@ -82,6 +158,24 @@ curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}
 The response includes `scheduledRunIds` for new runs and `resumedRunIds` for waiting runs that the event resumed.
 
 See [send events](/api-references/durable-execution/events/send).
+
+## Trigger a function directly
+
+Use direct triggers when you want to start one function without sending a normal event through the app trigger matcher:
+
+```ts
+const run = await durable.triggerFunction({
+  functionId: 'send-receipt',
+  event: 'invoice.paid',
+  data: {
+    invoiceId: 'inv_123',
+    customerId: 'cus_123',
+  },
+  idempotencyKey: 'inv_123',
+});
+```
+
+See [trigger a workflow run](/api-references/durable-execution/runs/trigger).
 
 ## Read a run
 
