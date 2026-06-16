@@ -1,0 +1,38 @@
+---
+title: "Create a disk user"
+description: "Create a disk-scoped token, AWS STS principal, or S3 credential."
+api: "POST /v1/agent-disk/disks/{diskId}/users"
+---
+
+Creates a disk-scoped user.
+
+Secrets for `token` and `s3-credential` users are returned only in the create response.
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "token",
+    "nickname": "worker"
+  }'
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+
+## Body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | string | No | `token`, `awssts`, or `s3-credential`. Defaults to `token`. |
+| `nickname` | string | No | Human-readable label for the user. |
+| `principal` | string | Conditional | AWS principal ARN. Required when `type` is `awssts`. |
+
+## Response
+
+Returns the created disk user. Token users include `token` once. S3 credential users include `accessKeyId` and `secretAccessKey` once.
+

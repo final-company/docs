@@ -1,0 +1,49 @@
+---
+title: "GitHub sync"
+description: "Sync Final Git branches with a GitHub repository."
+---
+
+Use GitHub sync to keep selected Final Git branches and GitHub branches aligned. Final reconciles each enabled branch by pulling GitHub changes into Final or pushing Final changes to GitHub.
+
+Open the repository in Final, select the **Git** tab, then use **GitHub sync**.
+
+## Requirements
+
+- A Final Git repository.
+- A GitHub App installation that belongs to the same organization.
+- GitHub repository contents read/write permission.
+- GitHub push event delivery enabled for the installation.
+- Admin access to the Final Git repository.
+
+## Configure sync
+
+In **GitHub sync**, enter:
+
+| Field | Description |
+| --- | --- |
+| **GitHub installation ID** | The GitHub App installation to use for repository access. |
+| **GitHub repo ID** | The GitHub repository ID to sync with Final Git. |
+| **Allowlisted branches** | Branches Final may reconcile. Use comma-separated branch names such as `main, release`. |
+| **Merge-queue inbound branches** | Branches where GitHub-to-Final updates may move a merge-queue target branch. |
+
+Click **Save sync** to enable sync. Final immediately queues a reconcile job for every allowlisted branch.
+
+## How reconciliation works
+
+For each branch, Final compares the GitHub branch head and the Final branch head:
+
+| State | Result |
+| --- | --- |
+| GitHub and Final match | The branch is marked `in_sync`. |
+| GitHub is ahead | Final pulls the GitHub branch into Final. |
+| Final is ahead | Final pushes the Final branch to GitHub. |
+| One side is missing | Final creates the missing branch from the existing side. |
+| Branches diverged | Final marks the branch `conflicted` and does not overwrite either side. |
+
+When an enforced merge queue protects a target branch, inbound GitHub changes are blocked unless that branch appears in **Merge-queue inbound branches**.
+
+## Retry or disable sync
+
+Use **Retry all** to queue reconciliation for every allowlisted branch. Use **Retry** on one branch to retry only that branch.
+
+Use **Disable** to stop GitHub sync for the repository. Disabling sync does not delete the Final Git repository or the GitHub repository.

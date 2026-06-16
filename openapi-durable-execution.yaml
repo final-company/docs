@@ -8,42 +8,48 @@ servers:
 security:
   - bearerAuth: []
 tags:
-  - name: Apps
+  - name: Namespaces
   - name: Workflows
   - name: Events
   - name: Runs
 paths:
-  /v1/durable-execution/apps/{appId}/meta:
+  /v1/durable-execution/namespaces/{namespace}/meta:
     get:
-      operationId: getDurableAppMeta
-      tags: [Apps]
-      summary: Get app metadata
-      description: Inspect the resolved app scope for the authenticated organization.
+      operationId: getDurableNamespaceMeta
+      tags: [Namespaces]
+      summary: Get namespace metadata
+      description: Inspect the resolved namespace scope for the authenticated user-owned API key.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
       responses:
         "200":
-          description: App metadata was returned.
+          description: Namespace metadata was returned.
           content:
             application/json:
               schema:
                 type: object
-                required: [appId, tenantId]
+                required: [namespace, organizationId, ownerUserId, teamId]
                 properties:
-                  appId:
+                  namespace:
                     type: string
-                  tenantId:
+                  organizationId:
                     type: string
+                  ownerUserId:
+                    type: string
+                    nullable: true
+                  teamId:
+                    type: string
+                    nullable: true
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /v1/durable-execution/apps/{appId}/workflows:
+  /v1/durable-execution/namespaces/{namespace}/workflows:
     get:
       operationId: listDurableWorkflows
       tags: [Workflows]
       summary: List workflows
-      description: List workflow versions registered for the app.
+      description: List workflow versions registered for the namespace.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
       responses:
         "200":
           description: Workflows were returned.
@@ -65,7 +71,7 @@ paths:
       summary: Register a workflow
       description: Register or update a durable workflow version. New workflow registrations use the WebSocket worker runtime.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
       requestBody:
         required: true
         content:
@@ -89,14 +95,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "503":
           $ref: "#/components/responses/Unavailable"
-  /v1/durable-execution/apps/{appId}/events:
+  /v1/durable-execution/namespaces/{namespace}/events:
     post:
       operationId: sendDurableEvents
       tags: [Events]
       summary: Send events
       description: Send one event or a batch of events. Matching triggers schedule new runs; matching waits resume existing runs.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
       requestBody:
         required: true
         content:
@@ -119,15 +125,15 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /v1/durable-execution/apps/{appId}/workflows/{workflowId}/runs:
+  /v1/durable-execution/namespaces/{namespace}/workflows/{workflowKey}/runs:
     post:
       operationId: triggerDurableWorkflowRun
       tags: [Runs]
       summary: Trigger a workflow run
       description: Start one run for a workflow directly.
       parameters:
-        - $ref: "#/components/parameters/AppId"
-        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/Namespace"
+        - $ref: "#/components/parameters/WorkflowKey"
       requestBody:
         required: false
         content:
@@ -145,14 +151,14 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /v1/durable-execution/apps/{appId}/runs/{runId}:
+  /v1/durable-execution/namespaces/{namespace}/runs/{runId}:
     get:
       operationId: getDurableRun
       tags: [Runs]
       summary: Get a run
       description: Get the current state of a durable execution run.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/RunId"
       responses:
         "200":
@@ -165,14 +171,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/durable-execution/apps/{appId}/runs/{runId}/history:
+  /v1/durable-execution/namespaces/{namespace}/runs/{runId}/history:
     get:
       operationId: listDurableRunHistory
       tags: [Runs]
       summary: List run history
       description: List ordered history records for a run.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/RunId"
       responses:
         "200":
@@ -191,14 +197,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/durable-execution/apps/{appId}/runs/{runId}/cancel:
+  /v1/durable-execution/namespaces/{namespace}/runs/{runId}/cancel:
     post:
       operationId: cancelDurableRun
       tags: [Runs]
       summary: Cancel a run
       description: Cancel a durable execution run.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/RunId"
       responses:
         "200":
@@ -211,14 +217,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/durable-execution/apps/{appId}/runs/{runId}/retry:
+  /v1/durable-execution/namespaces/{namespace}/runs/{runId}/retry:
     post:
       operationId: retryDurableRun
       tags: [Runs]
       summary: Retry a run
       description: Retry a terminal durable execution run.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/RunId"
       responses:
         "202":
@@ -231,14 +237,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/durable-execution/apps/{appId}/runs/{runId}/signals:
+  /v1/durable-execution/namespaces/{namespace}/runs/{runId}/signals:
     post:
       operationId: signalDurableRun
       tags: [Runs]
       summary: Signal a run
       description: Send a signal payload to a waiting run.
       parameters:
-        - $ref: "#/components/parameters/AppId"
+        - $ref: "#/components/parameters/Namespace"
         - $ref: "#/components/parameters/RunId"
       requestBody:
         required: true
@@ -265,21 +271,21 @@ components:
       type: http
       scheme: bearer
       bearerFormat: API key
-      description: Organization API key.
+      description: User-owned API key.
   parameters:
-    AppId:
-      name: appId
+    Namespace:
+      name: namespace
       in: path
       required: true
-      description: Durable app namespace.
+      description: Durable namespace.
       schema:
         type: string
         example: billing
-    WorkflowId:
-      name: workflowId
+    WorkflowKey:
+      name: workflowKey
       in: path
       required: true
-      description: Durable workflow ID.
+      description: Durable workflow key.
       schema:
         type: string
         example: send-receipt
@@ -333,7 +339,7 @@ components:
     Workflow:
       type: object
       required:
-        - workflowId
+        - workflowKey
         - version
         - displayName
         - runtime
@@ -343,7 +349,7 @@ components:
         - metadata
         - registeredAt
       properties:
-        workflowId:
+        workflowKey:
           type: string
         version:
           type: string
@@ -370,9 +376,9 @@ components:
           format: date-time
     RegisterWorkflowRequest:
       type: object
-      required: [workflowId, version, displayName, runtime]
+      required: [workflowKey, version, displayName, runtime]
       properties:
-        workflowId:
+        workflowKey:
           type: string
         version:
           type: string
@@ -529,7 +535,7 @@ components:
       properties:
         runId:
           type: string
-        workflowId:
+        workflowKey:
           type: string
         workflowVersion:
           type: string

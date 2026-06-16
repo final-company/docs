@@ -1,0 +1,47 @@
+---
+title: "Create a disk"
+description: "Create a private or team-owned Agent Disk."
+api: "POST /v1/agent-disk/disks"
+---
+
+Creates an Agent Disk and a default disk token.
+
+With a user-owned API key, omit `teamId` to create a private disk. With an organization-owned API key, `teamId` is required because organization-only Agent Disks are not supported.
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "agent-cache",
+    "region": "aws-us-east-1"
+  }'
+```
+
+## Body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Disk name. Must match `^[a-zA-Z0-9_-]+$`. |
+| `region` | string | No | Region for the disk. Defaults to the service region when omitted. |
+| `teamId` | string | No | Team owner for the disk. Required for organization-owned API keys. |
+| `dataSource` | object or null | No | External object-store source for the disk. |
+
+## `dataSource`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `provider` | string | No | One of `s3`, `gcs`, `r2`, or `s3-compatible`. Defaults to `s3`. |
+| `bucketName` | string | Yes | Source bucket name. |
+| `bucketEndpoint` | string | No | Endpoint for R2 or S3-compatible sources. |
+| `bucketPrefix` | string | No | Prefix inside the bucket. |
+| `accessMode` | string | No | `rw` or `ro`. Defaults to `rw`. |
+| `auth.type` | string | No | `iam` or `accessKeys`. |
+| `auth.accessKeyId` | string | No | Access key ID when using access keys. |
+| `auth.secretAccessKey` | string | No | Secret access key when using access keys. |
+| `auth.sessionToken` | string | No | Optional session token. |
+
+## Response
+
+Returns the disk object with `diskId` and a default `token`. The token is shown once.
+

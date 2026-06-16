@@ -1,0 +1,23 @@
+---
+title: "Get a disk"
+description: "Get one Agent Disk by ID."
+api: "GET /v1/agent-disk/disks/{diskId}"
+---
+
+Returns one Agent Disk visible to the API key.
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks/<disk-id>" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+
+## Response
+
+Returns a JSON envelope whose `data` field is a disk object.
+

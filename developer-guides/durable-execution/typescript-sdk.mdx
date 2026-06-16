@@ -5,7 +5,7 @@ description: "Use the Durable Execution SDK to define typed functions and run We
 
 The Durable Execution SDK is the recommended way to define workflow functions and run workers.
 
-Workers connect to Final over WebSocket with an app-scoped connect key. You do not expose a worker HTTP endpoint, and you do not pass an `environment` field to the SDK.
+Workers connect to Final over WebSocket with a namespace-scoped connect key. You do not expose a worker HTTP endpoint, and you do not pass an `environment` field to the SDK.
 
 ## Install
 
@@ -15,15 +15,16 @@ npm install @finalai/durable-execution zod
 
 ## Create a durable app
 
-Define your app once with an app ID, tenant ID, version, event schemas, and API base URL:
+Define your durable namespace once with an organization ID, owner, version, event schemas, and API base URL:
 
 ```ts
 import { createDurableExecution } from '@finalai/durable-execution';
 import { z } from 'zod';
 
 export const durable = createDurableExecution({
-  id: 'billing',
-  tenantId: process.env.FINAL_TENANT_ID!,
+  namespace: 'billing',
+  organizationId: process.env.FINAL_ORGANIZATION_ID!,
+  ownerUserId: process.env.FINAL_OWNER_USER_ID!,
   version: '2026-06-15',
   schemas: {
     'orders/created': z.object({
@@ -49,7 +50,7 @@ Use `durable.createFunction()` for each workflow function:
 ```ts
 export const approvalWorkflow = durable.createFunction(
   {
-    id: 'approval-workflow',
+    key: 'approval-workflow',
     name: 'Approval workflow',
     triggers: [durable.on('orders/created')],
     retries: 3,
@@ -140,7 +141,7 @@ Start one function without using the trigger matcher:
 
 ```ts
 const run = await durable.triggerFunction({
-  functionId: 'approval-workflow',
+  functionKey: 'approval-workflow',
   event: 'orders/created',
   data: {
     orderId: 'ord_123',
@@ -153,9 +154,9 @@ The returned `run` has the same shape as [get a run](/api-references/durable-exe
 
 ## Worker credentials
 
-Use an organization API key for REST API calls such as sending events, triggering runs, and reading run history.
+Use a user-owned API key for REST API calls such as sending events, triggering runs, and reading run history.
 
-Use a Durable Execution connect key only for worker connections. Connect keys are app-scoped secrets. Store them in your secret manager and load them into worker processes as `FINAL_DURABLE_CONNECT_KEY`.
+Use a Durable Execution connect key only for worker connections. Connect keys are namespace-scoped secrets. Store them in your secret manager and load them into worker processes as `FINAL_DURABLE_CONNECT_KEY`.
 
 The SDK exchanges the connect key for short-lived WebSocket gateway tokens. Do not send connect keys to browsers or untrusted clients.
 

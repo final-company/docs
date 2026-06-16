@@ -1,0 +1,26 @@
+---
+title: "Remove a disk user"
+description: "Revoke a disk-scoped user."
+api: "DELETE /v1/agent-disk/disks/{diskId}/users/{identifier}"
+---
+
+Revokes a disk user by identifier.
+
+The identifier can be the user ID, token suffix, AWS principal ARN, or S3 access key ID.
+
+```bash
+curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users/<identifier>" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+| `identifier` | string | Yes | Disk user identifier. |
+
+## Response
+
+Returns `{ "deleted": true }` when the disk user was found.
+

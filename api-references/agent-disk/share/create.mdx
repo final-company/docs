@@ -1,0 +1,33 @@
+---
+title: "Create a share URL"
+description: "Create a signed URL for a path on an Agent Disk."
+api: "POST /v1/agent-disk/disks/{diskId}/share/{path}"
+---
+
+Creates a signed URL for a path on an Agent Disk.
+
+The path is required. Paths under `.agent-disk/` are reserved and cannot be shared.
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/share/artifacts/report.json?expiresIn=86400&branch=main" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+| `path` | string | Yes | Path to share. May include slashes. |
+
+## Query parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `branch` | string | No | Branch containing the path. Defaults to the disk default branch. |
+| `expiresIn` | number | No | Expiry in seconds. Must be `3600`, `28800`, `86400`, or `604800`. Defaults to `86400`. |
+
+## Response
+
+Returns a signed `url`, `expiresIn`, and `expiresAt`.
+

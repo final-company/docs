@@ -1,0 +1,37 @@
+---
+title: "Create a branch"
+description: "Create an Agent Disk branch from a checkpoint."
+api: "POST /v1/agent-disk/disks/{diskId}/branches"
+---
+
+Creates a branch from a checkpoint.
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "experiment-a",
+    "fromCheckpoint": "before-refactor",
+    "fromBranch": "main"
+  }'
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+
+## Body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | New branch name. |
+| `fromCheckpoint` | string | Yes | Checkpoint name to branch from. |
+| `fromBranch` | string | No | Source branch containing the checkpoint. Defaults to `main`. |
+
+## Response
+
+Returns the created branch.
+

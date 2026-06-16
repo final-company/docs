@@ -9,19 +9,21 @@ Use the Durable Execution TypeScript SDK to define functions and connect workers
 
 You need:
 
-- An organization API key for public REST API calls.
-- A Durable Execution connect key for the app worker.
-- Your Final tenant ID.
+- A user-owned API key for public REST API calls.
+- A Durable Execution connect key for the namespace worker.
+- Your Final organization ID.
+- Your Final user ID.
 
 Organization admins can create API keys in Final under **Settings** > **API Keys**.
 
-Set the base URL, API key, app ID, tenant ID, and connect key:
+Set the base URL, API key, namespace, organization ID, owner user ID, and connect key:
 
 ```bash
 export FINAL_API_URL="https://api.final.ai"
 export FINAL_API_KEY="<api-key>"
-export FINAL_DURABLE_APP_ID="billing"
-export FINAL_TENANT_ID="<tenant-id>"
+export FINAL_DURABLE_NAMESPACE="billing"
+export FINAL_ORGANIZATION_ID="<organization-id>"
+export FINAL_OWNER_USER_ID="<user-id>"
 export FINAL_DURABLE_CONNECT_KEY="<connect-key>"
 ```
 
@@ -41,17 +43,18 @@ Install the Durable Execution SDK:
 npm install @finalai/durable-execution zod
 ```
 
-## Define an app and function
+## Define a namespace and function
 
-Create a typed durable app and function:
+Create a typed durable namespace and function:
 
 ```ts
 import { createDurableExecution } from '@finalai/durable-execution';
 import { z } from 'zod';
 
 export const durable = createDurableExecution({
-  id: process.env.FINAL_DURABLE_APP_ID!,
-  tenantId: process.env.FINAL_TENANT_ID!,
+  namespace: process.env.FINAL_DURABLE_NAMESPACE!,
+  organizationId: process.env.FINAL_ORGANIZATION_ID!,
+  ownerUserId: process.env.FINAL_OWNER_USER_ID!,
   version: '2026-06-15',
   schemas: {
     'invoice.paid': z.object({
@@ -70,7 +73,7 @@ export const durable = createDurableExecution({
 
 export const sendReceipt = durable.createFunction(
   {
-    id: 'send-receipt',
+    key: 'send-receipt',
     name: 'Send receipt',
     triggers: [durable.on('invoice.paid')],
     retries: 3,
@@ -142,7 +145,7 @@ await durable.send({
 Or send the same event through the public REST API:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/events" \
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/namespaces/${FINAL_DURABLE_NAMESPACE}/events" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -165,7 +168,7 @@ Use direct triggers when you want to start one function without sending a normal
 
 ```ts
 const run = await durable.triggerFunction({
-  functionId: 'send-receipt',
+  functionKey: 'send-receipt',
   event: 'invoice.paid',
   data: {
     invoiceId: 'inv_123',
@@ -182,14 +185,14 @@ See [trigger a workflow run](/api-references/durable-execution/runs/trigger).
 Fetch a run by ID:
 
 ```bash
-curl "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>" \
+curl "${FINAL_API_URL}/v1/durable-execution/namespaces/${FINAL_DURABLE_NAMESPACE}/runs/<run-id>" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 Read run history:
 
 ```bash
-curl "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/history" \
+curl "${FINAL_API_URL}/v1/durable-execution/namespaces/${FINAL_DURABLE_NAMESPACE}/runs/<run-id>/history" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 

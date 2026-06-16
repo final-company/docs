@@ -1,0 +1,25 @@
+---
+title: "List disks"
+description: "List Agent Disks visible to the caller."
+api: "GET /v1/agent-disk/disks"
+---
+
+Lists Agent Disks visible to the API key.
+
+User-owned keys see private disks owned by the user and team-owned disks for teams the user belongs to. Organization-owned keys see disks in the organization.
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks?name=agent-cache" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Query parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | No | Exact disk name filter. |
+
+## Response
+
+Returns a JSON envelope whose `data` field is an array of disk objects.
+

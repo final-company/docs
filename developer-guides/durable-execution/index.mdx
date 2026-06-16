@@ -31,11 +31,11 @@ Use it when a workflow needs to survive process restarts, external callbacks, hu
 
 | Concept | Description |
 | --- | --- |
-| App | A durable execution namespace. The `appId` path segment identifies the app, such as `billing`. |
+| Namespace | A durable execution boundary under the API key owner, such as `billing`. |
 | Function | SDK code that implements a durable workflow. |
 | Workflow | A registered durable workflow version with a WebSocket worker runtime and one or more triggers. |
 | Worker | Your process that connects to Final over WebSocket, leases work, and drains on shutdown. |
-| Connect key | An app-scoped secret that lets a worker create a WebSocket session. |
+| Connect key | A namespace-scoped secret that lets a worker create a WebSocket session. |
 | Event | A named payload that can schedule matching workflows or resume waiting runs. |
 | Run | One execution of a workflow. Runs can be `queued`, `running`, `waiting`, `completed`, `failed`, or `cancelled`. |
 | Signal | A payload sent to a waiting run, optionally targeting a specific step. |
@@ -43,7 +43,7 @@ Use it when a workflow needs to survive process restarts, external callbacks, hu
 The public API is mounted under:
 
 ```text
-https://api.final.ai/v1/durable-execution/apps/{appId}
+https://api.final.ai/v1/durable-execution/namespaces/{namespace}
 ```
 
 For endpoint details, see the [Durable Execution API reference](/api-references/durable-execution).

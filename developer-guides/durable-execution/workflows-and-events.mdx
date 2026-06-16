@@ -3,7 +3,7 @@ title: "Workflows and events"
 description: "Register durable workflows and send events that start or resume runs."
 ---
 
-A durable workflow is registered under one app. Final injects tenant scope from the API key and URL, so request bodies do not include `scope`.
+A durable workflow is registered under one namespace. Final injects organization and owner scope from the user-owned API key and URL, so request bodies do not include `scope`.
 
 The SDK registers function manifests when a worker connects. Use direct workflow registration only for lower-level integrations.
 
@@ -13,10 +13,10 @@ Register each deployable workflow version with:
 
 | Field | Description |
 | --- | --- |
-| `workflowId` | Stable workflow ID, such as `send-receipt`. |
+| `workflowKey` | Stable workflow key, such as `send-receipt`. |
 | `version` | Workflow version to execute, such as `1` or a build ID. |
 | `displayName` | Human-readable workflow name. |
-| `runtime` | WebSocket worker runtime assigned to the app worker queue. |
+| `runtime` | WebSocket worker runtime assigned to the namespace worker queue. |
 | `triggers` | Event or cron triggers that schedule runs. |
 | `retryPolicy` | Retry limit and backoff settings. Defaults to three exponential attempts. |
 | `metadata` | App-defined metadata attached to the workflow registration. |
@@ -84,4 +84,4 @@ Send events with the [send events endpoint](/api-references/durable-execution/ev
 
 Use [list workflows](/api-references/durable-execution/workflows/list) to inspect the workflow versions registered for an app.
 
-Use [get app metadata](/api-references/durable-execution/apps/get-meta) to confirm the resolved app namespace.
+Use [get namespace metadata](/api-references/durable-execution/namespaces/get-meta) to confirm the resolved namespace scope.

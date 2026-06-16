@@ -1,0 +1,29 @@
+---
+title: "List checkpoints"
+description: "List checkpoints for an Agent Disk."
+api: "GET /v1/agent-disk/disks/{diskId}/checkpoints"
+---
+
+Lists checkpoints for an Agent Disk.
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints?branch=main" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+
+## Query parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `branch` | string | No | Branch name filter. |
+
+## Response
+
+Returns a JSON envelope whose `data` field is an array of checkpoint objects.
+

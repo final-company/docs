@@ -1,0 +1,35 @@
+---
+title: "Create a checkpoint"
+description: "Create a checkpoint for an Agent Disk branch."
+api: "POST /v1/agent-disk/disks/{diskId}/checkpoints"
+---
+
+Creates a checkpoint for a branch. If `branch` is omitted, the checkpoint is created from `main`.
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "before-refactor",
+    "branch": "main"
+  }'
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+
+## Body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Checkpoint name. |
+| `branch` | string | No | Source branch. Defaults to `main`. |
+
+## Response
+
+Returns the created checkpoint.
+

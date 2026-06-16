@@ -1264,7 +1264,7 @@ components:
           type: array
           items:
             type: string
-          example: [apps:read]
+          example: ["apps:read"]
         owner:
           type: object
           required: [type, id]
@@ -1305,7 +1305,7 @@ components:
           items:
             type: string
           description: Permissions for the new key. These cannot exceed the caller key's permissions.
-          example: [apps:read]
+          example: ["apps:read"]
         expiresAt:
           type: string
           format: date-time

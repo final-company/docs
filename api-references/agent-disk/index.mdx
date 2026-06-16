@@ -1,0 +1,45 @@
+---
+title: "Agent Disk API"
+description: "Reference for the Final Agent Disk REST API."
+---
+
+Use the Agent Disk API to create persistent disks for agents, manage disk-scoped users, create checkpoints and branches, share disk paths, and inspect usage.
+
+Every request uses bearer authentication with a Final API key:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+The public Agent Disk API namespace is:
+
+```text
+https://api.final.ai/v1/agent-disk
+```
+
+Legacy Agent Disk token-management routes under `/tokens` are not exposed. Use standard Final API keys for public API requests.
+
+<Card title="Disks" icon="hard-drive" href="/api-references/agent-disk/disks/list">
+  Create, list, inspect, and delete Agent Disks.
+</Card>
+
+<Card title="Disk users" icon="users" href="/api-references/agent-disk/users/create">
+  Add token, AWS STS, or S3 credential users for a disk.
+</Card>
+
+<Card title="Checkpoints" icon="flag" href="/api-references/agent-disk/checkpoints/list">
+  List and create branch checkpoints.
+</Card>
+
+<Card title="Branches" icon="git-branch" href="/api-references/agent-disk/branches/list">
+  List, create, and delete disk branches.
+</Card>
+
+<Card title="Share links" icon="link" href="/api-references/agent-disk/share/create">
+  Create signed URLs for disk paths.
+</Card>
+
+<Card title="Usage" icon="chart-column" href="/api-references/agent-disk/usage/get">
+  Inspect active bytes, GiB-hours, and per-branch usage.
+</Card>
+

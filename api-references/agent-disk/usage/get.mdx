@@ -1,0 +1,17 @@
+---
+title: "Get usage"
+description: "Get Agent Disk usage visible to the caller."
+api: "GET /v1/agent-disk/usage"
+---
+
+Returns Agent Disk usage visible to the API key.
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/usage" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Response
+
+Returns active bytes, GiB-hours, disk count, and per-disk branch usage.
+

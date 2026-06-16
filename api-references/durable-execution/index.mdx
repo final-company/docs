@@ -5,9 +5,9 @@ description: "Reference for the public Durable Execution REST API."
 
 Use the Durable Execution API to send events, start runs, inspect history, cancel, retry, signal waiting runs, and inspect workflow registrations.
 
-For worker setup, use the [Durable Execution TypeScript SDK](/developer-guides/durable-execution/typescript-sdk). SDK workers connect over WebSocket with an app-scoped connect key.
+For worker setup, use the [Durable Execution TypeScript SDK](/developer-guides/durable-execution/typescript-sdk). SDK workers connect over WebSocket with a namespace-scoped connect key.
 
-Every machine-facing request uses organization API key authentication:
+Every machine-facing request uses user-owned API key authentication:
 
 ```bash
 Authorization: Bearer <api-key>
@@ -19,8 +19,8 @@ The public base URL is:
 https://api.final.ai/v1/durable-execution
 ```
 
-<Card title="Apps" icon="box" href="/api-references/durable-execution/apps/get-meta">
-  Inspect the resolved app namespace.
+<Card title="Namespaces" icon="box" href="/api-references/durable-execution/namespaces/get-meta">
+  Inspect the resolved namespace scope.
 </Card>
 
 <Card title="Workflows" icon="workflow" href="/api-references/durable-execution/workflows/list">

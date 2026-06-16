@@ -1,0 +1,24 @@
+---
+title: "Delete a branch"
+description: "Delete an Agent Disk branch."
+api: "DELETE /v1/agent-disk/disks/{diskId}/branches/{name}"
+---
+
+Deletes a branch. The `main` branch cannot be deleted.
+
+```bash
+curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches/<branch-name>" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+| `name` | string | Yes | Branch name. |
+
+## Response
+
+Returns `{ "deleted": true }` when the branch was found.
+

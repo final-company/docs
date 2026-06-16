@@ -1,0 +1,150 @@
+---
+title: "Agent Disk"
+description: "Create persistent disks for agents and manage branches, checkpoints, users, shares, and usage."
+---
+
+Agent Disk gives agents persistent storage that can be mounted, branched, checkpointed, shared, and billed independently from a VM or workspace.
+
+Use Agent Disk when an agent needs durable file state across runs, reproducible branch points, or a disk that can be shared between agent workflows.
+
+The public REST API is available at:
+
+```text
+https://api.final.ai/v1/agent-disk
+```
+
+For endpoint details, see the [Agent Disk API reference](/api-references/agent-disk).
+
+## Ownership
+
+Agent Disk supports user-owned and team-owned disks.
+
+| API key owner | Create behavior | Visibility |
+| --- | --- | --- |
+| User-owned API key | Omit `teamId` to create a private disk, or pass `teamId` to create a team-owned disk. | Private disks owned by the user and disks for teams the user belongs to. |
+| Organization-owned API key | Pass `teamId` when creating a disk. Organization-only disks are not supported. | Disks in the organization. |
+
+## Create a disk
+
+Create a private disk with a user-owned API key:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "agent-cache",
+    "region": "aws-us-east-1"
+  }'
+```
+
+Create a team-owned disk by adding `teamId`:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "team-agent-cache",
+    "region": "aws-us-east-1",
+    "teamId": "0193b000-0000-7000-8000-000000000002"
+  }'
+```
+
+The create response includes a default disk token once. Store it immediately if you need token-based mount access.
+
+## List and inspect disks
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Filter by exact disk name:
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks?name=agent-cache" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Fetch one disk:
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks/<disk-id>" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Manage access
+
+Create disk users when a client or integration needs disk-scoped access.
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "token",
+    "nickname": "worker"
+  }'
+```
+
+User types are `token`, `awssts`, and `s3-credential`. Token and S3 credential secrets are only returned when they are created.
+
+## Checkpoint and branch
+
+Create a checkpoint from the current branch state:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "before-refactor",
+    "branch": "main"
+  }'
+```
+
+Create a branch from a checkpoint:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "experiment-a",
+    "fromCheckpoint": "before-refactor",
+    "fromBranch": "main"
+  }'
+```
+
+## Share a path
+
+Create a signed URL for a path on a disk:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/share/artifacts/report.json?expiresIn=86400" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Allowed expiry values are `3600`, `28800`, `86400`, and `604800` seconds.
+
+## Use the TypeScript SDK
+
+Use the external API surface when you want the SDK to call `api.final.ai`:
+
+```ts
+import { createAgentDisk } from '@finalai/agent-disk';
+
+const agentDisk = createAgentDisk({
+  apiSurface: 'external',
+  controlUrl: 'https://api.final.ai/v1/agent-disk',
+  apiKey: process.env.FINAL_API_KEY,
+});
+
+const { disk, token } = await agentDisk.createDisk({
+  name: 'agent-cache',
+});
+
+console.log(disk.id, token);
+```
+

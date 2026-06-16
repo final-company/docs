@@ -27,7 +27,8 @@
           {
             "group": "Platform",
             "pages": [
-              "developer-guides/authentication"
+              "developer-guides/authentication",
+              "developer-guides/secrets"
             ]
           },
           {
@@ -37,6 +38,7 @@
               "developer-guides/git/clone",
               "developer-guides/git/pull-requests",
               "developer-guides/git/merge-queues",
+              "developer-guides/git/github-sync",
               "developer-guides/git/manage"
             ]
           },
@@ -50,6 +52,12 @@
               "developer-guides/virtual-machines/lifecycle",
               "developer-guides/virtual-machines/networking",
               "developer-guides/virtual-machines/access"
+            ]
+          },
+          {
+            "group": "Agent Disk",
+            "pages": [
+              "developer-guides/agent-disk/index"
             ]
           },
           {
@@ -140,6 +148,18 @@
                 "group": "API keys",
                 "pages": [
                   "api-references/api-keys/create"
+                ]
+              },
+              {
+                "group": "Secrets",
+                "pages": [
+                  "api-references/secrets/list",
+                  "api-references/secrets/create",
+                  "api-references/secrets/get",
+                  "api-references/secrets/update",
+                  "api-references/secrets/delete",
+                  "api-references/secrets/read-value",
+                  "api-references/secrets/write-value"
                 ]
               }
             ]
@@ -278,13 +298,62 @@
             ]
           },
           {
+            "group": "Agent Disk",
+            "pages": [
+              "api-references/agent-disk/index",
+              {
+                "group": "Disks",
+                "pages": [
+                  "api-references/agent-disk/disks/list",
+                  "api-references/agent-disk/disks/create",
+                  "api-references/agent-disk/disks/get",
+                  "api-references/agent-disk/disks/delete"
+                ]
+              },
+              {
+                "group": "Disk users",
+                "pages": [
+                  "api-references/agent-disk/users/create",
+                  "api-references/agent-disk/users/delete"
+                ]
+              },
+              {
+                "group": "Checkpoints",
+                "pages": [
+                  "api-references/agent-disk/checkpoints/list",
+                  "api-references/agent-disk/checkpoints/create"
+                ]
+              },
+              {
+                "group": "Branches",
+                "pages": [
+                  "api-references/agent-disk/branches/list",
+                  "api-references/agent-disk/branches/create",
+                  "api-references/agent-disk/branches/delete"
+                ]
+              },
+              {
+                "group": "Share links",
+                "pages": [
+                  "api-references/agent-disk/share/create"
+                ]
+              },
+              {
+                "group": "Usage",
+                "pages": [
+                  "api-references/agent-disk/usage/get"
+                ]
+              }
+            ]
+          },
+          {
             "group": "Durable Execution",
             "pages": [
               "api-references/durable-execution/index",
               {
-                "group": "Apps",
+                "group": "Namespaces",
                 "pages": [
-                  "api-references/durable-execution/apps/get-meta"
+                  "api-references/durable-execution/namespaces/get-meta"
                 ]
               },
               {
@@ -404,7 +473,15 @@
     },
     {
       "source": "/api-reference/durable-execution/apps/get-meta",
-      "destination": "/api-references/durable-execution/apps/get-meta"
+      "destination": "/api-references/durable-execution/namespaces/get-meta"
+    },
+    {
+      "source": "/api-references/durable-execution/apps/get-meta",
+      "destination": "/api-references/durable-execution/namespaces/get-meta"
+    },
+    {
+      "source": "/api-reference/durable-execution/namespaces/get-meta",
+      "destination": "/api-references/durable-execution/namespaces/get-meta"
     },
     {
       "source": "/api-reference/durable-execution/events/send",

@@ -19,8 +19,8 @@ https://api.final.ai
 
 | Credential | Use it for |
 | --- | --- |
-| Organization API key | Public REST APIs for Agent Workspaces, WebSocket Gateway, Virtual Machines, Durable Execution, and API key management. |
-| User API key | User-attributed Agent Workspaces requests. |
+| Organization API key | Public REST APIs for Agent Workspaces, WebSocket Gateway, Virtual Machines, Agent Disk team-owned disks, and API key management. |
+| User API key | User-attributed Agent Workspaces requests, private or team-owned Agent Disk requests, Durable Execution, and Secrets. |
 | Production access token | Git repository management endpoints. |
 | Minted Git credentials | Short-lived Git HTTPS clone, fetch, and push operations. |
 | VM token | Scoped VM access where VM tokens are supported. VM tokens do not authenticate public API requests to `api.final.ai`. |
@@ -79,13 +79,31 @@ Gateway session tokens are scoped to tenant-local resources and expire quickly. 
 
 See [WebSocket Gateway](/developer-guides/websocket-gateway) and the [WebSocket Gateway API reference](/api-references/websocket-gateway).
 
+## Authenticate Agent Disk requests
+
+Use a Final API key for Agent Disk REST API requests.
+
+User-owned API keys can create private disks by omitting `teamId`, or team-owned disks by passing a `teamId` for a team the user belongs to. Organization-owned API keys can access organization disks and must pass `teamId` when creating a disk because Agent Disk does not support organization-only disks.
+
+Disk tokens, S3 credentials, and AWS STS users are disk-scoped access methods. They do not authenticate public API requests to `api.final.ai`.
+
+See [Agent Disk](/developer-guides/agent-disk) and the [Agent Disk API reference](/api-references/agent-disk).
+
 ## Authenticate Durable Execution workers
 
-Use an organization API key for Durable Execution REST API requests, including sending events, triggering runs, and reading history.
+Use a user-owned API key for Durable Execution REST API requests, including sending events, triggering runs, and reading history. Durable Execution scopes work by organization, key owner, and namespace.
 
-Use a Durable Execution connect key for SDK workers. A connect key is scoped to one durable app and is exchanged for short-lived WebSocket worker session tokens by `connect()`. Store connect keys as server-side secrets and do not send them to browsers or untrusted clients.
+Use a Durable Execution connect key for SDK workers. A connect key is scoped to one durable namespace and is exchanged for short-lived WebSocket worker session tokens by `connect()`. Store connect keys as server-side secrets and do not send them to browsers or untrusted clients.
 
 See [TypeScript SDK and workers](/developer-guides/durable-execution/typescript-sdk).
+
+## Authenticate Secrets requests
+
+Use a user-owned API key for the Secrets API. Reads require `secrets:read`; creates, updates, value writes, and deletes require `secrets:write`.
+
+Secrets are scoped to the API key owner inside the organization. Organization-owned API keys must resolve to a local user owner before they can access Secrets.
+
+See [Secrets](/developer-guides/secrets) and the [Secrets API reference](/api-references/secrets/list).
 
 ## Authenticate Git operations
 

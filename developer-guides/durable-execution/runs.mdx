@@ -19,7 +19,7 @@ A run is one execution of a durable workflow. Runs move through these statuses:
 Use direct triggers when you want to start one workflow without sending a normal event through the app trigger matcher:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/workflows/send-receipt/runs" \
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/namespaces/${FINAL_DURABLE_NAMESPACE}/workflows/send-receipt/runs" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -49,7 +49,7 @@ Use [list run history](/api-references/durable-execution/runs/history) to read o
 Signal a waiting run when an external system or human action has the data needed to continue:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/signals" \
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/namespaces/${FINAL_DURABLE_NAMESPACE}/runs/<run-id>/signals" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -70,14 +70,14 @@ See [signal a run](/api-references/durable-execution/runs/signal).
 Cancel a run that should not continue:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/cancel" \
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/namespaces/${FINAL_DURABLE_NAMESPACE}/runs/<run-id>/cancel" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 Retry a terminal run:
 
 ```bash
-curl -X POST "${FINAL_API_URL}/v1/durable-execution/apps/${FINAL_DURABLE_APP_ID}/runs/<run-id>/retry" \
+curl -X POST "${FINAL_API_URL}/v1/durable-execution/namespaces/${FINAL_DURABLE_NAMESPACE}/runs/<run-id>/retry" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 

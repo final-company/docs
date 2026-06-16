@@ -5,7 +5,7 @@ description: "Reference for the Final REST API."
 
 Use the API reference for endpoint details, request schemas, response schemas, and interactive examples.
 
-Git endpoints use a production access token. Platform, Agent Workspaces, Virtual Machines, and Durable Execution endpoints use an API key. See [authentication](/developer-guides/authentication) for credential types and examples.
+Git endpoints use a production access token. Platform, Agent Workspaces, Virtual Machines, Agent Disk, Secrets, and Durable Execution endpoints use an API key. See [authentication](/developer-guides/authentication) for credential types and examples.
 
 ```bash
 Authorization: Bearer <token>
@@ -32,6 +32,10 @@ Authorization: Bearer <api-key>
   Create organization API keys for automation.
 </Card>
 
+<Card title="Secrets" icon="lock-keyhole" href="/api-references/secrets/list">
+  Store, read, rotate, and delete user-owned automation secrets.
+</Card>
+
 <Card title="Agent Workspaces" icon="folder-code" href="/api-references/agent-workspaces">
   Create workspaces, send messages, poll state, and archive agent work.
 </Card>
@@ -42,6 +46,10 @@ Authorization: Bearer <api-key>
 
 <Card title="Virtual Machines" icon="server" href="/api-references/virtual-machines">
   Create VMs, run commands, manage files, attach domains, and control access.
+</Card>
+
+<Card title="Agent Disk" icon="hard-drive" href="/api-references/agent-disk">
+  Create persistent disks, manage disk users, branch and checkpoint storage, share paths, and inspect usage.
 </Card>
 
 <Card title="Durable Execution" icon="workflow" href="/api-references/durable-execution">

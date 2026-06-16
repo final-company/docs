@@ -1,0 +1,23 @@
+---
+title: "Delete a disk"
+description: "Delete an Agent Disk by ID."
+api: "DELETE /v1/agent-disk/disks/{diskId}"
+---
+
+Marks an Agent Disk for deletion and revokes active sessions for that disk.
+
+```bash
+curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/<disk-id>" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Path parameters
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `diskId` | string | Yes | Agent Disk ID. |
+
+## Response
+
+Returns `{ "deleted": true }` when the disk was found.
+
