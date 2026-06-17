@@ -82,7 +82,7 @@ The response includes `url`, `protocolVersion`, `token`, `expiresAt`, and `jti`.
 
 Send `chat`, `room:123`, or another app-defined channel name. Do not prefix resource names with `user:` or `team:`.
 
-If you decode a gateway token while debugging, use the `tenantId` claim to identify the owner scope. User-owned keys use a user tenant, and team-owned keys use a team tenant.
+If you decode a gateway token while debugging, use the `tenantId` claim to identify the owner scope. User-owned keys use a user tenant, and team-owned keys use a team tenant. Tenant IDs contain public wire IDs, such as `user:org_...:usr_...` or `team:org_...:team_...`.
 
 ## Connect over WebSocket
 

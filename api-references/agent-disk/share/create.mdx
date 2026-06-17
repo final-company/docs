@@ -9,7 +9,7 @@ Creates a signed URL for a path on an Agent Disk.
 The path is required. Paths under `.agent-disk/` are reserved and cannot be shared.
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/share/artifacts/report.json?expiresIn=86400&branch=main" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/share/artifacts/report.json?expiresIn=86400&branch=main" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
@@ -17,7 +17,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/share/artifacts
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `diskId` | string | Yes | Agent Disk ID. |
+| `diskId` | string | Yes | Agent Disk wire ID with the `dsk_` prefix. |
 | `path` | string | Yes | Path to share. May include slashes. |
 
 ## Query parameters
@@ -30,4 +30,3 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/share/artifacts
 ## Response
 
 Returns a signed `url`, `expiresIn`, and `expiresAt`.
-

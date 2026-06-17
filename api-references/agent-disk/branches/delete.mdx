@@ -7,7 +7,7 @@ api: "DELETE /v1/agent-disk/disks/{diskId}/branches/{name}"
 Deletes a branch. The `main` branch cannot be deleted.
 
 ```bash
-curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches/<branch-name>" \
+curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/branches/<branch-name>" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
@@ -15,10 +15,9 @@ curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches/<bra
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `diskId` | string | Yes | Agent Disk ID. |
+| `diskId` | string | Yes | Agent Disk wire ID with the `dsk_` prefix. |
 | `name` | string | Yes | Branch name. |
 
 ## Response
 
 Returns `{ "deleted": true }` when the branch was found.
-

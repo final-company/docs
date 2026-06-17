@@ -9,7 +9,7 @@ Revokes a disk user by identifier.
 The identifier can be the user ID, token suffix, AWS principal ARN, or S3 access key ID.
 
 ```bash
-curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users/<identifier>" \
+curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/users/<identifier>" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
@@ -17,10 +17,9 @@ curl -X DELETE "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users/<identi
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `diskId` | string | Yes | Agent Disk ID. |
+| `diskId` | string | Yes | Agent Disk wire ID with the `dsk_` prefix. |
 | `identifier` | string | Yes | Disk user identifier. |
 
 ## Response
 
 Returns `{ "deleted": true }` when the disk user was found.
-

@@ -6,7 +6,7 @@ api: "POST /v1/agent-disk/disks"
 
 Creates an Agent Disk and a default disk token.
 
-With a user-owned API key, omit `teamId` to create a private disk. With an organization-owned API key, `teamId` is required because organization-only Agent Disks are not supported.
+With a user-owned API key, omit `teamId` to create a private disk. With an organization-owned API key, `teamId` is required because organization-only Agent Disks are not supported. Pass `teamId` as a public `team_` ID.
 
 ```bash
 curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
@@ -24,7 +24,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
 | --- | --- | --- | --- |
 | `name` | string | Yes | Disk name. Must match `^[a-zA-Z0-9_-]+$`. |
 | `region` | string | No | Region for the disk. Defaults to the service region when omitted. |
-| `teamId` | string | No | Team owner for the disk. Required for organization-owned API keys. |
+| `teamId` | string | No | Team owner for the disk. Use a `team_` ID. Required for organization-owned API keys. |
 | `dataSource` | object or null | No | External object-store source for the disk. |
 
 ## `dataSource`
@@ -43,5 +43,4 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
 
 ## Response
 
-Returns the disk object with `diskId` and a default `token`. The token is shown once.
-
+Returns the disk object with `diskId` as a `dsk_` ID and a default `token`. The token is shown once.

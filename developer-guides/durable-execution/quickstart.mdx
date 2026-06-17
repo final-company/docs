@@ -11,8 +11,8 @@ You need:
 
 - A user-owned or team-owned API key for public REST API calls.
 - A Durable Execution connect key for the namespace worker.
-- Your Final organization ID.
-- Your Final user ID or team ID.
+- Your Final organization ID, as an `org_` ID.
+- Your Final user ID (`usr_`) or team ID (`team_`).
 
 Organization admins can create API keys in Final under **Settings** > **API Keys**.
 
@@ -22,12 +22,12 @@ Set the base URL, API key, namespace, organization ID, owner user ID, and connec
 export FINAL_API_URL="https://api.final.ai"
 export FINAL_API_KEY="<api-key>"
 export FINAL_DURABLE_NAMESPACE="billing"
-export FINAL_ORGANIZATION_ID="<organization-id>"
-export FINAL_OWNER_USER_ID="<user-id>"
+export FINAL_ORGANIZATION_ID="org_1111117Hxt1fAWDjN7TW"
+export FINAL_OWNER_USER_ID="usr_1111117Hxt1fAWDjN7TX"
 export FINAL_DURABLE_CONNECT_KEY="<connect-key>"
 ```
 
-For a team-owned durable namespace, use a team-owned API key and pass `teamId` to the SDK instead of `ownerUserId`.
+For a team-owned durable namespace, use a team-owned API key and pass a `team_` ID as `teamId` to the SDK instead of `ownerUserId`.
 
 Durable Execution uses bearer authentication:
 

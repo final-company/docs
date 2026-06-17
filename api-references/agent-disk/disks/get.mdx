@@ -7,7 +7,7 @@ api: "GET /v1/agent-disk/disks/{diskId}"
 Returns one Agent Disk visible to the API key.
 
 ```bash
-curl "https://api.final.ai/v1/agent-disk/disks/<disk-id>" \
+curl "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
@@ -15,9 +15,8 @@ curl "https://api.final.ai/v1/agent-disk/disks/<disk-id>" \
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `diskId` | string | Yes | Agent Disk ID. |
+| `diskId` | string | Yes | Agent Disk wire ID with the `dsk_` prefix. |
 
 ## Response
 
 Returns a JSON envelope whose `data` field is a disk object.
-

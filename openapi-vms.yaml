@@ -42,7 +42,7 @@ paths:
       operationId: createVm
       tags: [VMs]
       summary: Create a VM
-      description: "Create a private or team-owned VM from a container image. Omit `teamId` to create a private VM for the acting user. Pass `teamId` to create a team-owned VM. Ownerless organization API keys must pass `teamId`. Requests support `Idempotency-Key`; replayed responses include `Idempotency-Replayed: true`. Idempotency keys are scoped by organization and VM owner scope."
+      description: "Create a private or team-owned VM from a container image. Omit `teamId` to create a private VM for the acting user. Pass `teamId` as a `team_` ID to create a team-owned VM. Ownerless organization API keys must pass `teamId`. Requests support `Idempotency-Key`; replayed responses include `Idempotency-Replayed: true`. Idempotency keys are scoped by organization and VM owner scope."
       parameters:
         - name: Idempotency-Key
           in: header
@@ -80,7 +80,7 @@ paths:
       operationId: getVm
       tags: [VMs]
       summary: Get a VM
-      description: Get a VM by ID or live name when it is visible to the authenticated API key owner.
+      description: Get a VM by `vm_` ID or live name when it is visible to the authenticated API key owner.
       responses:
         "200":
           description: VM was returned.
@@ -120,7 +120,7 @@ paths:
       operationId: deleteVm
       tags: [VMs]
       summary: Delete a VM
-      description: Delete a VM by ID or name.
+      description: Delete a VM by `vm_` ID or name.
       responses:
         "200":
           description: VM was deleted.
@@ -385,8 +385,10 @@ paths:
         - name: shareId
           in: path
           required: true
+          description: VM share wire ID.
           schema:
             type: string
+            example: vmsh_1111117Hxt1fAWDjN7Tb
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -453,8 +455,10 @@ paths:
         - name: domainId
           in: path
           required: true
+          description: Custom domain wire ID.
           schema:
             type: string
+            example: vmcd_1111117Hxt1fAWDjN7Tc
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -502,6 +506,8 @@ paths:
                     example: fvm1.payload.sig
                   id:
                     type: string
+                    description: VM token wire ID.
+                    example: vmtk_1111117Hxt1fAWDjN7Td
   /v1/vms/tokens/{tokenId}:
     delete:
       operationId: revokeVmToken
@@ -512,8 +518,10 @@ paths:
         - name: tokenId
           in: path
           required: true
+          description: VM token wire ID.
           schema:
             type: string
+            example: vmtk_1111117Hxt1fAWDjN7Td
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -577,8 +585,10 @@ paths:
         - name: keyId
           in: path
           required: true
+          description: SSH key wire ID.
           schema:
             type: string
+            example: vmsk_1111117Hxt1fAWDjN7Te
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -639,7 +649,7 @@ components:
       name: idOrName
       in: path
       required: true
-      description: VM ID or live VM name.
+      description: VM wire ID (`vm_...`) or live VM name.
       schema:
         type: string
   responses:
@@ -713,20 +723,21 @@ components:
       properties:
         id:
           type: string
-          format: uuid
+          description: VM wire ID.
+          example: vm_1111117Hxt1fAWDjN7TZ
         name:
           type: string
           example: wild-haddock
         teamId:
           type: string
-          format: uuid
           nullable: true
-          description: Team owner for a team-owned VM. Null for private VMs.
+          description: Team owner for a team-owned VM, as a `team_` ID. Null for private VMs.
+          example: team_1111117Hxt1fAWDjN7TY
         ownerUserId:
           type: string
-          format: uuid
           nullable: true
-          description: User owner for a private VM. Null for team-owned VMs.
+          description: User owner for a private VM, as a `usr_` ID. Null for team-owned VMs.
+          example: usr_1111117Hxt1fAWDjN7TX
         state:
           type: integer
         stateName:
@@ -800,8 +811,8 @@ components:
           type: string
         teamId:
           type: string
-          format: uuid
-          description: Create a team-owned VM for this team. Omit to create a private VM for the acting user. Required when the API key has no acting user.
+          description: Create a team-owned VM for this team. Use a `team_` ID. Omit to create a private VM for the acting user. Required when the API key has no acting user.
+          example: team_1111117Hxt1fAWDjN7TY
         regionSlug:
           type: string
         vcpu:
@@ -841,7 +852,8 @@ components:
           type: boolean
         registryCredentialId:
           type: string
-          format: uuid
+          description: Registry credential wire ID.
+          example: vmrc_1111117Hxt1fAWDjN7Tn
         tags:
           type: array
           items:
@@ -970,6 +982,8 @@ components:
       properties:
         id:
           type: string
+          description: VM event wire ID.
+          example: vmev_1111117Hxt1fAWDjN7Tm
         type:
           type: integer
         payload:
@@ -983,6 +997,8 @@ components:
       properties:
         id:
           type: string
+          description: VM share wire ID.
+          example: vmsh_1111117Hxt1fAWDjN7Tb
         kind:
           type: string
           enum: [user, email, team, link]
@@ -992,12 +1008,16 @@ components:
         userId:
           type: string
           nullable: true
+          description: Shared user as a `usr_` ID.
+          example: usr_1111117Hxt1fAWDjN7TX
         email:
           type: string
           nullable: true
         teamId:
           type: string
           nullable: true
+          description: Shared team as a `team_` ID.
+          example: team_1111117Hxt1fAWDjN7TY
         createdAt:
           type: string
           format: date-time
@@ -1010,13 +1030,15 @@ components:
           enum: [user, email, team, link]
         userId:
           type: string
-          format: uuid
+          description: User to share with, as a `usr_` ID.
+          example: usr_1111117Hxt1fAWDjN7TX
         email:
           type: string
           format: email
         teamId:
           type: string
-          format: uuid
+          description: Team to share with, as a `team_` ID.
+          example: team_1111117Hxt1fAWDjN7TY
         access:
           type: string
           enum: [http, full]
@@ -1026,6 +1048,8 @@ components:
       properties:
         id:
           type: string
+          description: Custom domain wire ID.
+          example: vmcd_1111117Hxt1fAWDjN7Tc
         domain:
           type: string
         status:
@@ -1043,11 +1067,15 @@ components:
       properties:
         id:
           type: string
+          description: VM token wire ID.
+          example: vmtk_1111117Hxt1fAWDjN7Td
         name:
           type: string
         vmId:
           type: string
           nullable: true
+          description: VM wire ID.
+          example: vm_1111117Hxt1fAWDjN7TZ
         scopes:
           type: array
           items:
@@ -1072,7 +1100,8 @@ components:
           type: string
         vmId:
           type: string
-          format: uuid
+          description: Limit the token to one VM by passing a `vm_` ID.
+          example: vm_1111117Hxt1fAWDjN7TZ
         scopes:
           type: array
           items:
@@ -1085,6 +1114,8 @@ components:
       properties:
         id:
           type: string
+          description: SSH key wire ID.
+          example: vmsk_1111117Hxt1fAWDjN7Te
         name:
           type: string
         fingerprint:

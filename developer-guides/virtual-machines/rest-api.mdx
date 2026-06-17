@@ -23,9 +23,9 @@ For every endpoint, schema, and response, see the [Virtual Machines API referenc
 
 Every VM is either private to a user or owned by a team.
 
-User-owned API keys create private VMs when you omit `teamId`. Pass `teamId` to create a team-owned VM for a team the acting user belongs to. Ownerless organization API keys must pass `teamId` when creating a VM.
+User-owned API keys create private VMs when you omit `teamId`. Pass `teamId` as a `team_` ID to create a team-owned VM for a team the acting user belongs to. Ownerless organization API keys must pass `teamId` when creating a VM.
 
-VM responses include `ownerUserId` for private VMs and `teamId` for team-owned VMs. Exactly one of those fields is set.
+VM IDs use the `vm_` prefix. VM responses include `ownerUserId` as a `usr_` ID for private VMs and `teamId` as a `team_` ID for team-owned VMs. Exactly one of those fields is set.
 
 ## Create a VM
 
@@ -36,7 +36,7 @@ curl -X POST "https://api.final.ai/v1/vms" \
   -H "Idempotency-Key: docs-demo-001" \
   -d '{
     "name": "docs-demo",
-    "teamId": "018f1111-2222-7333-8444-555555555555",
+    "teamId": "team_1111117Hxt1fAWDjN7TY",
     "image": "docker.io/library/ubuntu:24.04",
     "vcpu": 2,
     "memoryMb": 4096,

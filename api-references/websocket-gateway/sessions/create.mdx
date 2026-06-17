@@ -36,8 +36,8 @@ EOF
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `subject` | string | No | Subject for the gateway token. Defaults to `user:<userId>` for user-owned keys or `team:<teamId>` for team-owned keys. |
-| `clientId` | string | No | Client identifier. Defaults to the owner user ID for user-owned keys or the team ID for team-owned keys. |
+| `subject` | string | No | Subject for the gateway token. Defaults to `user:<workosUserId>` when available, `user:<usr_...>` for user-owned keys without a WorkOS user ID, or `team:<team_...>` for team-owned keys. |
+| `clientId` | string | No | Client identifier. Defaults to the owner `usr_...` ID for user-owned keys or the `team_...` ID for team-owned keys. |
 | `ttlMs` | integer | No | Token lifetime in milliseconds. Maximum `600000`. |
 | `grants` | object | Yes | Scoped access grants. At least one grant is required. |
 | `metadata` | object | No | Additional token metadata. |
@@ -77,4 +77,4 @@ Connect with the returned `url`, `token`, and `protocolVersion`:
 wss://ws.api.final.ai/connect?token=<gateway-token>&protocolVersion=1
 ```
 
-If you inspect the gateway token while debugging, use the `tenantId` claim to identify the owner scope.
+If you inspect the gateway token while debugging, use the `tenantId` claim to identify the owner scope. Tenant IDs contain public wire IDs, such as `user:org_...:usr_...` or `team:org_...:team_...`.

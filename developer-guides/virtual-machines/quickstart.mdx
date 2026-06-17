@@ -9,7 +9,7 @@ The CLI stores credentials in `~/.config/final-vm/config.json`. You can also set
 
 ## Before you begin
 
-You need a Final API key. Use a user-owned API key to create private VMs. Use `--team <team-id>` when you want to create a team-owned VM or when you use an ownerless organization API key.
+You need a Final API key. Use a user-owned API key to create private VMs. Use `--team <team_...>` when you want to create a team-owned VM or when you use an ownerless organization API key.
 
 The public API host is:
 
@@ -45,7 +45,7 @@ Create a team-owned VM:
 ```bash
 final-vm new docker.io/library/ubuntu:24.04 \
   --name team-demo \
-  --team 018f1111-2222-7333-8444-555555555555
+  --team team_1111117Hxt1fAWDjN7TY
 ```
 
 Create a VM that exposes an HTTP app on port `3000`:

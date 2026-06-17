@@ -18,7 +18,7 @@ paths:
       operationId: getDurableNamespaceMeta
       tags: [Namespaces]
       summary: Get namespace metadata
-      description: Inspect the resolved namespace scope for the authenticated user-owned or team-owned API key.
+      description: Inspect the resolved namespace scope for the authenticated user-owned or team-owned API key. Scope IDs are returned as public wire IDs.
       parameters:
         - $ref: "#/components/parameters/Namespace"
       responses:
@@ -34,12 +34,15 @@ paths:
                     type: string
                   organizationId:
                     type: string
+                    example: org_1111117Hxt1fAWDjN7TW
                   ownerUserId:
                     type: string
                     nullable: true
+                    example: usr_1111117Hxt1fAWDjN7TX
                   teamId:
                     type: string
                     nullable: true
+                    example: null
         "401":
           $ref: "#/components/responses/Unauthorized"
   /v1/durable-execution/namespaces/{namespace}/workflows:

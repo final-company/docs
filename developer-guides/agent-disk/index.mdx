@@ -24,6 +24,8 @@ Agent Disk supports user-owned and team-owned disks.
 | User-owned API key | Omit `teamId` to create a private disk, or pass `teamId` to create a team-owned disk. | Private disks owned by the user and disks for teams the user belongs to. |
 | Organization-owned API key | Pass `teamId` when creating a disk. Organization-only disks are not supported. | Disks in the organization. |
 
+Agent Disk IDs use the `dsk_` prefix. Team-owned disk requests use a `team_` ID for `teamId`.
+
 ## Create a disk
 
 Create a private disk with a user-owned API key:
@@ -47,7 +49,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
   -d '{
     "name": "team-agent-cache",
     "region": "aws-us-east-1",
-    "teamId": "0193b000-0000-7000-8000-000000000002"
+    "teamId": "team_1111117Hxt1fAWDjN7TY"
   }'
 ```
 
@@ -70,7 +72,7 @@ curl "https://api.final.ai/v1/agent-disk/disks?name=agent-cache" \
 Fetch one disk:
 
 ```bash
-curl "https://api.final.ai/v1/agent-disk/disks/<disk-id>" \
+curl "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
@@ -79,7 +81,7 @@ curl "https://api.final.ai/v1/agent-disk/disks/<disk-id>" \
 Create disk users when a client or integration needs disk-scoped access.
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/users" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -95,7 +97,7 @@ User types are `token`, `awssts`, and `s3-credential`. Token and S3 credential s
 Create a checkpoint from the current branch state:
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/checkpoints" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -107,7 +109,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints" \
 Create a branch from a checkpoint:
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/branches" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -122,7 +124,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches" \
 Create a signed URL for a path on a disk:
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/share/artifacts/report.json?expiresIn=86400" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/share/artifacts/report.json?expiresIn=86400" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
@@ -147,4 +149,3 @@ const { disk, token } = await agentDisk.createDisk({
 
 console.log(disk.id, token);
 ```
-

@@ -64,6 +64,12 @@ curl -X POST "https://api.final.ai/v1/api-keys" \
 
 The response includes the plaintext `value` once. Store it immediately.
 
+## Use public IDs
+
+Public APIs return Final wire IDs for Final-minted resources. Use these IDs in API requests instead of raw UUIDs.
+
+Common prefixes include `org_` for organizations, `usr_` for users, `team_` for teams, `ak_` for API keys, `dsk_` for Agent Disks, and `vm_` for Virtual Machines. VM subresources use prefixes such as `vmsh_` for shares, `vmcd_` for custom domains, `vmtk_` for VM tokens, and `vmsk_` for SSH keys.
+
 ## Authenticate Agent Workspaces
 
 Agent Workspaces accepts organization-owned, team-owned, and user-owned API keys.

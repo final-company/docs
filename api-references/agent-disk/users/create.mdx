@@ -9,7 +9,7 @@ Creates a disk-scoped user.
 Secrets for `token` and `s3-credential` users are returned only in the create response.
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/users" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -22,7 +22,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users" \
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `diskId` | string | Yes | Agent Disk ID. |
+| `diskId` | string | Yes | Agent Disk wire ID with the `dsk_` prefix. |
 
 ## Body
 
@@ -35,4 +35,3 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/users" \
 ## Response
 
 Returns the created disk user. Token users include `token` once. S3 credential users include `accessKeyId` and `secretAccessKey` once.
-

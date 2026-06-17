@@ -7,7 +7,7 @@ api: "POST /v1/agent-disk/disks/{diskId}/checkpoints"
 Creates a checkpoint for a branch. If `branch` is omitted, the checkpoint is created from `main`.
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/checkpoints" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -20,7 +20,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints" \
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `diskId` | string | Yes | Agent Disk ID. |
+| `diskId` | string | Yes | Agent Disk wire ID with the `dsk_` prefix. |
 
 ## Body
 
@@ -32,4 +32,3 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/checkpoints" \
 ## Response
 
 Returns the created checkpoint.
-

@@ -11,7 +11,7 @@ Every request to the public VM API uses bearer authentication with a Final API k
 Authorization: Bearer <api-key>
 ```
 
-VMs are scoped to one owner. Private VMs return `ownerUserId`; team-owned VMs return `teamId`. Pass `teamId` when creating a team-owned VM or when using an ownerless organization API key.
+VMs are scoped to one owner. VM IDs use the `vm_` prefix. Private VMs return `ownerUserId` as a `usr_` ID; team-owned VMs return `teamId` as a `team_` ID. Pass a `team_` ID as `teamId` when creating a team-owned VM or when using an ownerless organization API key.
 
 The public VM API namespace is:
 

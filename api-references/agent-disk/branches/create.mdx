@@ -7,7 +7,7 @@ api: "POST /v1/agent-disk/disks/{diskId}/branches"
 Creates a branch from a checkpoint.
 
 ```bash
-curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches" \
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/branches" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -21,7 +21,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches" \
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `diskId` | string | Yes | Agent Disk ID. |
+| `diskId` | string | Yes | Agent Disk wire ID with the `dsk_` prefix. |
 
 ## Body
 
@@ -34,4 +34,3 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/<disk-id>/branches" \
 ## Response
 
 Returns the created branch.
-
