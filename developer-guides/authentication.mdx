@@ -19,12 +19,11 @@ https://api.final.ai
 
 | Credential | Use it for |
 | --- | --- |
-| Organization API key | Organization-scoped REST APIs, Virtual Machines team-owned creation with `teamId`, Agent Workspaces through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
+| Organization API key | Organization-scoped REST APIs, Computers team-owned creation with `teamId`, Agent Workspaces through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
 | Team API key | Team-scoped Agent Workspaces, WebSocket Gateway, and Durable Execution requests. |
-| User API key | User-scoped Agent Workspaces, WebSocket Gateway, Durable Execution, Secrets, private or team-owned Virtual Machines, and private or team-owned Agent Disk requests. |
-| Production access token | Git repository management endpoints. |
+| User API key | User-scoped Agent Workspaces, WebSocket Gateway, Durable Execution, Secrets, Git repositories, private or team-owned Computers, and private or team-owned Agent Disk requests. |
 | Minted Git credentials | Short-lived Git HTTPS clone, fetch, and push operations. |
-| VM token | Scoped VM access where VM tokens are supported. VM tokens do not authenticate public API requests to `api.final.ai`. |
+| computer token | Scoped Computer access where computer tokens are supported. computer tokens do not authenticate public API requests to `api.final.ai`. |
 
 ## Use API keys
 
@@ -68,7 +67,7 @@ The response includes the plaintext `value` once. Store it immediately.
 
 Most public APIs return Final wire IDs for Final-minted resources. Use these IDs in API requests instead of raw UUIDs when an endpoint returns a prefixed ID.
 
-Common prefixes include `org_` for organizations, `usr_` for users, `team_` for teams, `ak_` for API keys, `gsr_` for Git repositories, `dsk_` for Agent Disks, and `vm_` for Virtual Machines. VM subresources use prefixes such as `vmsh_` for shares, `vmcd_` for custom domains, `vmtk_` for VM tokens, and `vmsk_` for SSH keys.
+Common prefixes include `org_` for organizations, `usr_` for users, `team_` for teams, `ak_` for API keys, `prof_` for agent profiles, `wksp_` for agent workspaces, `sess_` for agent sessions, `fnod_` for Final Nodes, `gsr_` for Git repositories, `dsk_` for Agent Disks, and `comp_` for Computers. Computer subresources use prefixes such as `cshr_` for shares, `cdmn_` for custom domains, `ctok_` for computer tokens, and `cssh_` for SSH keys.
 
 Secrets are an exception. The Secrets API returns UUID secret IDs, and you can use either the UUID or the secret name in `secretId` path parameters.
 
@@ -92,17 +91,17 @@ Gateway session tokens are scoped to the API key owner and expire quickly. Do no
 
 See [WebSocket Gateway](/developer-guides/websocket-gateway) and the [WebSocket Gateway API reference](/api-references/websocket-gateway).
 
-## Authenticate Virtual Machines requests
+## Authenticate Computers requests
 
-Use a Final API key for Virtual Machines REST API requests.
+Use a Final API key for Computers REST API requests.
 
-User-owned API keys create private VMs when you omit `teamId`. To create a team-owned VM, pass `teamId` for a team the acting user belongs to.
+User-owned API keys create private Computers when you omit `teamId`. To create a team-owned Computer, pass `teamId` for a team the acting user belongs to.
 
-Ownerless organization API keys can access organization VMs, but they must pass `teamId` when creating a VM. Every VM has exactly one owner scope: either `ownerUserId` for a private VM or `teamId` for a team-owned VM.
+Ownerless organization API keys can access organization Computers, but they must pass `teamId` when creating a Computer. Every Computer has exactly one owner scope: either `ownerUserId` for a private Computer or `teamId` for a team-owned Computer.
 
-VM tokens are scoped VM credentials where supported. They do not authenticate public API requests to `api.final.ai`.
+computer tokens are scoped Computer credentials where supported. They do not authenticate public API requests to `api.final.ai`.
 
-See [Virtual Machines](/developer-guides/virtual-machines) and the [Virtual Machines API reference](/api-references/virtual-machines).
+See [Computers](/developer-guides/computers) and the [Computers API reference](/api-references/computers).
 
 ## Authenticate Agent Disk requests
 
@@ -132,11 +131,11 @@ See [Secrets](/developer-guides/secrets) and the [Secrets API reference](/api-re
 
 ## Authenticate Git operations
 
-Git repository management endpoints currently use a production access token:
+Use a user-owned API key for Git repository management endpoints. Reads require `repositories:read`. Creates, archives, deletes, and write-capable Git credential minting require `repositories:write`.
 
 ```bash
-curl "https://api.final.ai/api/repositories" \
-  -H "Authorization: Bearer ${access_token}"
+curl "https://api.final.ai/v1/repositories" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 For Git clone, fetch, and push, first mint short-lived Git credentials with [mint Git credentials](/api-references/repositories/mint-git-credentials). Use those credentials with the Git remote URL instead of sending your API key to Git.

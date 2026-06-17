@@ -1,0 +1,117 @@
+---
+title: "Computers quickstart"
+description: "Create, inspect, connect to, and delete a Computer with the final-computer CLI."
+---
+
+Use the `final-computer` CLI for day-to-day Computer work. The CLI is a thin client over the public Computers REST API. If you want to call the API directly, see [use the REST API](/developer-guides/computers/rest-api).
+
+The CLI stores credentials in `~/.config/final-computer/config.json`. You can also set `FINAL_COMPUTER_API_KEY` and `FINAL_COMPUTER_API_URL` in your environment.
+
+## Before you begin
+
+You need a Final API key. Use a user-owned API key to create private Computers. Use `--team <team_...>` when you want to create a team-owned Computer or when you use an ownerless organization API key.
+
+The public API host is:
+
+```text
+https://api.final.ai
+```
+
+Direct Computer REST endpoints are namespaced under `https://api.final.ai/v1/computers`.
+
+## Authenticate the CLI
+
+```bash
+final-computer login --api-key <api-key>
+```
+
+For automation, set environment variables instead:
+
+```bash
+export FINAL_COMPUTER_API_KEY="<api-key>"
+export FINAL_COMPUTER_API_URL="https://api.final.ai"
+```
+
+## Create a Computer
+
+Create a Computer from a container image:
+
+```bash
+final-computer new docker.io/library/ubuntu:24.04 --name docs-demo
+```
+
+Create a team-owned Computer:
+
+```bash
+final-computer new docker.io/library/ubuntu:24.04 \
+  --name team-demo \
+  --team team_1111117Hxt1fAWDjN7TY
+```
+
+Create a Computer that exposes an HTTP app on port `3000`:
+
+```bash
+final-computer new docker.io/library/node:22-slim \
+  --name preview-app \
+  --port 3000 \
+  --public \
+  --command "node server.js"
+```
+
+The CLI prints the Computer hostname after creation. To create Computers from the API, use the [create a Computer endpoint](/api-references/computers/computers/create).
+
+## List and inspect Computers
+
+```bash
+final-computer ls
+final-computer stat docs-demo
+```
+
+Use `--json` with any command when you need machine-readable output:
+
+```bash
+final-computer stat docs-demo --json
+```
+
+The matching REST endpoints are [list Computers](/api-references/computers/computers/list) and [get a Computer](/api-references/computers/computers/get).
+
+## Connect with SSH
+
+Register an SSH public key before connecting:
+
+```bash
+final-computer ssh-key add laptop "$(cat ~/.ssh/id_ed25519.pub)"
+```
+
+Then connect:
+
+```bash
+final-computer ssh docs-demo
+```
+
+You can pass extra SSH flags after the Computer name:
+
+```bash
+final-computer ssh docs-demo -L 8080:localhost:3000
+```
+
+For API details, see [add an SSH key](/api-references/computers/ssh-keys/add).
+
+## Copy files
+
+Use `final-computer cp` with Computer-side paths written as `<computer>:<path>`:
+
+```bash
+final-computer cp ./app.tar.gz docs-demo:/tmp/app.tar.gz
+final-computer cp docs-demo:/var/log/app.log ./app.log
+```
+
+The REST API also supports direct file reads and writes. See [read a file](/api-references/computers/files/read) and [write a file](/api-references/computers/files/write).
+
+## Delete the Computer
+
+```bash
+final-computer rm docs-demo
+```
+
+You can also delete a Computer with the [delete a Computer endpoint](/api-references/computers/computers/delete).

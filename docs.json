@@ -24,20 +24,20 @@
       {
         "tab": "Developer Guides",
         "pages": [
-        {
-          "group": "Platform",
-          "pages": [
-            "developer-guides/authentication"
-          ]
-        },
-        {
-          "group": "Secrets",
-          "pages": [
-            "developer-guides/secrets"
-          ]
-        },
-        {
-          "group": "Git",
+          {
+            "group": "Platform",
+            "pages": [
+              "developer-guides/authentication"
+            ]
+          },
+          {
+            "group": "Secrets",
+            "pages": [
+              "developer-guides/secrets"
+            ]
+          },
+          {
+            "group": "Git",
             "pages": [
               "developer-guides/git/index",
               "developer-guides/git/clone",
@@ -48,15 +48,15 @@
             ]
           },
           {
-            "group": "Virtual Machines",
+            "group": "Computers",
             "pages": [
-              "developer-guides/virtual-machines/index",
-              "developer-guides/virtual-machines/rest-api",
-              "developer-guides/virtual-machines/quickstart",
-              "developer-guides/virtual-machines/sdk",
-              "developer-guides/virtual-machines/lifecycle",
-              "developer-guides/virtual-machines/networking",
-              "developer-guides/virtual-machines/access"
+              "developer-guides/computers/index",
+              "developer-guides/computers/rest-api",
+              "developer-guides/computers/quickstart",
+              "developer-guides/computers/sdk",
+              "developer-guides/computers/lifecycle",
+              "developer-guides/computers/networking",
+              "developer-guides/computers/access"
             ]
           },
           {
@@ -94,29 +94,29 @@
         "pages": [
           {
             "group": "Platform",
-          "pages": [
-            {
-              "group": "API keys",
-              "pages": [
-                "api-references/api-keys/create"
-              ]
-            }
-          ]
-        },
-        {
-          "group": "Secrets",
-          "pages": [
-            "api-references/secrets/list",
-            "api-references/secrets/create",
-            "api-references/secrets/get",
-            "api-references/secrets/update",
-            "api-references/secrets/delete",
-            "api-references/secrets/read-value",
-            "api-references/secrets/write-value"
-          ]
-        },
-        {
-          "group": "Git",
+            "pages": [
+              {
+                "group": "API keys",
+                "pages": [
+                  "api-references/api-keys/create"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Secrets",
+            "pages": [
+              "api-references/secrets/list",
+              "api-references/secrets/create",
+              "api-references/secrets/get",
+              "api-references/secrets/update",
+              "api-references/secrets/delete",
+              "api-references/secrets/read-value",
+              "api-references/secrets/write-value"
+            ]
+          },
+          {
+            "group": "Git",
             "pages": [
               "api-references/index",
               {
@@ -230,74 +230,74 @@
             ]
           },
           {
-            "group": "Virtual Machines",
+            "group": "Computers",
             "pages": [
-              "api-references/virtual-machines/index",
+              "api-references/computers/index",
               {
-                "group": "VMs",
+                "group": "Computers",
                 "pages": [
-                  "api-references/virtual-machines/vms/list",
-                  "api-references/virtual-machines/vms/create",
-                  "api-references/virtual-machines/vms/get",
-                  "api-references/virtual-machines/vms/update",
-                  "api-references/virtual-machines/vms/update-visibility",
-                  "api-references/virtual-machines/vms/action",
-                  "api-references/virtual-machines/vms/list-events",
-                  "api-references/virtual-machines/vms/delete"
+                  "api-references/computers/computers/list",
+                  "api-references/computers/computers/create",
+                  "api-references/computers/computers/get",
+                  "api-references/computers/computers/update",
+                  "api-references/computers/computers/update-visibility",
+                  "api-references/computers/computers/action",
+                  "api-references/computers/computers/list-events",
+                  "api-references/computers/computers/delete"
                 ]
               },
               {
                 "group": "Execution",
                 "pages": [
-                  "api-references/virtual-machines/execution/execute",
-                  "api-references/virtual-machines/execution/stream",
-                  "api-references/virtual-machines/execution/list-processes",
-                  "api-references/virtual-machines/execution/run-cli-command"
+                  "api-references/computers/execution/execute",
+                  "api-references/computers/execution/stream",
+                  "api-references/computers/execution/list-processes",
+                  "api-references/computers/execution/run-cli-command"
                 ]
               },
               {
                 "group": "Files",
                 "pages": [
-                  "api-references/virtual-machines/files/read",
-                  "api-references/virtual-machines/files/write"
+                  "api-references/computers/files/read",
+                  "api-references/computers/files/write"
                 ]
               },
               {
                 "group": "Shares",
                 "pages": [
-                  "api-references/virtual-machines/shares/list",
-                  "api-references/virtual-machines/shares/create",
-                  "api-references/virtual-machines/shares/delete"
+                  "api-references/computers/shares/list",
+                  "api-references/computers/shares/create",
+                  "api-references/computers/shares/delete"
                 ]
               },
               {
                 "group": "Domains",
                 "pages": [
-                  "api-references/virtual-machines/domains/list",
-                  "api-references/virtual-machines/domains/add",
-                  "api-references/virtual-machines/domains/delete"
+                  "api-references/computers/domains/list",
+                  "api-references/computers/domains/add",
+                  "api-references/computers/domains/delete"
                 ]
               },
               {
                 "group": "Tokens",
                 "pages": [
-                  "api-references/virtual-machines/tokens/list",
-                  "api-references/virtual-machines/tokens/create",
-                  "api-references/virtual-machines/tokens/delete"
+                  "api-references/computers/tokens/list",
+                  "api-references/computers/tokens/create",
+                  "api-references/computers/tokens/delete"
                 ]
               },
               {
                 "group": "SSH keys",
                 "pages": [
-                  "api-references/virtual-machines/ssh-keys/list",
-                  "api-references/virtual-machines/ssh-keys/add",
-                  "api-references/virtual-machines/ssh-keys/delete"
+                  "api-references/computers/ssh-keys/list",
+                  "api-references/computers/ssh-keys/add",
+                  "api-references/computers/ssh-keys/delete"
                 ]
               },
               {
                 "group": "Regions",
                 "pages": [
-                  "api-references/virtual-machines/regions/list"
+                  "api-references/computers/regions/list"
                 ]
               }
             ]
@@ -630,115 +630,115 @@
     },
     {
       "source": "/api-reference/virtual-machines",
-      "destination": "/api-references/virtual-machines"
+      "destination": "/api-references/computers"
     },
     {
       "source": "/api-reference/virtual-machines/domains/add",
-      "destination": "/api-references/virtual-machines/domains/add"
+      "destination": "/api-references/computers/domains/add"
     },
     {
       "source": "/api-reference/virtual-machines/domains/delete",
-      "destination": "/api-references/virtual-machines/domains/delete"
+      "destination": "/api-references/computers/domains/delete"
     },
     {
       "source": "/api-reference/virtual-machines/domains/list",
-      "destination": "/api-references/virtual-machines/domains/list"
+      "destination": "/api-references/computers/domains/list"
     },
     {
       "source": "/api-reference/virtual-machines/execution/execute",
-      "destination": "/api-references/virtual-machines/execution/execute"
+      "destination": "/api-references/computers/execution/execute"
     },
     {
       "source": "/api-reference/virtual-machines/execution/list-processes",
-      "destination": "/api-references/virtual-machines/execution/list-processes"
+      "destination": "/api-references/computers/execution/list-processes"
     },
     {
       "source": "/api-reference/virtual-machines/execution/run-cli-command",
-      "destination": "/api-references/virtual-machines/execution/run-cli-command"
+      "destination": "/api-references/computers/execution/run-cli-command"
     },
     {
       "source": "/api-reference/virtual-machines/execution/stream",
-      "destination": "/api-references/virtual-machines/execution/stream"
+      "destination": "/api-references/computers/execution/stream"
     },
     {
       "source": "/api-reference/virtual-machines/files/read",
-      "destination": "/api-references/virtual-machines/files/read"
+      "destination": "/api-references/computers/files/read"
     },
     {
       "source": "/api-reference/virtual-machines/files/write",
-      "destination": "/api-references/virtual-machines/files/write"
+      "destination": "/api-references/computers/files/write"
     },
     {
       "source": "/api-reference/virtual-machines/regions/list",
-      "destination": "/api-references/virtual-machines/regions/list"
+      "destination": "/api-references/computers/regions/list"
     },
     {
       "source": "/api-reference/virtual-machines/shares/create",
-      "destination": "/api-references/virtual-machines/shares/create"
+      "destination": "/api-references/computers/shares/create"
     },
     {
       "source": "/api-reference/virtual-machines/shares/delete",
-      "destination": "/api-references/virtual-machines/shares/delete"
+      "destination": "/api-references/computers/shares/delete"
     },
     {
       "source": "/api-reference/virtual-machines/shares/list",
-      "destination": "/api-references/virtual-machines/shares/list"
+      "destination": "/api-references/computers/shares/list"
     },
     {
       "source": "/api-reference/virtual-machines/ssh-keys/add",
-      "destination": "/api-references/virtual-machines/ssh-keys/add"
+      "destination": "/api-references/computers/ssh-keys/add"
     },
     {
       "source": "/api-reference/virtual-machines/ssh-keys/delete",
-      "destination": "/api-references/virtual-machines/ssh-keys/delete"
+      "destination": "/api-references/computers/ssh-keys/delete"
     },
     {
       "source": "/api-reference/virtual-machines/ssh-keys/list",
-      "destination": "/api-references/virtual-machines/ssh-keys/list"
+      "destination": "/api-references/computers/ssh-keys/list"
     },
     {
       "source": "/api-reference/virtual-machines/tokens/create",
-      "destination": "/api-references/virtual-machines/tokens/create"
+      "destination": "/api-references/computers/tokens/create"
     },
     {
       "source": "/api-reference/virtual-machines/tokens/delete",
-      "destination": "/api-references/virtual-machines/tokens/delete"
+      "destination": "/api-references/computers/tokens/delete"
     },
     {
       "source": "/api-reference/virtual-machines/tokens/list",
-      "destination": "/api-references/virtual-machines/tokens/list"
+      "destination": "/api-references/computers/tokens/list"
     },
     {
       "source": "/api-reference/virtual-machines/vms/action",
-      "destination": "/api-references/virtual-machines/vms/action"
+      "destination": "/api-references/computers/computers/action"
     },
     {
       "source": "/api-reference/virtual-machines/vms/create",
-      "destination": "/api-references/virtual-machines/vms/create"
+      "destination": "/api-references/computers/computers/create"
     },
     {
       "source": "/api-reference/virtual-machines/vms/delete",
-      "destination": "/api-references/virtual-machines/vms/delete"
+      "destination": "/api-references/computers/computers/delete"
     },
     {
       "source": "/api-reference/virtual-machines/vms/get",
-      "destination": "/api-references/virtual-machines/vms/get"
+      "destination": "/api-references/computers/computers/get"
     },
     {
       "source": "/api-reference/virtual-machines/vms/list",
-      "destination": "/api-references/virtual-machines/vms/list"
+      "destination": "/api-references/computers/computers/list"
     },
     {
       "source": "/api-reference/virtual-machines/vms/list-events",
-      "destination": "/api-references/virtual-machines/vms/list-events"
+      "destination": "/api-references/computers/computers/list-events"
     },
     {
       "source": "/api-reference/virtual-machines/vms/update",
-      "destination": "/api-references/virtual-machines/vms/update"
+      "destination": "/api-references/computers/computers/update"
     },
     {
       "source": "/api-reference/virtual-machines/vms/update-visibility",
-      "destination": "/api-references/virtual-machines/vms/update-visibility"
+      "destination": "/api-references/computers/computers/update-visibility"
     },
     {
       "source": "/authentication",
@@ -794,31 +794,171 @@
     },
     {
       "source": "/virtual-machines",
-      "destination": "/developer-guides/virtual-machines"
+      "destination": "/developer-guides/computers"
     },
     {
       "source": "/virtual-machines/access",
-      "destination": "/developer-guides/virtual-machines/access"
+      "destination": "/developer-guides/computers/access"
     },
     {
       "source": "/virtual-machines/lifecycle",
-      "destination": "/developer-guides/virtual-machines/lifecycle"
+      "destination": "/developer-guides/computers/lifecycle"
     },
     {
       "source": "/virtual-machines/networking",
-      "destination": "/developer-guides/virtual-machines/networking"
+      "destination": "/developer-guides/computers/networking"
     },
     {
       "source": "/virtual-machines/quickstart",
-      "destination": "/developer-guides/virtual-machines/quickstart"
+      "destination": "/developer-guides/computers/quickstart"
     },
     {
       "source": "/virtual-machines/rest-api",
-      "destination": "/developer-guides/virtual-machines/rest-api"
+      "destination": "/developer-guides/computers/rest-api"
     },
     {
       "source": "/virtual-machines/sdk",
-      "destination": "/developer-guides/virtual-machines/sdk"
+      "destination": "/developer-guides/computers/sdk"
+    },
+    {
+      "source": "/api-references/virtual-machines",
+      "destination": "/api-references/computers"
+    },
+    {
+      "source": "/api-references/virtual-machines/domains/add",
+      "destination": "/api-references/computers/domains/add"
+    },
+    {
+      "source": "/api-references/virtual-machines/domains/delete",
+      "destination": "/api-references/computers/domains/delete"
+    },
+    {
+      "source": "/api-references/virtual-machines/domains/list",
+      "destination": "/api-references/computers/domains/list"
+    },
+    {
+      "source": "/api-references/virtual-machines/execution/execute",
+      "destination": "/api-references/computers/execution/execute"
+    },
+    {
+      "source": "/api-references/virtual-machines/execution/list-processes",
+      "destination": "/api-references/computers/execution/list-processes"
+    },
+    {
+      "source": "/api-references/virtual-machines/execution/run-cli-command",
+      "destination": "/api-references/computers/execution/run-cli-command"
+    },
+    {
+      "source": "/api-references/virtual-machines/execution/stream",
+      "destination": "/api-references/computers/execution/stream"
+    },
+    {
+      "source": "/api-references/virtual-machines/files/read",
+      "destination": "/api-references/computers/files/read"
+    },
+    {
+      "source": "/api-references/virtual-machines/files/write",
+      "destination": "/api-references/computers/files/write"
+    },
+    {
+      "source": "/api-references/virtual-machines/regions/list",
+      "destination": "/api-references/computers/regions/list"
+    },
+    {
+      "source": "/api-references/virtual-machines/shares/create",
+      "destination": "/api-references/computers/shares/create"
+    },
+    {
+      "source": "/api-references/virtual-machines/shares/delete",
+      "destination": "/api-references/computers/shares/delete"
+    },
+    {
+      "source": "/api-references/virtual-machines/shares/list",
+      "destination": "/api-references/computers/shares/list"
+    },
+    {
+      "source": "/api-references/virtual-machines/ssh-keys/add",
+      "destination": "/api-references/computers/ssh-keys/add"
+    },
+    {
+      "source": "/api-references/virtual-machines/ssh-keys/delete",
+      "destination": "/api-references/computers/ssh-keys/delete"
+    },
+    {
+      "source": "/api-references/virtual-machines/ssh-keys/list",
+      "destination": "/api-references/computers/ssh-keys/list"
+    },
+    {
+      "source": "/api-references/virtual-machines/tokens/create",
+      "destination": "/api-references/computers/tokens/create"
+    },
+    {
+      "source": "/api-references/virtual-machines/tokens/delete",
+      "destination": "/api-references/computers/tokens/delete"
+    },
+    {
+      "source": "/api-references/virtual-machines/tokens/list",
+      "destination": "/api-references/computers/tokens/list"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/action",
+      "destination": "/api-references/computers/computers/action"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/create",
+      "destination": "/api-references/computers/computers/create"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/delete",
+      "destination": "/api-references/computers/computers/delete"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/get",
+      "destination": "/api-references/computers/computers/get"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/list",
+      "destination": "/api-references/computers/computers/list"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/list-events",
+      "destination": "/api-references/computers/computers/list-events"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/update",
+      "destination": "/api-references/computers/computers/update"
+    },
+    {
+      "source": "/api-references/virtual-machines/vms/update-visibility",
+      "destination": "/api-references/computers/computers/update-visibility"
+    },
+    {
+      "source": "/developer-guides/virtual-machines",
+      "destination": "/developer-guides/computers"
+    },
+    {
+      "source": "/developer-guides/virtual-machines/access",
+      "destination": "/developer-guides/computers/access"
+    },
+    {
+      "source": "/developer-guides/virtual-machines/lifecycle",
+      "destination": "/developer-guides/computers/lifecycle"
+    },
+    {
+      "source": "/developer-guides/virtual-machines/networking",
+      "destination": "/developer-guides/computers/networking"
+    },
+    {
+      "source": "/developer-guides/virtual-machines/quickstart",
+      "destination": "/developer-guides/computers/quickstart"
+    },
+    {
+      "source": "/developer-guides/virtual-machines/rest-api",
+      "destination": "/developer-guides/computers/rest-api"
+    },
+    {
+      "source": "/developer-guides/virtual-machines/sdk",
+      "destination": "/developer-guides/computers/sdk"
     }
   ],
   "logo": {

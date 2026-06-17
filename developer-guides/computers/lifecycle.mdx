@@ -1,0 +1,79 @@
+---
+title: "Lifecycle and settings"
+description: "Control Computer state, resource sizing, environment variables, and idle behavior."
+---
+
+Computers move through lifecycle states such as `pending`, `creating`, `running`, `paused`, `stopped`, `resuming`, `shelved`, `error`, and `deleted`.
+
+Use lifecycle actions when you need to change the Computer process state. Use settings updates when you need to change the Computer configuration.
+
+## Lifecycle actions
+
+| Action | Use it when |
+| --- | --- |
+| `start` | You want to start a stopped Computer. |
+| `stop` | You want to stop a Computer without deleting its record. |
+| `pause` | You want to retain the Computer and let it resume later. |
+| `resume` | You want to wake a paused, stopped, or shelved Computer. |
+| `restart` | You want to restart the Computer workload. |
+| `delete` | You want to remove the Computer. |
+
+Run an action with the CLI:
+
+```bash
+final-computer restart docs-demo
+```
+
+Or call the [perform a Computer action endpoint](/api-references/computers/computers/action).
+
+## Resize a Computer
+
+You can update CPU, memory, and disk size:
+
+```bash
+final-computer resize docs-demo --vcpu 4 --memory 8192 --disk 40
+```
+
+Disk size is grow-only. Plan disk reductions by creating a new Computer and copying the data you need.
+
+Use the [update a Computer endpoint](/api-references/computers/computers/update) for API-based resizing.
+
+## Rename, tag, and comment
+
+```bash
+final-computer rename docs-demo docs-prod
+final-computer tag docs-prod production owner-docs
+final-computer comment docs-prod "Preview app for documentation testing"
+```
+
+Tags replace the existing tag list. Comments can be set to an empty value to clear them through the API.
+
+## Update environment variables
+
+Use the API or SDK to replace environment variables:
+
+```ts
+await computer.settings({
+  env: {
+    NODE_ENV: "production",
+    FEATURE_FLAG: "enabled",
+  },
+});
+```
+
+Environment variables are part of the Computer settings payload on [update a Computer](/api-references/computers/computers/update).
+
+## Configure idle behavior
+
+`idleTimeoutSeconds` controls when an idle Computer pauses or is reaped. `autoResume` controls whether retained Computers wake on access.
+
+Ephemeral Computers are deleted when they become idle. Non-ephemeral Computers are retained and can resume later.
+
+```bash
+final-computer new docker.io/library/ubuntu:24.04 \
+  --name short-job \
+  --ephemeral \
+  --idle-timeout 300
+```
+
+Use ephemeral Computers for sandboxes and jobs. Use retained Computers for services, development environments, and workloads where state matters.

@@ -1,0 +1,44 @@
+---
+title: "Computers API"
+description: "Reference for the Final Computers REST API."
+---
+
+Use the public Computers REST API to create machines, run commands, read and write files, manage networking, and control access.
+
+Every request to the public Computer API uses bearer authentication with a Final API key:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+Computers are scoped to one owner. Computer IDs use the `comp_` prefix. Private Computers return `ownerUserId` as a `usr_` ID; team-owned Computers return `teamId` as a `team_` ID. Pass a `team_` ID as `teamId` when creating a team-owned Computer or when using an ownerless organization API key.
+
+The public Computer API namespace is:
+
+```text
+https://api.final.ai/v1/computers
+```
+
+<Card title="Computers" icon="server" href="/api-references/computers/computers/list">
+  Create, list, inspect, update, and delete Computers.
+</Card>
+
+<Card title="Execution" icon="terminal" href="/api-references/computers/execution/execute">
+  Run commands, stream command output, and inspect running processes.
+</Card>
+
+<Card title="Files" icon="file" href="/api-references/computers/files/read">
+  Read and write files inside a Computer.
+</Card>
+
+<Card title="Shares and domains" icon="globe" href="/api-references/computers/shares/list">
+  Share Computer access and attach custom domains.
+</Card>
+
+<Card title="Tokens and SSH keys" icon="key-round" href="/api-references/computers/tokens/list">
+  Manage computer tokens and SSH public keys.
+</Card>
+
+<Card title="Regions" icon="map" href="/api-references/computers/regions/list">
+  List regions that can accept new Computers.
+</Card>

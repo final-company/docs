@@ -31,4 +31,33 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/
 
 ## Response
 
-Returns the created checkpoint.
+Returns the created checkpoint in a JSON envelope.
+
+```json
+{
+  "data": {
+    "id": "0193b000-0000-7000-8000-000000000201",
+    "name": "before-refactor",
+    "branch": "main",
+    "status": "sealed",
+    "manifestKey": "manifests/main/11/manifest.json",
+    "sealSeq": 11,
+    "baseManifest": {
+      "formatVersion": 1,
+      "sealSeq": 11,
+      "entries": [
+        {
+          "index": 11,
+          "owner": "checkpoint",
+          "source": "main",
+          "durable": true,
+          "entryBase64": "..."
+        }
+      ]
+    },
+    "createdAt": "2026-06-17T20:29:34.000Z"
+  }
+}
+```
+
+`manifestKey` identifies the checkpoint manifest stored by Agent Disk. `baseManifest` is the durable manifest used when creating a branch from the checkpoint.

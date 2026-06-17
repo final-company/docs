@@ -1,0 +1,76 @@
+---
+title: "Tokens and SSH keys"
+description: "Use Final API keys, computer tokens, and SSH public keys with Final Computers."
+---
+
+Computers use three credential types:
+
+| Credential | Use it for |
+| --- | --- |
+| Final API key | Authenticating the CLI, SDK, and public REST API. |
+| Computer token | Granting scoped computer access where computer tokens are supported. |
+| SSH public key | Connecting to Computers over SSH. |
+
+## API keys
+
+Create API keys in Final under **Settings** > **API Keys**. Use a user-owned API key for private Computers. Pass `teamId` as a `team_` ID when you create a team-owned Computer or when you use an ownerless organization API key.
+
+Use the key as a bearer token:
+
+```bash
+curl "https://api.final.ai/v1/computers" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}"
+```
+
+Use the same key with the CLI:
+
+```bash
+final-computer login --api-key "${FINAL_COMPUTER_API_KEY}"
+```
+
+For cross-product auth details, see [authentication](/developer-guides/authentication).
+
+## Computer tokens
+
+Create computer tokens when you need a credential that can be revoked independently or scoped to a computer.
+
+Use a Final API key to call the public API at `api.final.ai`. Computer tokens are managed by the public API, but they do not authenticate public API requests.
+
+```bash
+final-computer token create ci-token --computer docs-demo --expires-days 30
+```
+
+The token value is returned once. Store it in your secret manager.
+
+List and revoke tokens:
+
+```bash
+final-computer token ls
+final-computer token revoke <token-id>
+```
+
+For API details, see [create a token](/api-references/computers/tokens/create), [list tokens](/api-references/computers/tokens/list), and [revoke a token](/api-references/computers/tokens/delete).
+
+## SSH keys
+
+Add your OpenSSH public key before using SSH:
+
+```bash
+final-computer ssh-key add laptop "$(cat ~/.ssh/id_ed25519.pub)"
+```
+
+List registered keys:
+
+```bash
+final-computer ssh-key ls
+```
+
+Remove a key by name:
+
+```bash
+final-computer ssh-key rm laptop
+```
+
+SSH key writes require a user context. Use a user-owned API key when you call the REST API directly.
+
+See [list SSH keys](/api-references/computers/ssh-keys/list), [add an SSH key](/api-references/computers/ssh-keys/add), and [delete an SSH key](/api-references/computers/ssh-keys/delete).

@@ -26,3 +26,34 @@ curl "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/checkpoi
 ## Response
 
 Returns a JSON envelope whose `data` field is an array of checkpoint objects.
+
+Checkpoint objects include `manifestKey`, `sealSeq`, and `baseManifest` when the checkpoint has been sealed. Pending checkpoints may not include a base manifest yet.
+
+```json
+{
+  "data": [
+    {
+      "id": "0193b000-0000-7000-8000-000000000201",
+      "name": "before-refactor",
+      "branch": "main",
+      "status": "sealed",
+      "manifestKey": "manifests/main/11/manifest.json",
+      "sealSeq": 11,
+      "baseManifest": {
+        "formatVersion": 1,
+        "sealSeq": 11,
+        "entries": [
+          {
+            "index": 11,
+            "owner": "checkpoint",
+            "source": "main",
+            "durable": true,
+            "entryBase64": "..."
+          }
+        ]
+      },
+      "createdAt": "2026-06-17T20:29:34.000Z"
+    }
+  ]
+}
+```

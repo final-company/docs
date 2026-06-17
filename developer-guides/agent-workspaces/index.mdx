@@ -15,6 +15,8 @@ Organization-owned keys can create workspaces for an agent profile. Team-owned k
 
 Organization-owned and team-owned keys must include `agentProfileId` when they create a workspace or session.
 
+Every new workspace or session must include `executionMode`. Use `cloud` for Final-managed cloud execution. Use `local` when you want the session to run on a local Final Node. You can also pass `finalNodeId` to target an existing node.
+
 ## Create a workspace
 
 Create a workspace and optionally send the first message:
@@ -25,8 +27,10 @@ curl -X POST "https://api.final.ai/v1/agent-workspaces" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: workspace-001" \
   -d '{
-    "agentProfileId": "agp_123",
+    "agentProfileId": "prof_123",
     "title": "Investigate failing tests",
+    "repositoryId": "gsr_123",
+    "executionMode": "cloud",
     "message": "Find the failing tests and propose a fix."
   }'
 ```

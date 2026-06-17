@@ -1,0 +1,76 @@
+---
+title: "Networking, domains, and sharing"
+description: "Expose HTTP services, add custom domains, and share Computer access."
+---
+
+Each Computer receives a hostname in its region. When you configure `httpPort`, Final can route HTTP traffic to that port.
+
+## Expose an HTTP service
+
+Create a Computer with an HTTP port:
+
+```bash
+final-computer new docker.io/library/node:22-slim \
+  --name preview-app \
+  --port 3000 \
+  --command "node server.js"
+```
+
+Set `--public` when the service should be reachable without Final authentication:
+
+```bash
+final-computer new docker.io/library/node:22-slim \
+  --name public-preview \
+  --port 3000 \
+  --public
+```
+
+You can toggle public HTTP access with [update Computer visibility](/api-references/computers/computers/update-visibility).
+
+## Use custom domains
+
+Add a domain to a Computer:
+
+```bash
+curl -X POST "https://api.final.ai/v1/computers/preview-app/domains" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"preview.example.com"}'
+```
+
+Then point a `CNAME` or `A` record for the domain at the Computer hostname. Final verifies DNS and issues the certificate automatically.
+
+Use [add a custom domain](/api-references/computers/domains/add), [list custom domains](/api-references/computers/domains/list), and [delete a custom domain](/api-references/computers/domains/delete) to manage domains from automation.
+
+## Share a Computer
+
+You can share a Computer with a user, email address, team, or link. Shares can grant `http` access or `full` access.
+
+Create a link share with the CLI:
+
+```bash
+final-computer share preview-app --link
+```
+
+Grant full access to an email address:
+
+```bash
+final-computer share preview-app --user teammate@example.com --full
+```
+
+Remove an email share:
+
+```bash
+final-computer share preview-app --user teammate@example.com --remove
+```
+
+For API-based sharing, use [create a share](/api-references/computers/shares/create) and [delete a share](/api-references/computers/shares/delete).
+
+## Choose access levels
+
+| Access | What it allows |
+| --- | --- |
+| `http` | Access to the Computer's HTTP service. |
+| `full` | Full Computer access, including SSH when the user has an authorized key. |
+
+Prefer `http` for previews and demos. Use `full` only when the recipient needs to operate the Computer.

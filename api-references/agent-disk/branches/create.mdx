@@ -4,7 +4,9 @@ description: "Create an Agent Disk branch from a checkpoint."
 api: "POST /v1/agent-disk/disks/{diskId}/branches"
 ---
 
-Creates a branch from a checkpoint.
+Creates a branch from a sealed checkpoint.
+
+Agent Disk uses the checkpoint's `baseManifest` to seed the new branch, so the branch starts from the durable log entries exported when the checkpoint was sealed.
 
 ```bash
 curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/branches" \

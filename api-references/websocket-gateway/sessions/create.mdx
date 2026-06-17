@@ -71,10 +71,19 @@ Each grant item has:
 }
 ```
 
-Connect with the returned `url`, `token`, and `protocolVersion`:
+Connect with the returned `url` and `protocolVersion`. Send the returned `token` in an `auth` frame after the socket opens. Query-string token auth is not supported.
 
-```text
-wss://ws.api.final.ai/connect?token=<gateway-token>&protocolVersion=1
+```js
+const authRequestId = "auth-1";
+const socket = new WebSocket("wss://ws.api.final.ai/connect?protocolVersion=1");
+
+socket.addEventListener("open", () => {
+  socket.send(JSON.stringify({
+    id: authRequestId,
+    type: "auth",
+    token: "<gateway-token>",
+  }));
+});
 ```
 
 If you inspect the gateway token while debugging, use the `tenantId` claim to identify the owner scope. Tenant IDs contain public wire IDs, such as `user:org_...:usr_...` or `team:org_...:team_...`.

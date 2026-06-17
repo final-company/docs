@@ -1,0 +1,1140 @@
+openapi: 3.0.3
+info:
+  title: Final Computers API
+  version: "1.0"
+  description: REST API for Final Computers.
+servers:
+  - url: https://api.final.ai
+security:
+  - bearerAuth: []
+tags:
+  - name: Computers
+  - name: Execution
+  - name: Files
+  - name: Shares
+  - name: Domains
+  - name: Tokens
+  - name: SSH keys
+  - name: Regions
+paths:
+  /v1/computers:
+    get:
+      operationId: listComputers
+      tags: [Computers]
+      summary: List Computers
+      description: List Computers visible to the authenticated API key owner. User-owned API keys see private Computers owned by that user and team-owned Computers for teams they belong to. Ownerless organization API keys can list organization Computers.
+      responses:
+        "200":
+          description: Computers were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [computers]
+                properties:
+                  computers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Computer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createComputer
+      tags: [Computers]
+      summary: Create a Computer
+      description: "Create a private or team-owned Computer from a container image. Omit `teamId` to create a private Computer for the acting user. Pass `teamId` as a `team_` ID to create a team-owned Computer. Ownerless organization API keys must pass `teamId`. Requests support `Idempotency-Key`; replayed responses include `Idempotency-Replayed: true`. Idempotency keys are scoped by organization and Computer owner scope."
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateComputerRequest"
+      responses:
+        "200":
+          description: Computer was created.
+          headers:
+            Idempotency-Replayed:
+              description: Present when an idempotent create response was replayed.
+              schema:
+                type: boolean
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComputerEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Error"
+  /v1/computers/{idOrName}:
+    parameters:
+      - $ref: "#/components/parameters/IdOrName"
+    get:
+      operationId: getComputer
+      tags: [Computers]
+      summary: Get a Computer
+      description: Get a Computer by `comp_` ID or live name when it is visible to the authenticated API key owner.
+      responses:
+        "200":
+          description: Computer was returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComputerEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    patch:
+      operationId: updateComputer
+      tags: [Computers]
+      summary: Update a Computer
+      description: Update Computer settings, resources, tags, and environment variables. Disk size is grow-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateComputerRequest"
+      responses:
+        "200":
+          description: Computer was updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComputerEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteComputer
+      tags: [Computers]
+      summary: Delete a Computer
+      description: Delete a Computer by `comp_` ID or name.
+      responses:
+        "200":
+          description: Computer was deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComputerEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/computers/{idOrName}/actions/{action}:
+    post:
+      operationId: performComputerAction
+      tags: [Computers]
+      summary: Perform a Computer action
+      description: Start, stop, pause, resume, restart, or delete a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [start, stop, pause, resume, restart, delete]
+      responses:
+        "200":
+          description: Action was accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComputerEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/computers/{idOrName}/visibility:
+    patch:
+      operationId: updateComputerVisibility
+      tags: [Computers]
+      summary: Update Computer visibility
+      description: Toggle public HTTP access for a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [httpPublic]
+              properties:
+                httpPublic:
+                  type: boolean
+      responses:
+        "200":
+          description: Visibility was updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComputerEnvelope"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/computers/{idOrName}/exec:
+    post:
+      operationId: executeComputerCommand
+      tags: [Execution]
+      summary: Execute a command
+      description: Run a buffered command inside a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecRequest"
+      responses:
+        "200":
+          description: Command finished or returned buffered output.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/computers/{idOrName}/exec/ws:
+    get:
+      operationId: streamComputerCommand
+      tags: [Execution]
+      summary: Stream command execution
+      description: "Open a WebSocket for streaming command execution. Browser clients can pass the bearer token as the `token` query parameter."
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket connection was accepted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/computers/{idOrName}/processes:
+    get:
+      operationId: listComputerProcesses
+      tags: [Execution]
+      summary: List processes
+      description: List processes captured inside a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      responses:
+        "200":
+          description: Processes were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [processes]
+                properties:
+                  processes:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComputerProcess"
+  /v1/computers/{idOrName}/files:
+    get:
+      operationId: readComputerFile
+      tags: [Files]
+      summary: Read a file
+      description: Read a file from a Computer as base64 data.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File data was returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileReadResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+    put:
+      operationId: writeComputerFile
+      tags: [Files]
+      summary: Write a file
+      description: Write base64 data to a file inside a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileWriteRequest"
+      responses:
+        "200":
+          description: File was written.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileWriteResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+  /v1/computers/{idOrName}/events:
+    get:
+      operationId: listComputerEvents
+      tags: [Computers]
+      summary: List Computer events
+      description: List recent events for a Computer, newest first.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Events were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComputerEvent"
+  /v1/computers/{idOrName}/shares:
+    get:
+      operationId: listComputerShares
+      tags: [Shares]
+      summary: List shares
+      description: List shares for a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      responses:
+        "200":
+          description: Shares were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [shares]
+                properties:
+                  shares:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComputerShare"
+    post:
+      operationId: createComputerShare
+      tags: [Shares]
+      summary: Create a share
+      description: Share Computer access with a user, email address, team, or link.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShareRequest"
+      responses:
+        "200":
+          description: Share was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [share]
+                properties:
+                  share:
+                    $ref: "#/components/schemas/ComputerShare"
+                  url:
+                    type: string
+                    nullable: true
+                    description: Returned for link shares.
+  /v1/computers/{idOrName}/shares/{shareId}:
+    delete:
+      operationId: deleteComputerShare
+      tags: [Shares]
+      summary: Delete a share
+      description: Remove a share from a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+        - name: shareId
+          in: path
+          required: true
+          description: Computer share wire ID.
+          schema:
+            type: string
+            example: cshr_1111117Hxt1fAWDjN7Tb
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /v1/computers/{idOrName}/domains:
+    get:
+      operationId: listComputerDomains
+      tags: [Domains]
+      summary: List custom domains
+      description: List custom domains attached to a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      responses:
+        "200":
+          description: Domains were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [domains]
+                properties:
+                  domains:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComputerDomain"
+    post:
+      operationId: addComputerDomain
+      tags: [Domains]
+      summary: Add a custom domain
+      description: Attach a custom domain to a Computer. Final verifies DNS and issues the certificate automatically.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [domain]
+              properties:
+                domain:
+                  type: string
+                  example: preview.example.com
+      responses:
+        "200":
+          description: Domain was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [domain]
+                properties:
+                  domain:
+                    $ref: "#/components/schemas/ComputerDomain"
+                  instructions:
+                    type: string
+  /v1/computers/{idOrName}/domains/{domainId}:
+    delete:
+      operationId: deleteComputerDomain
+      tags: [Domains]
+      summary: Delete a custom domain
+      description: Remove a custom domain from a Computer.
+      parameters:
+        - $ref: "#/components/parameters/IdOrName"
+        - name: domainId
+          in: path
+          required: true
+          description: Custom domain wire ID.
+          schema:
+            type: string
+            example: cdmn_1111117Hxt1fAWDjN7Tc
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /v1/computers/tokens:
+    get:
+      operationId: listComputerTokens
+      tags: [Tokens]
+      summary: List tokens
+      description: List computer tokens for the authenticated organization.
+      responses:
+        "200":
+          description: Tokens were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tokens]
+                properties:
+                  tokens:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComputerToken"
+    post:
+      operationId: createComputerToken
+      tags: [Tokens]
+      summary: Create a token
+      description: Create a computer token. The plaintext token is returned once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTokenRequest"
+      responses:
+        "200":
+          description: Token was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, id]
+                properties:
+                  token:
+                    type: string
+                    example: fvm1.payload.sig
+                  id:
+                    type: string
+                    description: computer token wire ID.
+                    example: ctok_1111117Hxt1fAWDjN7Td
+  /v1/computers/tokens/{tokenId}:
+    delete:
+      operationId: revokeComputerToken
+      tags: [Tokens]
+      summary: Revoke a token
+      description: Revoke a computer token.
+      parameters:
+        - name: tokenId
+          in: path
+          required: true
+          description: computer token wire ID.
+          schema:
+            type: string
+            example: ctok_1111117Hxt1fAWDjN7Td
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /v1/computers/ssh-keys:
+    get:
+      operationId: listComputerSshKeys
+      tags: [SSH keys]
+      summary: List SSH keys
+      description: List SSH public keys for the authenticated organization.
+      responses:
+        "200":
+          description: SSH keys were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sshKeys]
+                properties:
+                  sshKeys:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SshKey"
+    post:
+      operationId: addComputerSshKey
+      tags: [SSH keys]
+      summary: Add an SSH key
+      description: Register an OpenSSH public key. Key writes require user context.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, publicKey]
+              properties:
+                name:
+                  type: string
+                publicKey:
+                  type: string
+                  example: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB... laptop
+      responses:
+        "200":
+          description: SSH key was registered.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sshKey]
+                properties:
+                  sshKey:
+                    $ref: "#/components/schemas/SshKey"
+        "403":
+          $ref: "#/components/responses/Error"
+  /v1/computers/ssh-keys/{keyId}:
+    delete:
+      operationId: deleteComputerSshKey
+      tags: [SSH keys]
+      summary: Delete an SSH key
+      description: Delete an SSH public key. Key writes require user context.
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          description: SSH key wire ID.
+          schema:
+            type: string
+            example: cssh_1111117Hxt1fAWDjN7Te
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /v1/computers/regions:
+    get:
+      operationId: listComputerRegions
+      tags: [Regions]
+      summary: List regions
+      description: List Computer regions and their public domains.
+      responses:
+        "200":
+          description: Regions were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [regions]
+                properties:
+                  regions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComputerRegion"
+  /v1/computers/exec:
+    post:
+      operationId: runComputerCliCommand
+      tags: [Execution]
+      summary: Run a CLI command
+      description: "Run a `final-computer` command through the command router. The body is a plain text command line. Responses are capped at 64 KB."
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: ls --json
+      responses:
+        "200":
+          description: Command result was returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exitCode, output]
+                properties:
+                  exitCode:
+                    type: integer
+                  output:
+                    type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+      description: Final API key.
+  parameters:
+    IdOrName:
+      name: idOrName
+      in: path
+      required: true
+      description: Computer wire ID (`comp_...`) or live Computer name.
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: Bearer token is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidRequest:
+      description: Request body or parameters are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Error:
+      description: Request failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Ok:
+      description: Operation succeeded.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ok]
+            properties:
+              ok:
+                type: boolean
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        issues:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    ComputerEnvelope:
+      type: object
+      required: [computer]
+      properties:
+        computer:
+          $ref: "#/components/schemas/Computer"
+    Computer:
+      type: object
+      required:
+        - id
+        - name
+        - teamId
+        - ownerUserId
+        - state
+        - stateName
+        - desiredState
+        - image
+        - vcpu
+        - memoryMb
+        - diskGb
+        - httpPublic
+        - ephemeral
+        - autoResume
+        - tags
+        - hostname
+        - sshCommand
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Computer wire ID.
+          example: comp_1111117Hxt1fAWDjN7TZ
+        name:
+          type: string
+          example: wild-haddock
+        teamId:
+          type: string
+          nullable: true
+          description: Team owner for a team-owned Computer, as a `team_` ID. Null for private Computers.
+          example: team_1111117Hxt1fAWDjN7TY
+        ownerUserId:
+          type: string
+          nullable: true
+          description: User owner for a private Computer, as a `usr_` ID. Null for team-owned Computers.
+          example: usr_1111117Hxt1fAWDjN7TX
+        state:
+          type: integer
+        stateName:
+          type: string
+          enum: [unknown, pending, creating, running, paused, stopped, resuming, migrating, error, deleted, shelved]
+        desiredState:
+          type: integer
+        image:
+          type: string
+          example: "docker.io/library/node:22-slim"
+        regionSlug:
+          type: string
+          nullable: true
+          example: lax
+        vcpu:
+          type: integer
+          example: 2
+        memoryMb:
+          type: integer
+          example: 4096
+        diskGb:
+          type: integer
+          example: 20
+        httpPort:
+          type: integer
+          nullable: true
+          example: 3000
+        httpPublic:
+          type: boolean
+        sshShard:
+          type: integer
+          nullable: true
+        ephemeral:
+          type: boolean
+        idleTimeoutSeconds:
+          type: integer
+          nullable: true
+          example: 300
+        autoResume:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        hostname:
+          type: string
+          example: wild-haddock.virtual-machine.lax-2.athens.finalwebservices.com
+        sshCommand:
+          type: string
+          example: ssh wild-haddock.virtual-machine.lax-2.athens.finalwebservices.com
+        createdAt:
+          type: string
+          format: date-time
+        lastActiveAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateComputerRequest:
+      type: object
+      required: [image]
+      properties:
+        image:
+          type: string
+        name:
+          type: string
+        teamId:
+          type: string
+          description: Create a team-owned Computer for this team. Use a `team_` ID. Omit to create a private Computer for the acting user. Required when the API key has no acting user.
+          example: team_1111117Hxt1fAWDjN7TY
+        regionSlug:
+          type: string
+        vcpu:
+          type: integer
+          minimum: 1
+        memoryMb:
+          type: integer
+          minimum: 1
+        diskGb:
+          type: integer
+          minimum: 1
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        setupScript:
+          type: string
+          maxLength: 10240
+        commandMode:
+          type: integer
+          enum: [1, 2, 3]
+          description: "`1` auto, `2` none, `3` custom."
+        customCommand:
+          type: string
+        httpPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        httpPublic:
+          type: boolean
+        ephemeral:
+          type: boolean
+        idleTimeoutSeconds:
+          type: integer
+          minimum: 1
+        autoResume:
+          type: boolean
+        registryCredentialId:
+          type: string
+          description: Registry credential wire ID.
+          example: creg_1111117Hxt1fAWDjN7Tn
+        tags:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+    UpdateComputerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        vcpu:
+          type: integer
+          minimum: 1
+        memoryMb:
+          type: integer
+          minimum: 1
+        diskGb:
+          type: integer
+          minimum: 1
+          description: Disk size is grow-only.
+        httpPort:
+          type: integer
+          nullable: true
+        httpPublic:
+          type: boolean
+        idleTimeoutSeconds:
+          type: integer
+          nullable: true
+          minimum: 1
+        autoResume:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        comment:
+          type: string
+          nullable: true
+        env:
+          type: object
+          additionalProperties:
+            type: string
+    ExecRequest:
+      type: object
+      required: [command]
+      properties:
+        command:
+          type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        cwd:
+          type: string
+        user:
+          type: string
+        timeoutMs:
+          type: integer
+          minimum: 1
+          maximum: 600000
+    ExecResult:
+      type: object
+      required: [exitCode, stdout, stderr, truncated]
+      properties:
+        exitCode:
+          type: integer
+          nullable: true
+        stdout:
+          type: string
+        stderr:
+          type: string
+        truncated:
+          type: boolean
+    ComputerProcess:
+      type: object
+      required: [pid, command]
+      properties:
+        pid:
+          type: integer
+        command:
+          type: string
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        startedAtMs:
+          type: integer
+          nullable: true
+    FileReadResult:
+      type: object
+      required: [dataB64, eof]
+      properties:
+        dataB64:
+          type: string
+          description: Base64-encoded file content.
+        eof:
+          type: boolean
+    FileWriteRequest:
+      type: object
+      required: [path, dataB64]
+      properties:
+        path:
+          type: string
+        dataB64:
+          type: string
+          description: Base64-encoded file content.
+        append:
+          type: boolean
+        mode:
+          type: integer
+          description: Optional file mode.
+    FileWriteResult:
+      type: object
+      required: [bytesWritten]
+      properties:
+        bytesWritten:
+          type: integer
+    ComputerEvent:
+      type: object
+      required: [id, type, payload, createdAt]
+      properties:
+        id:
+          type: string
+          description: Computer event wire ID.
+          example: cevt_1111117Hxt1fAWDjN7Tm
+        type:
+          type: integer
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    ComputerShare:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Computer share wire ID.
+          example: cshr_1111117Hxt1fAWDjN7Tb
+        kind:
+          type: string
+          enum: [user, email, team, link]
+        access:
+          type: string
+          enum: [http, full]
+        userId:
+          type: string
+          nullable: true
+          description: Shared user as a `usr_` ID.
+          example: usr_1111117Hxt1fAWDjN7TX
+        email:
+          type: string
+          nullable: true
+        teamId:
+          type: string
+          nullable: true
+          description: Shared team as a `team_` ID.
+          example: team_1111117Hxt1fAWDjN7TY
+        createdAt:
+          type: string
+          format: date-time
+    CreateShareRequest:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [user, email, team, link]
+        userId:
+          type: string
+          description: User to share with, as a `usr_` ID.
+          example: usr_1111117Hxt1fAWDjN7TX
+        email:
+          type: string
+          format: email
+        teamId:
+          type: string
+          description: Team to share with, as a `team_` ID.
+          example: team_1111117Hxt1fAWDjN7TY
+        access:
+          type: string
+          enum: [http, full]
+          default: http
+    ComputerDomain:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Custom domain wire ID.
+          example: cdmn_1111117Hxt1fAWDjN7Tc
+        domain:
+          type: string
+        status:
+          type: string
+          example: pending_dns
+        lastError:
+          type: string
+          nullable: true
+        certExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+    ComputerToken:
+      type: object
+      properties:
+        id:
+          type: string
+          description: computer token wire ID.
+          example: ctok_1111117Hxt1fAWDjN7Td
+        name:
+          type: string
+        computerId:
+          type: string
+          nullable: true
+          description: Computer wire ID.
+          example: comp_1111117Hxt1fAWDjN7TZ
+        scopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+    CreateTokenRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        computerId:
+          type: string
+          description: Limit the token to one Computer by passing a `comp_` ID.
+          example: comp_1111117Hxt1fAWDjN7TZ
+        scopes:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+    SshKey:
+      type: object
+      properties:
+        id:
+          type: string
+          description: SSH key wire ID.
+          example: cssh_1111117Hxt1fAWDjN7Te
+        name:
+          type: string
+        fingerprint:
+          type: string
+          example: "SHA256:abc123"
+        createdAt:
+          type: string
+          format: date-time
+    ComputerRegion:
+      type: object
+      required: [slug, displayName, computerDomain, acceptingNewComputers]
+      properties:
+        slug:
+          type: string
+          example: lax
+        displayName:
+          type: string
+          example: Los Angeles
+        computerDomain:
+          type: string
+        acceptingNewComputers:
+          type: boolean

@@ -429,7 +429,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/repositories:
+  /v1/repositories:
     get:
       operationId: listRepositories
       tags: [Repositories]
@@ -482,7 +482,7 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /api/repositories/{repositoryId}:
+  /v1/repositories/{repositoryId}:
     get:
       operationId: getRepository
       tags: [Repositories]
@@ -525,7 +525,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/archive:
+  /v1/repositories/{repositoryId}/archive:
     post:
       operationId: archiveRepository
       tags: [Repositories]
@@ -547,7 +547,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/git-credentials:
+  /v1/repositories/{repositoryId}/git-credentials:
     post:
       operationId: mintGitCredentials
       tags: [Repositories]
@@ -577,7 +577,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/pull-requests:
+  /v1/repositories/{repositoryId}/pull-requests:
     get:
       operationId: listPullRequests
       tags: [Pull requests]
@@ -626,7 +626,7 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "409":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestNumber}:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestNumber}:
     get:
       operationId: getPullRequest
       tags: [Pull requests]
@@ -643,7 +643,7 @@ paths:
                 $ref: "#/components/schemas/PullRequestDetail"
         "404":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestNumber}/diff:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestNumber}/diff:
     get:
       operationId: getPullRequestDiff
       tags: [Pull requests]
@@ -667,7 +667,7 @@ paths:
                 $ref: "#/components/schemas/PullRequestDiff"
         "404":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestId}:
     patch:
       operationId: updatePullRequest
       tags: [Pull requests]
@@ -694,7 +694,7 @@ paths:
                     $ref: "#/components/schemas/PullRequest"
         "409":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/parent:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestId}/parent:
     post:
       operationId: setPullRequestParent
       tags: [Pull requests]
@@ -726,7 +726,7 @@ paths:
                     $ref: "#/components/schemas/PullRequest"
         "409":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/detach:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestId}/detach:
     post:
       operationId: detachPullRequest
       tags: [Pull requests]
@@ -745,7 +745,7 @@ paths:
                 properties:
                   pullRequest:
                     $ref: "#/components/schemas/PullRequest"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/reviews:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestId}/reviews:
     post:
       operationId: createPullRequestReview
       tags: [Pull requests]
@@ -779,7 +779,7 @@ paths:
                 properties:
                   review:
                     $ref: "#/components/schemas/PullRequestReview"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/stack/repair:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestId}/stack/repair:
     post:
       operationId: repairPullRequestStack
       tags: [Pull requests]
@@ -790,7 +790,7 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PullRequestList"
-  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/stack/split:
+  /v1/repositories/{repositoryId}/pull-requests/{pullRequestId}/stack/split:
     post:
       operationId: splitPullRequestStack
       tags: [Pull requests]
@@ -801,7 +801,7 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PullRequestList"
-  /api/repositories/{repositoryId}/pull-requests/stack/reorder:
+  /v1/repositories/{repositoryId}/pull-requests/stack/reorder:
     post:
       operationId: reorderPullRequestStack
       tags: [Pull requests]
@@ -825,7 +825,7 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PullRequestList"
-  /api/repositories/{repositoryId}/commit-statuses:
+  /v1/repositories/{repositoryId}/commit-statuses:
     post:
       operationId: createCommitStatus
       tags: [Checks]
@@ -850,7 +850,7 @@ paths:
                 properties:
                   commitStatus:
                     $ref: "#/components/schemas/CommitStatus"
-  /api/repositories/{repositoryId}/check-runs:
+  /v1/repositories/{repositoryId}/check-runs:
     post:
       operationId: createCheckRun
       tags: [Checks]
@@ -875,7 +875,7 @@ paths:
                 properties:
                   checkRun:
                     $ref: "#/components/schemas/CheckRun"
-  /api/repositories/{repositoryId}/merge-queues:
+  /v1/repositories/{repositoryId}/merge-queues:
     get:
       operationId: listMergeQueues
       tags: [Merge queues]
@@ -918,7 +918,7 @@ paths:
                 properties:
                   mergeQueue:
                     $ref: "#/components/schemas/MergeQueue"
-  /api/repositories/{repositoryId}/merge-queues/{queueId}/entries:
+  /v1/repositories/{repositoryId}/merge-queues/{queueId}/entries:
     get:
       operationId: listMergeQueueEntries
       tags: [Merge queues]
@@ -939,7 +939,7 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MergeQueueEntry"
-  /api/repositories/{repositoryId}/merge-queues/{queueId}/attempts:
+  /v1/repositories/{repositoryId}/merge-queues/{queueId}/attempts:
     get:
       operationId: listMergeQueueAttempts
       tags: [Merge queues]
@@ -965,7 +965,7 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MergeQueueAttempt"
-  /api/repositories/{repositoryId}/merge-queues/{queueId}/activity:
+  /v1/repositories/{repositoryId}/merge-queues/{queueId}/activity:
     get:
       operationId: listMergeQueueActivity
       tags: [Merge queues]
@@ -986,7 +986,7 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MergeQueueEvent"
-  /api/repositories/{repositoryId}/merge-queues/enqueue:
+  /v1/repositories/{repositoryId}/merge-queues/enqueue:
     post:
       operationId: enqueuePullRequest
       tags: [Merge queues]
@@ -1012,7 +1012,7 @@ paths:
                     $ref: "#/components/schemas/MergeQueueEntry"
         "409":
           $ref: "#/components/responses/Error"
-  /api/repositories/{repositoryId}/merge-queues/entries/{entryId}/dequeue:
+  /v1/repositories/{repositoryId}/merge-queues/entries/{entryId}/dequeue:
     post:
       operationId: dequeueMergeQueueEntry
       tags: [Merge queues]
@@ -1043,7 +1043,7 @@ paths:
                 properties:
                   entry:
                     $ref: "#/components/schemas/MergeQueueEntry"
-  /api/repositories/{repositoryId}/merge-queues/entries/{entryId}:
+  /v1/repositories/{repositoryId}/merge-queues/entries/{entryId}:
     patch:
       operationId: updateMergeQueueEntry
       tags: [Merge queues]
@@ -1073,7 +1073,7 @@ paths:
                 properties:
                   entry:
                     $ref: "#/components/schemas/MergeQueueEntry"
-  /api/repositories/{repositoryId}/merge-queues/entries/reorder:
+  /v1/repositories/{repositoryId}/merge-queues/entries/reorder:
     post:
       operationId: reorderMergeQueueEntries
       tags: [Merge queues]
@@ -1115,7 +1115,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: token
-      description: Final access token or API key.
+      description: Final API key.
   parameters:
     RepositoryId:
       name: repositoryId
@@ -1318,7 +1318,6 @@ components:
         - id
         - title
         - mainSessionId
-        - workspaceKind
         - repositoryId
         - finalNodeId
         - workspaceDir
@@ -1330,23 +1329,21 @@ components:
       properties:
         id:
           type: string
-          example: agw_123
+          example: wksp_123
         title:
           type: string
           nullable: true
         mainSessionId:
           type: string
-          example: ags_123
-        workspaceKind:
-          type: integer
-          enum: [0, 1, 2]
-          description: "`0` unknown, `1` main, `2` ticket."
+          example: sess_123
         repositoryId:
           type: string
           nullable: true
+          example: gsr_123
         finalNodeId:
           type: string
           nullable: true
+          example: fnod_123
         workspaceDir:
           type: string
           nullable: true
@@ -1386,11 +1383,11 @@ components:
       properties:
         id:
           type: string
-          example: ags_123
+          example: sess_123
         workspaceId:
           type: string
           nullable: true
-          example: agw_123
+          example: wksp_123
         title:
           type: string
           nullable: true
@@ -1417,6 +1414,7 @@ components:
         agentProfileId:
           type: string
           nullable: true
+          example: prof_123
         metadata:
           type: object
           additionalProperties: true
@@ -1431,11 +1429,13 @@ components:
           format: date-time
     CreateAgentWorkspaceRequest:
       type: object
+      required: [executionMode]
+      additionalProperties: false
       properties:
         agentProfileId:
           type: string
           description: Agent profile to run as. Required for organization-owned and team-owned API keys.
-          example: agp_123
+          example: prof_123
         title:
           type: string
           nullable: true
@@ -1443,36 +1443,54 @@ components:
           type: string
           nullable: true
           description: Repository to mount into the workspace.
+          example: gsr_123
         workspaceDir:
           type: string
           nullable: true
           description: Directory where the agent should start.
-        finalNodeType:
-          type: integer
-          enum: [0, 1, 2, 3]
-          description: "`1` local, `2` dedicated cloud, `3` on-demand cloud."
+        finalNodeId:
+          type: string
+          nullable: true
+          description: Existing Final Node to run on. Omit for Final to allocate one from `executionMode`.
+          example: fnod_123
+        executionMode:
+          type: string
+          enum: [local, cloud]
+          description: Where the session should run. Use `cloud` for Final-managed cloud execution or `local` to target local execution.
         message:
           type: string
           description: Optional first user message to submit after the workspace is created.
           example: Start work
     CreateAgentSessionRequest:
       type: object
+      required: [executionMode]
+      additionalProperties: false
       properties:
         agentProfileId:
           type: string
           description: Agent profile to use for runtime defaults. Required for organization-owned and team-owned API keys.
-          example: agp_123
+          example: prof_123
         title:
           type: string
           nullable: true
+        repositoryId:
+          type: string
+          nullable: true
+          description: Repository to mount for this session when the workspace does not already have one.
+          example: gsr_123
         workspaceDir:
           type: string
           nullable: true
           description: Directory where the agent should start.
-        finalNodeType:
-          type: integer
-          enum: [0, 1, 2, 3]
-          description: "`1` local, `2` dedicated cloud, `3` on-demand cloud."
+        finalNodeId:
+          type: string
+          nullable: true
+          description: Existing Final Node to run on. Defaults to the workspace node when present.
+          example: fnod_123
+        executionMode:
+          type: string
+          enum: [local, cloud]
+          description: Where the session should run. Use `cloud` for Final-managed cloud execution or `local` to target local execution.
     UpdateAgentWorkspaceRequest:
       type: object
       properties:

@@ -3,17 +3,17 @@ title: "Manage repositories"
 description: "Create Final Git repositories and mint short-lived Git credentials."
 ---
 
-Use the console API to manage Git-backed repositories. Every request requires a production access token. For complete endpoint details, see the [API reference](/api-references).
+Use the Final API to manage Git-backed repositories. Every request requires a user-owned API key. For complete endpoint details, see the [API reference](/api-references).
 
 ```bash
-access_token="<access-token>"
+export FINAL_API_KEY="<api-key>"
 ```
 
 ## Create a repository
 
 ```bash
-curl -X POST "https://api.final.ai/api/repositories" \
-  -H "Authorization: Bearer ${access_token}" \
+curl -X POST "https://api.final.ai/v1/repositories" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "displayName": "Docs",
@@ -39,8 +39,8 @@ Use the returned `repository.id` when minting Git credentials. See [create a rep
 See [list repositories](/api-references/repositories/list) for query parameters and response fields.
 
 ```bash
-curl "https://api.final.ai/api/repositories" \
-  -H "Authorization: Bearer ${access_token}"
+curl "https://api.final.ai/v1/repositories" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 ## Get a repository
@@ -50,8 +50,8 @@ See [get a repository](/api-references/repositories/get) for response fields.
 ```bash
 repository_id="<repository-id>"
 
-curl "https://api.final.ai/api/repositories/${repository_id}" \
-  -H "Authorization: Bearer ${access_token}"
+curl "https://api.final.ai/v1/repositories/${repository_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 ## Mint Git credentials
@@ -61,8 +61,8 @@ See [mint Git credentials](/api-references/repositories/mint-git-credentials) fo
 ```bash
 repository_id="<repository-id>"
 
-curl -X POST "https://api.final.ai/api/repositories/${repository_id}/git-credentials" \
-  -H "Authorization: Bearer ${access_token}" \
+curl -X POST "https://api.final.ai/v1/repositories/${repository_id}/git-credentials" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"access":"write"}'
 ```
@@ -90,8 +90,8 @@ Archive marks the repository as archived:
 ```bash
 repository_id="<repository-id>"
 
-curl -X POST "https://api.final.ai/api/repositories/${repository_id}/archive" \
-  -H "Authorization: Bearer ${access_token}"
+curl -X POST "https://api.final.ai/v1/repositories/${repository_id}/archive" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
 Delete removes it:
@@ -99,11 +99,18 @@ Delete removes it:
 ```bash
 repository_id="<repository-id>"
 
-curl -X DELETE "https://api.final.ai/api/repositories/${repository_id}" \
-  -H "Authorization: Bearer ${access_token}"
+curl -X DELETE "https://api.final.ai/v1/repositories/${repository_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
-## Token scopes
+## API key permissions
+
+| Permission | Enables |
+| --- | --- |
+| `repositories:read` | List repositories, read repository metadata, and mint read-only Git credentials. |
+| `repositories:write` | Create, archive, and delete repositories, and mint read-write Git credentials. |
+
+## Git credential access
 
 | Access | Scopes |
 | --- | --- |

@@ -86,24 +86,37 @@ If you decode a gateway token while debugging, use the `tenantId` claim to ident
 
 ## Connect over WebSocket
 
-Pass the token and protocol version as query parameters:
+Pass `protocolVersion` in the URL. Then send the gateway token as the first frame after the socket opens. Do not put the token in the query string.
 
 ```js
 const channelName = "chat";
+const authRequestId = "auth-1";
 
 const socket = new WebSocket(
-  `${session.url}?token=${encodeURIComponent(session.token)}&protocolVersion=${session.protocolVersion}`,
+  `${session.url}?protocolVersion=${session.protocolVersion}`,
 );
 
 socket.addEventListener("open", () => {
   socket.send(JSON.stringify({
-    type: "channel.subscribe",
-    channel: channelName,
+    id: authRequestId,
+    type: "auth",
+    token: session.token,
   }));
 });
 
 socket.addEventListener("message", (event) => {
   const frame = JSON.parse(event.data);
+
+  if (
+    frame.type === "ack" &&
+    frame.operation === "auth" &&
+    frame.requestId === authRequestId
+  ) {
+    socket.send(JSON.stringify({
+      type: "channel.subscribe",
+      channel: channelName,
+    }));
+  }
 
   if (frame.type === "channel.message") {
     console.log(frame.message.name, frame.message.data);

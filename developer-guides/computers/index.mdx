@@ -1,0 +1,51 @@
+---
+title: "Computers"
+description: "Create and operate Final Computers from container images."
+---
+
+Final Computers run container images as persistent or ephemeral cloud machines. Use them for agent runtimes, sandboxes, build jobs, preview services, and workloads that need command execution, files, SSH, and HTTP access.
+
+You can manage Computers with the public REST API, the `final-computer` CLI, or the TypeScript SDK.
+
+<Card title="Use the REST API" icon="braces" href="/developer-guides/computers/rest-api">
+  Create, inspect, update, execute commands on, and delete Computers with HTTP requests.
+</Card>
+
+<Card title="Create your first Computer" icon="terminal" href="/developer-guides/computers/quickstart">
+  Authenticate the CLI, create a Computer from a container image, and connect with SSH.
+</Card>
+
+<Card title="Use the TypeScript SDK" icon="code" href="/developer-guides/computers/sdk">
+  Create Computers, run commands, read and write files, and clean up ephemeral machines from code.
+</Card>
+
+<Card title="Manage lifecycle and settings" icon="settings" href="/developer-guides/computers/lifecycle">
+  Resize machines, update environment variables, restart workloads, and control idle behavior.
+</Card>
+
+<Card title="Expose apps and share access" icon="globe" href="/developer-guides/computers/networking">
+  Configure HTTP ports, public access, custom domains, and sharing.
+</Card>
+
+<Card title="Manage tokens and SSH keys" icon="key-round" href="/developer-guides/computers/access">
+  Manage computer tokens, register SSH public keys, and choose the right credential for each workflow.
+</Card>
+
+<Card title="API reference" icon="book-open" href="/api-references/computers">
+  Browse every public REST endpoint for Computers, execution, files, shares, domains, tokens, SSH keys, and regions.
+</Card>
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| Computer | A cloud machine created from a container image. Each Computer has a name, region, resources, HTTP settings, and lifecycle state. |
+| Private Computer | A Computer owned by one user. Create a private Computer by using a user-owned API key and omitting `teamId`. |
+| Team-owned Computer | A Computer owned by a team. Create one by passing `teamId` as a `team_` ID when you create the Computer. |
+| Image | The container image used to boot the Computer, such as `docker.io/library/ubuntu:24.04` or a private image. |
+| Ephemeral Computer | A Computer that is deleted when it becomes idle instead of being paused. Use this for short-lived jobs and sandboxes. |
+| Auto resume | A setting that lets retained Computers wake when accessed after being paused or shelved. |
+| computer token | A scoped Computer credential you can create, list, and revoke from the public API. |
+| SSH key | An OpenSSH public key registered to your user for SSH access to Computers in your organization. |
+
+For raw API details, start with [create a Computer](/api-references/computers/computers/create) and [list Computers](/api-references/computers/computers/list).

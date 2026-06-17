@@ -3,7 +3,7 @@ title: "Agent Disk"
 description: "Create persistent disks for agents and manage branches, checkpoints, users, shares, and usage."
 ---
 
-Agent Disk gives agents persistent storage that can be mounted, branched, checkpointed, shared, and billed independently from a VM or workspace.
+Agent Disk gives agents persistent storage that can be mounted, branched, checkpointed, shared, and billed independently from a computer or workspace.
 
 Use Agent Disk when an agent needs durable file state across runs, reproducible branch points, or a disk that can be shared between agent workflows.
 
@@ -105,6 +105,8 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/
     "branch": "main"
   }'
 ```
+
+The checkpoint response includes `manifestKey`, `sealSeq`, and `baseManifest` after the checkpoint is sealed. Agent Disk uses that base manifest when it creates a branch from the checkpoint.
 
 Create a branch from a checkpoint:
 

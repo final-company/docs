@@ -13,6 +13,8 @@ Authorization: Bearer <api-key>
 
 Organization-owned and team-owned keys must include `agentProfileId` when they create workspaces or sessions. Team-owned keys are scoped to agent profiles and workspaces for that team. User-owned keys act as the key owner.
 
+Create requests must include `executionMode`. Use `cloud` for Final-managed cloud execution, or `local` when targeting local execution. Pass `finalNodeId` only when you want to run on a specific existing Final Node.
+
 The public Agent Workspaces namespace is:
 
 ```text

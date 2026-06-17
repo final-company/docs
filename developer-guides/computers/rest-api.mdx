@@ -1,0 +1,107 @@
+---
+title: "Use the REST API"
+description: "Create and manage Computers with the public Final Computers REST API."
+---
+
+Final Computers has a public REST API. Use it when you want to create, inspect, update, execute commands on, and delete Computers from your own services or automation.
+
+The public Computer API namespace is:
+
+```text
+https://api.final.ai/v1/computers
+```
+
+Every request uses bearer authentication with a Final API key:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+For every endpoint, schema, and response, see the [Computers API reference](/api-references/computers).
+
+## Ownership
+
+Every Computer is either private to a user or owned by a team.
+
+User-owned API keys create private Computers when you omit `teamId`. Pass `teamId` as a `team_` ID to create a team-owned Computer for a team the acting user belongs to. Ownerless organization API keys must pass `teamId` when creating a Computer.
+
+Computer IDs use the `comp_` prefix. Computer responses include `ownerUserId` as a `usr_` ID for private Computers and `teamId` as a `team_` ID for team-owned Computers. Exactly one of those fields is set.
+
+## Create a Computer
+
+```bash
+curl -X POST "https://api.final.ai/v1/computers" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: docs-demo-001" \
+  -d '{
+    "name": "docs-demo",
+    "teamId": "team_1111117Hxt1fAWDjN7TY",
+    "image": "docker.io/library/ubuntu:24.04",
+    "vcpu": 2,
+    "memoryMb": 4096,
+    "diskGb": 20
+  }'
+```
+
+Use the `Idempotency-Key` header when retrying create requests. If Final replays a previous create response, the response includes `Idempotency-Replayed: true`.
+
+Idempotency keys are scoped by organization and Computer owner scope. You can reuse the same key for a private Computer and a team-owned Computer without colliding.
+
+See [create a Computer](/api-references/computers/computers/create).
+
+## List and inspect Computers
+
+```bash
+curl "https://api.final.ai/v1/computers" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}"
+```
+
+```bash
+curl "https://api.final.ai/v1/computers/docs-demo" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}"
+```
+
+See [list Computers](/api-references/computers/computers/list) and [get a Computer](/api-references/computers/computers/get).
+
+## Update a Computer
+
+```bash
+curl -X PATCH "https://api.final.ai/v1/computers/docs-demo" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vcpu": 4,
+    "memoryMb": 8192,
+    "tags": ["docs", "preview"]
+  }'
+```
+
+Disk size is grow-only. You can also update HTTP settings, idle behavior, tags, comments, and environment variables.
+
+See [update a Computer](/api-references/computers/computers/update).
+
+## Run a command
+
+```bash
+curl -X POST "https://api.final.ai/v1/computers/docs-demo/exec" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command": "uname -a",
+    "timeoutMs": 30000
+  }'
+```
+
+Use the buffered command endpoint for short commands. Use the [exec WebSocket](/api-references/computers/execution/stream) for streaming output.
+
+See [execute a command](/api-references/computers/execution/execute).
+
+## Delete a Computer
+
+```bash
+curl -X DELETE "https://api.final.ai/v1/computers/docs-demo" \
+  -H "Authorization: Bearer ${FINAL_COMPUTER_API_KEY}"
+```
+
+See [delete a Computer](/api-references/computers/computers/delete).
