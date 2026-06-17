@@ -24,14 +24,14 @@ Use it when a workflow needs to survive process restarts, external callbacks, hu
 </Card>
 
 <Card title="API reference" icon="book-open" href="/api-references/durable-execution">
-  Browse every public REST endpoint for apps, workflows, events, and runs.
+  Browse every public REST endpoint for namespaces, workflows, events, and runs.
 </Card>
 
 ## Core concepts
 
 | Concept | Description |
 | --- | --- |
-| Namespace | A durable execution boundary under the API key owner, such as `billing`. |
+| Namespace | A durable execution boundary under the user or team API key owner, such as `billing`. |
 | Function | SDK code that implements a durable workflow. |
 | Workflow | A registered durable workflow version with a WebSocket worker runtime and one or more triggers. |
 | Worker | Your process that connects to Final over WebSocket, leases work, and drains on shutdown. |

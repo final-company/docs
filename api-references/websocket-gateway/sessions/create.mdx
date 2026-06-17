@@ -6,7 +6,9 @@ api: "POST /v1/websocket-gateway/sessions"
 
 Creates a short-lived token for connecting to the hosted WebSocket Gateway.
 
-Set `CHANNEL_NAME` to the channel your application uses. Channel names are tenant-local resource names. Send `chat`, `room:123`, or another app-defined name, not `org:<id>:channel:chat`.
+Requires a user-owned or team-owned API key with `websocket_gateway:connect`.
+
+Set `CHANNEL_NAME` to the channel your application uses. Channel names are owner-local resource names scoped to the API key owner. Send `chat`, `room:123`, or another app-defined name. Do not prefix resource names with `user:` or `team:`.
 
 ```bash
 CHANNEL_NAME="chat"
@@ -34,8 +36,8 @@ EOF
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `subject` | string | No | Subject for the gateway token. Defaults to the authenticated user, API key, or organization. |
-| `clientId` | string | No | Client identifier. Defaults to the API key ID or organization ID. |
+| `subject` | string | No | Subject for the gateway token. Defaults to `user:<userId>` for user-owned keys or `team:<teamId>` for team-owned keys. |
+| `clientId` | string | No | Client identifier. Defaults to the owner user ID for user-owned keys or the team ID for team-owned keys. |
 | `ttlMs` | integer | No | Token lifetime in milliseconds. Maximum `600000`. |
 | `grants` | object | Yes | Scoped access grants. At least one grant is required. |
 | `metadata` | object | No | Additional token metadata. |
@@ -53,7 +55,7 @@ Each grant item has:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `name` | string | Yes | Tenant-local resource name, such as a channel name, RPC name, bridge name, or work queue name. Do not prefix with `org:`. |
+| `name` | string | Yes | Owner-local resource name, such as a channel name, RPC name, bridge name, or work queue name. Do not prefix with `user:` or `team:`. |
 | `access` | string[] | Yes | Access values for the grant type. |
 | `limits` | object | No | Optional `maxFrameBytes`, `maxFramesPerMinute`, and `maxSubscriptions` limits. |
 
@@ -62,7 +64,7 @@ Each grant item has:
 ```json
 {
   "protocolVersion": 1,
-  "url": "wss://gateway.final.ai/connect",
+  "url": "wss://ws.api.final.ai/connect",
   "token": "<gateway-token>",
   "expiresAt": "2026-06-15T12:10:00.000Z",
   "jti": "issued-token-1"
@@ -72,5 +74,7 @@ Each grant item has:
 Connect with the returned `url`, `token`, and `protocolVersion`:
 
 ```text
-wss://gateway.final.ai/connect?token=<gateway-token>&protocolVersion=1
+wss://ws.api.final.ai/connect?token=<gateway-token>&protocolVersion=1
 ```
+
+If you inspect the gateway token while debugging, use the `tenantId` claim to identify the owner scope.

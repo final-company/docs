@@ -19,15 +19,18 @@ https://api.final.ai
 
 | Credential | Use it for |
 | --- | --- |
-| Organization API key | Public REST APIs for Agent Workspaces, WebSocket Gateway, Virtual Machines, Agent Disk team-owned disks, and API key management. |
-| User API key | User-attributed Agent Workspaces requests, private or team-owned Agent Disk requests, Durable Execution, and Secrets. |
+| Organization API key | Organization-scoped REST APIs, Virtual Machines team-owned creation with `teamId`, Agent Workspaces through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
+| Team API key | Team-scoped Agent Workspaces, WebSocket Gateway, and Durable Execution requests. |
+| User API key | User-scoped Agent Workspaces, WebSocket Gateway, Durable Execution, Secrets, private or team-owned Virtual Machines, and private or team-owned Agent Disk requests. |
 | Production access token | Git repository management endpoints. |
 | Minted Git credentials | Short-lived Git HTTPS clone, fetch, and push operations. |
 | VM token | Scoped VM access where VM tokens are supported. VM tokens do not authenticate public API requests to `api.final.ai`. |
 
 ## Use API keys
 
-Organization admins can create API keys in Final under **Settings** > **API Keys**.
+Create API keys in Final under **Settings** > **API Keys**. Available scopes depend on your role and team membership.
+
+Final API keys use the `final_sk` prefix. Production keys start with `final_sk_live_`; non-production keys start with `final_sk_test_`.
 
 Store API keys in your secret manager and load them into your automation environment:
 
@@ -63,9 +66,11 @@ The response includes the plaintext `value` once. Store it immediately.
 
 ## Authenticate Agent Workspaces
 
-Agent Workspaces accepts organization-owned and user-owned API keys.
+Agent Workspaces accepts organization-owned, team-owned, and user-owned API keys.
 
 Organization-owned keys create workspaces through an agent profile. Include `agentProfileId` when you create a workspace or session.
+
+Team-owned keys also require `agentProfileId`. The profile must belong to the same team as the API key, and list/get/update requests are scoped to that team's workspaces.
 
 User-owned keys create workspaces as the key owner and do not require `agentProfileId`.
 
@@ -73,11 +78,23 @@ See [Agent Workspaces](/developer-guides/agent-workspaces) and the [Agent Worksp
 
 ## Authenticate WebSocket Gateway requests
 
-Use an API key to create short-lived WebSocket Gateway session tokens and to publish server-side channel or work queue events.
+Use a user-owned or team-owned API key to create short-lived WebSocket Gateway session tokens and to publish server-side channel or work queue events. Organization-owned API keys cannot mint or use gateway-scoped resources.
 
-Gateway session tokens are scoped to tenant-local resources and expire quickly. Do not send your API key to browser or worker clients. Create a session token from your server, then pass the returned token and gateway URL to the client.
+Gateway session tokens are scoped to the API key owner and expire quickly. Do not send your API key to browser or worker clients. Create a session token from your server, then pass the returned token and gateway URL to the client.
 
 See [WebSocket Gateway](/developer-guides/websocket-gateway) and the [WebSocket Gateway API reference](/api-references/websocket-gateway).
+
+## Authenticate Virtual Machines requests
+
+Use a Final API key for Virtual Machines REST API requests.
+
+User-owned API keys create private VMs when you omit `teamId`. To create a team-owned VM, pass `teamId` for a team the acting user belongs to.
+
+Ownerless organization API keys can access organization VMs, but they must pass `teamId` when creating a VM. Every VM has exactly one owner scope: either `ownerUserId` for a private VM or `teamId` for a team-owned VM.
+
+VM tokens are scoped VM credentials where supported. They do not authenticate public API requests to `api.final.ai`.
+
+See [Virtual Machines](/developer-guides/virtual-machines) and the [Virtual Machines API reference](/api-references/virtual-machines).
 
 ## Authenticate Agent Disk requests
 
@@ -91,7 +108,7 @@ See [Agent Disk](/developer-guides/agent-disk) and the [Agent Disk API reference
 
 ## Authenticate Durable Execution workers
 
-Use a user-owned API key for Durable Execution REST API requests, including sending events, triggering runs, and reading history. Durable Execution scopes work by organization, key owner, and namespace.
+Use a user-owned or team-owned API key for Durable Execution REST API requests, including sending events, triggering runs, and reading history. Durable Execution scopes work by organization, API key owner, and namespace.
 
 Use a Durable Execution connect key for SDK workers. A connect key is scoped to one durable namespace and is exchanged for short-lived WebSocket worker session tokens by `connect()`. Store connect keys as server-side secrets and do not send them to browsers or untrusted clients.
 
@@ -120,4 +137,4 @@ For Git clone, fetch, and push, first mint short-lived Git credentials with [min
 
 `401` means the credential is missing, malformed, expired, or invalid.
 
-`403` means the credential is valid but cannot perform the requested action. For API key creation, check that the caller key is organization-owned, includes `api_keys:write`, and already has every permission requested for the new key.
+`403` means the credential is valid but cannot perform the requested action. Check the endpoint's required key owner type, permissions, and team membership. For API key creation through the public API, the caller key must be organization-owned, include `api_keys:write`, and already have every permission requested for the new key.

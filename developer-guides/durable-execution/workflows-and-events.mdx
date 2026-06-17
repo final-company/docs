@@ -3,7 +3,7 @@ title: "Workflows and events"
 description: "Register durable workflows and send events that start or resume runs."
 ---
 
-A durable workflow is registered under one namespace. Final injects organization and owner scope from the user-owned API key and URL, so request bodies do not include `scope`.
+A durable workflow is registered under one namespace. Final injects organization and owner scope from the user-owned or team-owned API key and URL, so request bodies do not include `scope`.
 
 The SDK registers function manifests when a worker connects. Use direct workflow registration only for lower-level integrations.
 
@@ -26,7 +26,7 @@ The runtime uses the WebSocket worker transport:
 ```json
 {
   "transport": "websocket",
-  "gatewayUrl": "wss://gateway.final.ai/connect",
+  "gatewayUrl": "wss://ws.api.final.ai/connect",
   "queue": "durable-execution:billing"
 }
 ```

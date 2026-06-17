@@ -5,11 +5,13 @@ description: "Reference for the Final Virtual Machines REST API."
 
 Use the public Virtual Machines REST API to create machines, run commands, read and write files, manage networking, and control access.
 
-Every request to the public VM API uses bearer authentication with an organization API key:
+Every request to the public VM API uses bearer authentication with a Final API key:
 
 ```bash
 Authorization: Bearer <api-key>
 ```
+
+VMs are scoped to one owner. Private VMs return `ownerUserId`; team-owned VMs return `teamId`. Pass `teamId` when creating a team-owned VM or when using an ownerless organization API key.
 
 The public VM API namespace is:
 

@@ -13,9 +13,11 @@ Your server creates a short-lived gateway session token with the public REST API
 
 ## Before you begin
 
-You need an API key for `https://api.final.ai`. See [authentication](/developer-guides/authentication) for bearer auth examples.
+You need a user-owned or team-owned API key for `https://api.final.ai`. See [authentication](/developer-guides/authentication) for bearer auth examples.
 
 The API key must have the gateway permissions required by the grants or operation you request.
+
+Gateway resources are scoped to the API key owner. A user-owned key and a team-owned key can both use a channel named `chat`, but those channels are isolated from each other.
 
 | Permission | Enables |
 | --- | --- |
@@ -41,7 +43,7 @@ The response includes the gateway URL clients should connect to:
 ```json
 {
   "protocolVersion": 1,
-  "url": "wss://gateway.final.ai/connect"
+  "url": "wss://ws.api.final.ai/connect"
 }
 ```
 
@@ -49,7 +51,7 @@ The response includes the gateway URL clients should connect to:
 
 Create a short-lived token with the least access the client needs.
 
-Set `CHANNEL_NAME` to the channel your application uses for chat messages. Channel names are tenant-local. Final scopes them to the caller organization when it mints the gateway token.
+Set `CHANNEL_NAME` to the channel your application uses for chat messages. Channel names are owner-local. Final derives the user or team scope from the API key when it mints the gateway token.
 
 ```bash
 CHANNEL_NAME="chat"
@@ -78,7 +80,9 @@ EOF
 
 The response includes `url`, `protocolVersion`, `token`, `expiresAt`, and `jti`.
 
-Send `chat`, `room:123`, or another app-defined channel name. Do not send `org:<id>:channel:chat`.
+Send `chat`, `room:123`, or another app-defined channel name. Do not prefix resource names with `user:` or `team:`.
+
+If you decode a gateway token while debugging, use the `tenantId` claim to identify the owner scope. User-owned keys use a user tenant, and team-owned keys use a team tenant.
 
 ## Connect over WebSocket
 

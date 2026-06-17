@@ -22,7 +22,7 @@ paths:
       operationId: listVms
       tags: [VMs]
       summary: List VMs
-      description: List VMs in the authenticated organization.
+      description: List VMs visible to the authenticated API key owner. User-owned API keys see private VMs owned by that user and team-owned VMs for teams they belong to. Ownerless organization API keys can list organization VMs.
       responses:
         "200":
           description: VMs were returned.
@@ -42,7 +42,7 @@ paths:
       operationId: createVm
       tags: [VMs]
       summary: Create a VM
-      description: "Create a VM from a container image. Requests support `Idempotency-Key`; replayed responses include `Idempotency-Replayed: true`."
+      description: "Create a private or team-owned VM from a container image. Omit `teamId` to create a private VM for the acting user. Pass `teamId` to create a team-owned VM. Ownerless organization API keys must pass `teamId`. Requests support `Idempotency-Key`; replayed responses include `Idempotency-Replayed: true`. Idempotency keys are scoped by organization and VM owner scope."
       parameters:
         - name: Idempotency-Key
           in: header
@@ -80,7 +80,7 @@ paths:
       operationId: getVm
       tags: [VMs]
       summary: Get a VM
-      description: Get a VM by ID or live name.
+      description: Get a VM by ID or live name when it is visible to the authenticated API key owner.
       responses:
         "200":
           description: VM was returned.
@@ -633,7 +633,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: token
-      description: Organization API key.
+      description: Final API key.
   parameters:
     IdOrName:
       name: idOrName
@@ -694,6 +694,8 @@ components:
       required:
         - id
         - name
+        - teamId
+        - ownerUserId
         - state
         - stateName
         - desiredState
@@ -715,6 +717,16 @@ components:
         name:
           type: string
           example: wild-haddock
+        teamId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Team owner for a team-owned VM. Null for private VMs.
+        ownerUserId:
+          type: string
+          format: uuid
+          nullable: true
+          description: User owner for a private VM. Null for team-owned VMs.
         state:
           type: integer
         stateName:
@@ -786,6 +798,10 @@ components:
           type: string
         name:
           type: string
+        teamId:
+          type: string
+          format: uuid
+          description: Create a team-owned VM for this team. Omit to create a private VM for the acting user. Required when the API key has no acting user.
         regionSlug:
           type: string
         vcpu:

@@ -11,6 +11,10 @@ Every request uses API key authentication:
 Authorization: Bearer <api-key>
 ```
 
+Session creation, channel publishing, and work offers require a user-owned or team-owned API key. Gateway resources are scoped to that key owner. A user-owned key and a team-owned key can use the same channel or queue names without sharing resources.
+
+Send app-local resource names, such as `chat` or `customer-jobs`. Do not include user or team tenant prefixes in request bodies or paths.
+
 The public base URL is:
 
 ```text

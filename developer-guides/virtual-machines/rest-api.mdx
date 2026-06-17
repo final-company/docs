@@ -11,13 +11,21 @@ The public VM API namespace is:
 https://api.final.ai/v1/vms
 ```
 
-Every request uses bearer authentication with an organization API key:
+Every request uses bearer authentication with a Final API key:
 
 ```bash
 Authorization: Bearer <api-key>
 ```
 
 For every endpoint, schema, and response, see the [Virtual Machines API reference](/api-references/virtual-machines).
+
+## Ownership
+
+Every VM is either private to a user or owned by a team.
+
+User-owned API keys create private VMs when you omit `teamId`. Pass `teamId` to create a team-owned VM for a team the acting user belongs to. Ownerless organization API keys must pass `teamId` when creating a VM.
+
+VM responses include `ownerUserId` for private VMs and `teamId` for team-owned VMs. Exactly one of those fields is set.
 
 ## Create a VM
 
@@ -28,6 +36,7 @@ curl -X POST "https://api.final.ai/v1/vms" \
   -H "Idempotency-Key: docs-demo-001" \
   -d '{
     "name": "docs-demo",
+    "teamId": "018f1111-2222-7333-8444-555555555555",
     "image": "docker.io/library/ubuntu:24.04",
     "vcpu": 2,
     "memoryMb": 4096,
@@ -36,6 +45,8 @@ curl -X POST "https://api.final.ai/v1/vms" \
 ```
 
 Use the `Idempotency-Key` header when retrying create requests. If Final replays a previous create response, the response includes `Idempotency-Replayed: true`.
+
+Idempotency keys are scoped by organization and VM owner scope. You can reuse the same key for a private VM and a team-owned VM without colliding.
 
 See [create a VM](/api-references/virtual-machines/vms/create).
 

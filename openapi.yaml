@@ -22,7 +22,7 @@ paths:
       operationId: createApiKey
       tags: [API keys]
       summary: Create an API key
-      description: "Create an organization API key. The caller must use an organization-owned API key with the `api_keys:write` permission. Requested permissions cannot exceed the caller key's permissions."
+      description: "Create a first-party Final organization API key. The caller must use an organization-owned API key with the `api_keys:write` permission. Requested permissions cannot exceed the caller key's permissions."
       requestBody:
         required: true
         content:
@@ -77,7 +77,7 @@ paths:
       operationId: createAgentWorkspace
       tags: [Agent workspaces]
       summary: Create an agent workspace
-      description: "Create an agent workspace and its main session. Organization-owned API keys must provide `agentProfileId`."
+      description: "Create an agent workspace and its main session. Organization-owned and team-owned API keys must provide `agentProfileId`."
       parameters:
         - name: Idempotency-Key
           in: header
@@ -1248,18 +1248,18 @@ components:
       properties:
         id:
           type: string
-          example: api_key_new
+          example: 0193b000-0000-7000-8000-000000000001
         name:
           type: string
           example: CI deploy
         obfuscatedValue:
           type: string
-          example: sk_...new
+          example: final_sk_live_...AjBc
         value:
           type: string
           nullable: true
-          description: Plaintext API key value. Returned only when the key is created.
-          example: sk_live_new
+          description: Plaintext API key value. Returned only when the key is created. Production keys start with `final_sk_live_`; non-production keys start with `final_sk_test_`.
+          example: final_sk_live_0193b000-0000-7000-8000-000000000001_w7KQ2w4mk3n9lL6xTvYx4p8ZrR0sAjBc
         permissions:
           type: array
           items:
@@ -1433,7 +1433,7 @@ components:
       properties:
         agentProfileId:
           type: string
-          description: Agent profile to run as. Required for organization-owned API keys.
+          description: Agent profile to run as. Required for organization-owned and team-owned API keys.
           example: agp_123
         title:
           type: string
@@ -1459,7 +1459,7 @@ components:
       properties:
         agentProfileId:
           type: string
-          description: Agent profile to use for runtime defaults. Required for organization-owned API keys.
+          description: Agent profile to use for runtime defaults. Required for organization-owned and team-owned API keys.
           example: agp_123
         title:
           type: string

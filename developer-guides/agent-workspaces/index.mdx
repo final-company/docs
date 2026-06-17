@@ -11,9 +11,9 @@ Use the [Agent Workspaces API reference](/api-references/agent-workspaces) for e
 
 You need an API key. See [authentication](/developer-guides/authentication) for credential types and bearer auth examples.
 
-Organization-owned keys can create workspaces for an agent profile. User-owned keys create workspaces as the key owner.
+Organization-owned keys can create workspaces for an agent profile. Team-owned keys create workspaces for agent profiles that belong to the same team as the key. User-owned keys create workspaces as the key owner.
 
-Organization-owned keys must include `agentProfileId` when they create a workspace or session.
+Organization-owned and team-owned keys must include `agentProfileId` when they create a workspace or session.
 
 ## Create a workspace
 

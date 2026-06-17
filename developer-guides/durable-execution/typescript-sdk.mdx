@@ -41,6 +41,8 @@ export const durable = createDurableExecution({
 });
 ```
 
+Pass exactly one owner field: `ownerUserId` for user-owned namespaces, or `teamId` for team-owned namespaces.
+
 The SDK does not read environment variables implicitly. Read your own configuration and pass values into `createDurableExecution()` and `connect()`.
 
 ## Define functions
@@ -154,7 +156,7 @@ The returned `run` has the same shape as [get a run](/api-references/durable-exe
 
 ## Worker credentials
 
-Use a user-owned API key for REST API calls such as sending events, triggering runs, and reading run history.
+Use a user-owned or team-owned API key for REST API calls such as sending events, triggering runs, and reading run history.
 
 Use a Durable Execution connect key only for worker connections. Connect keys are namespace-scoped secrets. Store them in your secret manager and load them into worker processes as `FINAL_DURABLE_CONNECT_KEY`.
 

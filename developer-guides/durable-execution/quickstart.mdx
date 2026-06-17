@@ -9,10 +9,10 @@ Use the Durable Execution TypeScript SDK to define functions and connect workers
 
 You need:
 
-- A user-owned API key for public REST API calls.
+- A user-owned or team-owned API key for public REST API calls.
 - A Durable Execution connect key for the namespace worker.
 - Your Final organization ID.
-- Your Final user ID.
+- Your Final user ID or team ID.
 
 Organization admins can create API keys in Final under **Settings** > **API Keys**.
 
@@ -26,6 +26,8 @@ export FINAL_ORGANIZATION_ID="<organization-id>"
 export FINAL_OWNER_USER_ID="<user-id>"
 export FINAL_DURABLE_CONNECT_KEY="<connect-key>"
 ```
+
+For a team-owned durable namespace, use a team-owned API key and pass `teamId` to the SDK instead of `ownerUserId`.
 
 Durable Execution uses bearer authentication:
 

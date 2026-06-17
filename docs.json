@@ -24,15 +24,20 @@
       {
         "tab": "Developer Guides",
         "pages": [
-          {
-            "group": "Platform",
-            "pages": [
-              "developer-guides/authentication",
-              "developer-guides/secrets"
-            ]
-          },
-          {
-            "group": "Git",
+        {
+          "group": "Platform",
+          "pages": [
+            "developer-guides/authentication"
+          ]
+        },
+        {
+          "group": "Secrets",
+          "pages": [
+            "developer-guides/secrets"
+          ]
+        },
+        {
+          "group": "Git",
             "pages": [
               "developer-guides/git/index",
               "developer-guides/git/clone",
@@ -88,7 +93,30 @@
         "tab": "API Reference",
         "pages": [
           {
-            "group": "Git",
+            "group": "Platform",
+          "pages": [
+            {
+              "group": "API keys",
+              "pages": [
+                "api-references/api-keys/create"
+              ]
+            }
+          ]
+        },
+        {
+          "group": "Secrets",
+          "pages": [
+            "api-references/secrets/list",
+            "api-references/secrets/create",
+            "api-references/secrets/get",
+            "api-references/secrets/update",
+            "api-references/secrets/delete",
+            "api-references/secrets/read-value",
+            "api-references/secrets/write-value"
+          ]
+        },
+        {
+          "group": "Git",
             "pages": [
               "api-references/index",
               {
@@ -137,29 +165,6 @@
                 "pages": [
                   "api-references/checks/create-commit-status",
                   "api-references/checks/create-check-run"
-                ]
-              }
-            ]
-          },
-          {
-            "group": "Platform",
-            "pages": [
-              {
-                "group": "API keys",
-                "pages": [
-                  "api-references/api-keys/create"
-                ]
-              },
-              {
-                "group": "Secrets",
-                "pages": [
-                  "api-references/secrets/list",
-                  "api-references/secrets/create",
-                  "api-references/secrets/get",
-                  "api-references/secrets/update",
-                  "api-references/secrets/delete",
-                  "api-references/secrets/read-value",
-                  "api-references/secrets/write-value"
                 ]
               }
             ]

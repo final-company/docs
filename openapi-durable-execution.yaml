@@ -18,7 +18,7 @@ paths:
       operationId: getDurableNamespaceMeta
       tags: [Namespaces]
       summary: Get namespace metadata
-      description: Inspect the resolved namespace scope for the authenticated user-owned API key.
+      description: Inspect the resolved namespace scope for the authenticated user-owned or team-owned API key.
       parameters:
         - $ref: "#/components/parameters/Namespace"
       responses:
@@ -271,7 +271,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: API key
-      description: User-owned API key.
+      description: User-owned or team-owned API key.
   parameters:
     Namespace:
       name: namespace
@@ -414,7 +414,7 @@ components:
         gatewayUrl:
           type: string
           format: uri
-          example: wss://gateway.final.ai/connect
+          example: wss://ws.api.final.ai/connect
         queue:
           type: string
           example: durable-execution:billing

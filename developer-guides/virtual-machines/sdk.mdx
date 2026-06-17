@@ -7,7 +7,7 @@ Use `@final/vm-sdk` when your application needs to create VMs, run commands, mov
 
 ## Authenticate
 
-Create a client with an organization API key:
+Create a client with a Final API key:
 
 ```ts
 import { createVmClient, orThrow } from "@final/vm-sdk";
@@ -27,6 +27,7 @@ const vm = orThrow(
   await client.createVm({
     image: "docker.io/library/node:22-slim",
     name: "sdk-preview",
+    teamId: "018f1111-2222-7333-8444-555555555555",
     httpPort: 3000,
     httpPublic: true,
     env: {
@@ -38,6 +39,8 @@ const vm = orThrow(
 
 console.log(vm.getInfo().hostname);
 ```
+
+Pass `teamId` to create a team-owned VM. Omit `teamId` to create a private VM for the acting user.
 
 The SDK sends `idempotencyKey` as the `Idempotency-Key` header on the [create a VM endpoint](/api-references/virtual-machines/vms/create).
 

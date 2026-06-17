@@ -1,19 +1,19 @@
 ---
 title: "Tokens and SSH keys"
-description: "Use organization API keys, VM tokens, and SSH public keys with Final Virtual Machines."
+description: "Use Final API keys, VM tokens, and SSH public keys with Final Virtual Machines."
 ---
 
 Virtual Machines use three credential types:
 
 | Credential | Use it for |
 | --- | --- |
-| Organization API key | Authenticating the CLI, SDK, and public REST API. |
+| Final API key | Authenticating the CLI, SDK, and public REST API. |
 | VM token | Granting scoped VM access where VM tokens are supported. |
 | SSH public key | Connecting to VMs over SSH. |
 
-## Organization API keys
+## API keys
 
-Organization admins can create API keys in Final under **Settings** > **API Keys**.
+Create API keys in Final under **Settings** > **API Keys**. Use a user-owned API key for private VMs. Use `teamId` when you create a team-owned VM or when you use an ownerless organization API key.
 
 Use the key as a bearer token:
 
@@ -34,7 +34,7 @@ For cross-product auth details, see [authentication](/developer-guides/authentic
 
 Create VM tokens when you need a credential that can be revoked independently or scoped to a VM.
 
-Use an organization API key to call the public API at `api.final.ai`. VM tokens are managed by the public API, but they do not authenticate public API requests.
+Use a Final API key to call the public API at `api.final.ai`. VM tokens are managed by the public API, but they do not authenticate public API requests.
 
 ```bash
 final-vm token create ci-token --vm docs-demo --expires-days 30
@@ -71,6 +71,6 @@ Remove a key by name:
 final-vm ssh-key rm laptop
 ```
 
-SSH key writes require a user context. When you call the REST API directly, include a user-attributed request path that can provide that context.
+SSH key writes require a user context. Use a user-owned API key when you call the REST API directly.
 
 See [list SSH keys](/api-references/virtual-machines/ssh-keys/list), [add an SSH key](/api-references/virtual-machines/ssh-keys/add), and [delete an SSH key](/api-references/virtual-machines/ssh-keys/delete).

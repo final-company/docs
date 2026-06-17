@@ -6,7 +6,11 @@ api: "POST /v1/websocket-gateway/channels/{channel}/events"
 
 Publishes an event to a gateway channel from the REST API.
 
+Requires a user-owned or team-owned API key with `websocket_gateway:publish`.
+
 Set `CHANNEL_NAME` to the channel your application uses. `chat` is only an example value, not a reserved Final channel.
+
+The channel is scoped to the API key owner. Publishing to `chat` with a user-owned key does not publish to a team-owned `chat` channel.
 
 The API also accepts `POST /v1/websocket-gateway/channels/events` when you provide `channel` in the request body.
 
@@ -29,7 +33,7 @@ curl -X POST "https://api.final.ai/v1/websocket-gateway/channels/${CHANNEL_NAME}
 
 | Parameter | Type | Description |
 | --- | --- | --- |
-| `channel` | string | Tenant-local channel name. Do not prefix with `org:`. |
+| `channel` | string | Owner-local channel name. Do not prefix with `user:` or `team:`. |
 
 ## Request body
 

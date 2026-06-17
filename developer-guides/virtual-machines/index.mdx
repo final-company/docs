@@ -40,6 +40,8 @@ You can manage VMs with the public REST API, the `final-vm` CLI, or the TypeScri
 | Concept | Description |
 | --- | --- |
 | VM | A cloud machine created from a container image. Each VM has a name, region, resources, HTTP settings, and lifecycle state. |
+| Private VM | A VM owned by one user. Create a private VM by using a user-owned API key and omitting `teamId`. |
+| Team-owned VM | A VM owned by a team. Create one by passing `teamId` when you create the VM. |
 | Image | The container image used to boot the VM, such as `docker.io/library/ubuntu:24.04` or a private image. |
 | Ephemeral VM | A VM that is deleted when it becomes idle instead of being paused. Use this for short-lived jobs and sandboxes. |
 | Auto resume | A setting that lets retained VMs wake when accessed after being paused or shelved. |
