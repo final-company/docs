@@ -3,17 +3,17 @@ title: "Clone and work with a repository"
 description: "Mint Git credentials, clone a Final Git repository, and push changes."
 ---
 
-Use a file system ID to mint short-lived Git credentials. Then use the returned HTTPS remote with normal Git commands.
+Use a repository ID to mint short-lived Git credentials. Then use the returned HTTPS remote with normal Git commands.
 
 ## Full example
 
 ```bash
 # Fill these in.
-file_system_id="<file-system-id>"
+repository_id="<repository-id>"
 access_token="<access-token>"
 
 # Mint credentials with write access.
-credentials=$(curl -s -X POST "https://api.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+credentials=$(curl -s -X POST "https://api.final.ai/api/repositories/${repository_id}/git-credentials" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{"access":"write"}')
@@ -42,10 +42,10 @@ Tokens expire after 10 minutes. Mint a new credential set for each workflow run.
 ## Fetch later
 
 ```bash
-file_system_id="<file-system-id>"
+repository_id="<repository-id>"
 access_token="<access-token>"
 
-credentials=$(curl -s -X POST "https://api.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+credentials=$(curl -s -X POST "https://api.final.ai/api/repositories/${repository_id}/git-credentials" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{"access":"read"}')

@@ -3,7 +3,7 @@ title: "Manage repositories"
 description: "Create Final Git repositories and mint short-lived Git credentials."
 ---
 
-Use the console API to manage Git-backed file systems. Every request requires a production access token. For complete endpoint details, see the [API reference](/api-references).
+Use the console API to manage Git-backed repositories. Every request requires a production access token. For complete endpoint details, see the [API reference](/api-references).
 
 ```bash
 access_token="<access-token>"
@@ -12,7 +12,7 @@ access_token="<access-token>"
 ## Create a repository
 
 ```bash
-curl -X POST "https://api.final.ai/api/file-systems" \
+curl -X POST "https://api.final.ai/api/repositories" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -24,22 +24,22 @@ curl -X POST "https://api.final.ai/api/file-systems" \
 
 ```json
 {
-  "fileSystem": {
-    "id": "fs_123",
+  "repository": {
+    "id": "gsr_123",
     "displayName": "Docs",
     "registrySlug": "docs"
   }
 }
 ```
 
-Use the returned `fileSystem.id` when minting Git credentials. See [create a repository](/api-references/repositories/create) for request and response fields.
+Use the returned `repository.id` when minting Git credentials. See [create a repository](/api-references/repositories/create) for request and response fields.
 
 ## List repositories
 
 See [list repositories](/api-references/repositories/list) for query parameters and response fields.
 
 ```bash
-curl "https://api.final.ai/api/file-systems" \
+curl "https://api.final.ai/api/repositories" \
   -H "Authorization: Bearer ${access_token}"
 ```
 
@@ -48,9 +48,9 @@ curl "https://api.final.ai/api/file-systems" \
 See [get a repository](/api-references/repositories/get) for response fields.
 
 ```bash
-file_system_id="<file-system-id>"
+repository_id="<repository-id>"
 
-curl "https://api.final.ai/api/file-systems/${file_system_id}" \
+curl "https://api.final.ai/api/repositories/${repository_id}" \
   -H "Authorization: Bearer ${access_token}"
 ```
 
@@ -59,9 +59,9 @@ curl "https://api.final.ai/api/file-systems/${file_system_id}" \
 See [mint Git credentials](/api-references/repositories/mint-git-credentials) for request and response fields.
 
 ```bash
-file_system_id="<file-system-id>"
+repository_id="<repository-id>"
 
-curl -X POST "https://api.final.ai/api/file-systems/${file_system_id}/git-credentials" \
+curl -X POST "https://api.final.ai/api/repositories/${repository_id}/git-credentials" \
   -H "Authorization: Bearer ${access_token}" \
   -H "Content-Type: application/json" \
   -d '{"access":"write"}'
@@ -88,18 +88,18 @@ See [archive a repository](/api-references/repositories/archive) and [delete a r
 Archive marks the repository as archived:
 
 ```bash
-file_system_id="<file-system-id>"
+repository_id="<repository-id>"
 
-curl -X POST "https://api.final.ai/api/file-systems/${file_system_id}/archive" \
+curl -X POST "https://api.final.ai/api/repositories/${repository_id}/archive" \
   -H "Authorization: Bearer ${access_token}"
 ```
 
 Delete removes it:
 
 ```bash
-file_system_id="<file-system-id>"
+repository_id="<repository-id>"
 
-curl -X DELETE "https://api.final.ai/api/file-systems/${file_system_id}" \
+curl -X DELETE "https://api.final.ai/api/repositories/${repository_id}" \
   -H "Authorization: Bearer ${access_token}"
 ```
 

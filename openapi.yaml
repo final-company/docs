@@ -429,12 +429,12 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/file-systems:
+  /api/repositories:
     get:
-      operationId: listFileSystems
+      operationId: listRepositories
       tags: [Repositories]
       summary: List repositories
-      description: List Git-backed file systems available to the authenticated user.
+      description: List Git-backed repositories available to the authenticated user.
       parameters:
         - name: deviceId
           in: query
@@ -448,25 +448,25 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [fileSystems]
+                required: [repositories]
                 properties:
-                  fileSystems:
+                  repositories:
                     type: array
                     items:
-                      $ref: "#/components/schemas/FileSystem"
+                      $ref: "#/components/schemas/Repository"
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
-      operationId: createFileSystem
+      operationId: createRepository
       tags: [Repositories]
       summary: Create a repository
-      description: Create a Git-backed file system.
+      description: Create a Git-backed repository.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateFileSystemRequest"
+              $ref: "#/components/schemas/CreateRepositoryRequest"
       responses:
         "201":
           description: Repository was created.
@@ -474,21 +474,21 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [fileSystem]
+                required: [repository]
                 properties:
-                  fileSystem:
-                    $ref: "#/components/schemas/FileSystem"
+                  repository:
+                    $ref: "#/components/schemas/Repository"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-  /api/file-systems/{fileSystemId}:
+  /api/repositories/{repositoryId}:
     get:
-      operationId: getFileSystem
+      operationId: getRepository
       tags: [Repositories]
       summary: Get a repository
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       responses:
         "200":
           description: Repository was returned.
@@ -496,20 +496,20 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [fileSystem]
+                required: [repository]
                 properties:
-                  fileSystem:
-                    $ref: "#/components/schemas/FileSystem"
+                  repository:
+                    $ref: "#/components/schemas/Repository"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
     delete:
-      operationId: deleteFileSystem
+      operationId: deleteRepository
       tags: [Repositories]
       summary: Delete a repository
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       responses:
         "200":
           description: Repository was deleted.
@@ -525,13 +525,13 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/archive:
+  /api/repositories/{repositoryId}/archive:
     post:
-      operationId: archiveFileSystem
+      operationId: archiveRepository
       tags: [Repositories]
       summary: Archive a repository
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       responses:
         "200":
           description: Repository was archived.
@@ -547,14 +547,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/git-credentials:
+  /api/repositories/{repositoryId}/git-credentials:
     post:
       operationId: mintGitCredentials
       tags: [Repositories]
       summary: Mint Git credentials
       description: Mint short-lived HTTPS Git credentials for clone, fetch, and push workflows.
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: false
         content:
@@ -577,13 +577,13 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/pull-requests:
+  /api/repositories/{repositoryId}/pull-requests:
     get:
       operationId: listPullRequests
       tags: [Pull requests]
       summary: List pull requests
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       responses:
         "200":
           description: Pull requests were returned.
@@ -604,7 +604,7 @@ paths:
       tags: [Pull requests]
       summary: Create a pull request
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: true
         content:
@@ -626,13 +626,13 @@ paths:
           $ref: "#/components/responses/InvalidRequest"
         "409":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestNumber}:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestNumber}:
     get:
       operationId: getPullRequest
       tags: [Pull requests]
       summary: Get a pull request
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestNumber"
       responses:
         "200":
@@ -643,13 +643,13 @@ paths:
                 $ref: "#/components/schemas/PullRequestDetail"
         "404":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestNumber}/diff:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestNumber}/diff:
     get:
       operationId: getPullRequestDiff
       tags: [Pull requests]
       summary: Get a pull request diff
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestNumber"
         - name: maxBytes
           in: query
@@ -667,13 +667,13 @@ paths:
                 $ref: "#/components/schemas/PullRequestDiff"
         "404":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}:
     patch:
       operationId: updatePullRequest
       tags: [Pull requests]
       summary: Update a pull request
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestId"
       requestBody:
         required: true
@@ -694,13 +694,13 @@ paths:
                     $ref: "#/components/schemas/PullRequest"
         "409":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/parent:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/parent:
     post:
       operationId: setPullRequestParent
       tags: [Pull requests]
       summary: Set pull request parent
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestId"
       requestBody:
         required: true
@@ -726,13 +726,13 @@ paths:
                     $ref: "#/components/schemas/PullRequest"
         "409":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/detach:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/detach:
     post:
       operationId: detachPullRequest
       tags: [Pull requests]
       summary: Detach a pull request
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestId"
       responses:
         "200":
@@ -745,13 +745,13 @@ paths:
                 properties:
                   pullRequest:
                     $ref: "#/components/schemas/PullRequest"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/reviews:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/reviews:
     post:
       operationId: createPullRequestReview
       tags: [Pull requests]
       summary: Create a pull request review
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestId"
       requestBody:
         required: true
@@ -779,35 +779,35 @@ paths:
                 properties:
                   review:
                     $ref: "#/components/schemas/PullRequestReview"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/stack/repair:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/stack/repair:
     post:
       operationId: repairPullRequestStack
       tags: [Pull requests]
       summary: Repair a pull request stack
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestId"
       responses:
         "200":
           $ref: "#/components/responses/PullRequestList"
-  /api/file-systems/{fileSystemId}/pull-requests/{pullRequestId}/stack/split:
+  /api/repositories/{repositoryId}/pull-requests/{pullRequestId}/stack/split:
     post:
       operationId: splitPullRequestStack
       tags: [Pull requests]
       summary: Split a pull request stack
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/PullRequestId"
       responses:
         "200":
           $ref: "#/components/responses/PullRequestList"
-  /api/file-systems/{fileSystemId}/pull-requests/stack/reorder:
+  /api/repositories/{repositoryId}/pull-requests/stack/reorder:
     post:
       operationId: reorderPullRequestStack
       tags: [Pull requests]
       summary: Reorder a pull request stack
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: true
         content:
@@ -825,14 +825,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PullRequestList"
-  /api/file-systems/{fileSystemId}/commit-statuses:
+  /api/repositories/{repositoryId}/commit-statuses:
     post:
       operationId: createCommitStatus
       tags: [Checks]
       summary: Create a commit status
       description: Report CI status for a commit SHA. Merge queues require statuses on the candidate SHA.
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: true
         content:
@@ -850,14 +850,14 @@ paths:
                 properties:
                   commitStatus:
                     $ref: "#/components/schemas/CommitStatus"
-  /api/file-systems/{fileSystemId}/check-runs:
+  /api/repositories/{repositoryId}/check-runs:
     post:
       operationId: createCheckRun
       tags: [Checks]
       summary: Create a check run
       description: Report a CI check run for a commit SHA. Merge queues require checks on the candidate SHA.
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: true
         content:
@@ -875,13 +875,13 @@ paths:
                 properties:
                   checkRun:
                     $ref: "#/components/schemas/CheckRun"
-  /api/file-systems/{fileSystemId}/merge-queues:
+  /api/repositories/{repositoryId}/merge-queues:
     get:
       operationId: listMergeQueues
       tags: [Merge queues]
       summary: List merge queues
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       responses:
         "200":
           description: Merge queues were returned.
@@ -900,7 +900,7 @@ paths:
       tags: [Merge queues]
       summary: Create or update a merge queue
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: true
         content:
@@ -918,13 +918,13 @@ paths:
                 properties:
                   mergeQueue:
                     $ref: "#/components/schemas/MergeQueue"
-  /api/file-systems/{fileSystemId}/merge-queues/{queueId}/entries:
+  /api/repositories/{repositoryId}/merge-queues/{queueId}/entries:
     get:
       operationId: listMergeQueueEntries
       tags: [Merge queues]
       summary: List merge queue entries
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/QueueId"
       responses:
         "200":
@@ -939,13 +939,13 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MergeQueueEntry"
-  /api/file-systems/{fileSystemId}/merge-queues/{queueId}/attempts:
+  /api/repositories/{repositoryId}/merge-queues/{queueId}/attempts:
     get:
       operationId: listMergeQueueAttempts
       tags: [Merge queues]
       summary: List merge queue attempts
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/QueueId"
         - name: entryId
           in: query
@@ -965,13 +965,13 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MergeQueueAttempt"
-  /api/file-systems/{fileSystemId}/merge-queues/{queueId}/activity:
+  /api/repositories/{repositoryId}/merge-queues/{queueId}/activity:
     get:
       operationId: listMergeQueueActivity
       tags: [Merge queues]
       summary: List merge queue activity
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/QueueId"
       responses:
         "200":
@@ -986,13 +986,13 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MergeQueueEvent"
-  /api/file-systems/{fileSystemId}/merge-queues/enqueue:
+  /api/repositories/{repositoryId}/merge-queues/enqueue:
     post:
       operationId: enqueuePullRequest
       tags: [Merge queues]
       summary: Enqueue a pull request
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: true
         content:
@@ -1012,13 +1012,13 @@ paths:
                     $ref: "#/components/schemas/MergeQueueEntry"
         "409":
           $ref: "#/components/responses/Error"
-  /api/file-systems/{fileSystemId}/merge-queues/entries/{entryId}/dequeue:
+  /api/repositories/{repositoryId}/merge-queues/entries/{entryId}/dequeue:
     post:
       operationId: dequeueMergeQueueEntry
       tags: [Merge queues]
       summary: Dequeue a merge queue entry
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/EntryId"
       requestBody:
         required: true
@@ -1043,13 +1043,13 @@ paths:
                 properties:
                   entry:
                     $ref: "#/components/schemas/MergeQueueEntry"
-  /api/file-systems/{fileSystemId}/merge-queues/entries/{entryId}:
+  /api/repositories/{repositoryId}/merge-queues/entries/{entryId}:
     patch:
       operationId: updateMergeQueueEntry
       tags: [Merge queues]
       summary: Update a merge queue entry
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/EntryId"
       requestBody:
         required: true
@@ -1073,13 +1073,13 @@ paths:
                 properties:
                   entry:
                     $ref: "#/components/schemas/MergeQueueEntry"
-  /api/file-systems/{fileSystemId}/merge-queues/entries/reorder:
+  /api/repositories/{repositoryId}/merge-queues/entries/reorder:
     post:
       operationId: reorderMergeQueueEntries
       tags: [Merge queues]
       summary: Reorder merge queue entries
       parameters:
-        - $ref: "#/components/parameters/FileSystemId"
+        - $ref: "#/components/parameters/RepositoryId"
       requestBody:
         required: true
         content:
@@ -1117,13 +1117,13 @@ components:
       bearerFormat: token
       description: Final access token or API key.
   parameters:
-    FileSystemId:
-      name: fileSystemId
+    RepositoryId:
+      name: repositoryId
       in: path
       required: true
       schema:
         type: string
-      description: Encoded file system ID.
+      description: Encoded repository ID.
     PullRequestId:
       name: pullRequestId
       in: path
@@ -1319,7 +1319,7 @@ components:
         - title
         - mainSessionId
         - workspaceKind
-        - fileSystemId
+        - repositoryId
         - finalNodeId
         - workspaceDir
         - metadata
@@ -1341,7 +1341,7 @@ components:
           type: integer
           enum: [0, 1, 2]
           description: "`0` unknown, `1` main, `2` ticket."
-        fileSystemId:
+        repositoryId:
           type: string
           nullable: true
         finalNodeId:
@@ -1439,10 +1439,10 @@ components:
         title:
           type: string
           nullable: true
-        fileSystemId:
+        repositoryId:
           type: string
           nullable: true
-          description: File system to mount into the workspace.
+          description: Repository to mount into the workspace.
         workspaceDir:
           type: string
           nullable: true
@@ -1543,7 +1543,7 @@ components:
         pollAfterMs:
           type: integer
           example: 1000
-    FileSystem:
+    Repository:
       type: object
       additionalProperties: true
       properties:
@@ -1561,7 +1561,7 @@ components:
         capabilities:
           type: object
           additionalProperties: true
-    CreateFileSystemRequest:
+    CreateRepositoryRequest:
       type: object
       required: [displayName]
       properties:
@@ -1572,8 +1572,9 @@ components:
           type: string
           maxLength: 120
         family:
-          type: string
-          enum: [versioned_fs]
+          type: integer
+          enum: [4]
+          description: Optional Git-backed repository family. Omit this field unless you need to set it explicitly.
         defaultBranch:
           type: string
         grants:
