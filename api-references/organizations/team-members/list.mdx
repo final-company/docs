@@ -1,0 +1,16 @@
+---
+title: "List team members"
+description: "List members of a team."
+api: "GET /v1/organizations/current/teams/{teamId}/members"
+---
+
+Requires `organizations:read`.
+
+```bash
+team_id="team_123"
+
+curl "https://api.final.ai/v1/organizations/current/teams/${team_id}/members" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Team member objects include a nested `user`, `role`, and `createdAt`.

@@ -1,0 +1,64 @@
+---
+title: "Branches and checkpoints"
+description: "Checkpoint Agent Disk state and branch from known-good points for parallel or reproducible work."
+---
+
+Branches and checkpoints let agents explore file state without losing the path back to a known-good version.
+
+Create a checkpoint before risky work, then branch from it when you want parallel experiments, repeatable review state, or a clean fallback.
+
+## When to checkpoint
+
+| Moment | Why it helps |
+| --- | --- |
+| Before a refactor | You can compare generated output before and after the change. |
+| Before running a destructive tool | You keep a branch point in case the tool rewrites too much. |
+| Before publishing artifacts | You can recreate the exact disk state behind an output. |
+| Before parallel agent runs | Each agent can branch from the same sealed state. |
+
+## Create a checkpoint
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/checkpoints" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "before-refactor",
+    "branch": "main"
+  }'
+```
+
+The checkpoint response includes `manifestKey`, `sealSeq`, and `baseManifest` after the checkpoint is sealed. Create branches only from sealed checkpoints.
+
+See [create a checkpoint](/api-references/agent-disk/checkpoints/create).
+
+## Branch from a checkpoint
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/branches" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "experiment-a",
+    "fromCheckpoint": "before-refactor",
+    "fromBranch": "main"
+  }'
+```
+
+Branches created from checkpoints may start in `creating` status while Agent Disk places and opens replicas. Wait until the branch status is `available` before mounting it or creating a share link from it.
+
+See [create a branch](/api-references/agent-disk/branches/create).
+
+## Parallel experiment flow
+
+1. Create a checkpoint from `main`.
+2. Create one branch per experiment from that checkpoint.
+3. Run each agent against its own branch.
+4. Share or inspect outputs from each branch.
+5. Keep the branch that produced useful output and delete branches that no longer matter.
+
+## Naming guidance
+
+Use checkpoint names that describe the decision point, such as `before-schema-migration` or `before-model-upgrade`.
+
+Use branch names that describe the experiment, such as `retrieval-v2`, `small-model-pass`, or `ui-copy-review`.

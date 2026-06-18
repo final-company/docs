@@ -1,0 +1,19 @@
+---
+title: "Create team"
+description: "Create an organization team."
+api: "POST /v1/organizations/current/teams"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+curl -X POST "https://api.final.ai/v1/organizations/current/teams" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Support",
+    "prefix": "SUP"
+  }'
+```
+
+`prefix` must contain uppercase letters only and must be 2 to 5 characters long.

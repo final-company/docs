@@ -11,6 +11,29 @@ Use merge queues to protect target branches and land reviewed pull requests in t
 
 For endpoint details, see the [merge queues API reference](/api-references/merge-queues/list).
 
+## When to use a merge queue
+
+Use a merge queue when `main`, `trunk`, or a release branch must stay green while many pull requests are landing. The queue tests the same candidate SHA that would become the target branch head, so passing checks on a stale pull request branch does not accidentally protect the wrong code.
+
+You probably want a queue when:
+
+- The target branch breaks after individually approved pull requests merge.
+- Pull requests are rebased often because the branch changes underneath them.
+- CI takes long enough that multiple approved changes are usually waiting.
+- Stacked pull requests should land as a validated range instead of as unrelated single PRs.
+- You need an audit trail for queue entries, attempts, candidate SHAs, and check results.
+
+## How Final queues work
+
+1. A pull request or stack range is enqueued for a target branch.
+2. Final Git creates a merge candidate ref for the exact work that may land.
+3. Your CI runs against the candidate SHA.
+4. CI reports required statuses or check runs back to Final.
+5. Final Git lands the candidate only after the required checks pass.
+6. If checks fail, time out, or the pull request changes, the attempt fails or becomes invalid.
+
+For stacked PRs, the queue entry can include the selected range of pull requests. This lets Final validate the code that will land together instead of treating each dependent pull request as if it were independent.
+
 ## Create or update a queue
 
 Open the repository in Final and select **Git**. Configured queues appear under **Merge queues**.
@@ -50,6 +73,14 @@ Queue entries can be reordered, fast-tracked, or removed before they land.
 Use the [enqueue a pull request endpoint](/api-references/merge-queues/enqueue) to queue pull requests from automation.
 
 Use `stackMergeabilityBypass: true` only for emergency partial-stack landings. It requires admin access.
+
+## Queue stacks
+
+When a stack is ready, enqueue the top pull request to queue the full stack range. Final Git includes the open pull requests from the stack root through the selected pull request.
+
+For a lower-only landing, enqueue a pull request in the middle of the stack. Final Git includes the root through that selected pull request. Use this when foundational changes are ready but higher pull requests still need work.
+
+Avoid partial-stack bypasses during normal development. They can land code while dependent open pull requests still expect a different stack shape.
 
 ## Inspect queues
 
@@ -121,6 +152,16 @@ Final Git lands the queue entry only after every required context passes on the 
 
 Report results with the [create a commit status endpoint](/api-references/checks/create-commit-status) or the [create a check run endpoint](/api-references/checks/create-check-run).
 
+## CI integration checklist
+
+| Check | Why it matters |
+| --- | --- |
+| Fetch `candidate_ref` | The candidate ref is the code Final may land. |
+| Test `candidate_sha` | Required checks must attach to the candidate SHA, not the source branch head. |
+| Report every required context | Missing contexts keep the attempt waiting until it times out. |
+| Preserve `attempt_id` in logs | It lets you connect CI failures to queue activity. |
+| Verify webhook signatures | The queue webhook can include `x-final-signature-sha256` when a secret is configured. |
+
 ## Candidate lifecycle
 
 Queue attempts move through these states:
@@ -134,3 +175,11 @@ Queue attempts move through these states:
 | Invalidated | The candidate no longer matches the pull request, stack, or queue state. |
 
 Final Git may remove candidate refs after attempts finish. If a candidate ref disappears before an active attempt reaches a terminal state, Final Git restores it from the stored attempt record.
+
+## Operating guidance
+
+Start with a small required context list. Add more required checks after the queue has been running cleanly and your CI can report results reliably.
+
+Use batching when several independent pull requests can be tested together. Use speculative processing when CI capacity can handle multiple candidates and you want the queue to prepare likely future states.
+
+Pause the queue during CI outages or branch incidents. Existing entries remain visible, but Final Git stops starting new attempts until you resume it.

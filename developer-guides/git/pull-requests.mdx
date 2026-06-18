@@ -9,6 +9,25 @@ Open the repository in Final and select the **Git** tab to see pull requests and
 
 For endpoint details, see the [pull requests API reference](/api-references/pull-requests/list).
 
+## What you can do
+
+| Goal | Use |
+| --- | --- |
+| Review one branch | Create a pull request from a source branch to a target branch. |
+| Split a large change | Create [stacked PRs](/developer-guides/git/stacked-prs), each depending on the previous one. |
+| Keep work moving during review | Continue building upstack while reviewers look at the lower pull requests. |
+| Land reviewed work safely | Use **Merge when ready** or enqueue the pull request through a merge queue. |
+| Repair changed branch history | Use stack repair, split, detach, or reorder controls when dependencies change. |
+
+## Pull request lifecycle
+
+1. Push a source branch to the repository.
+2. Create a pull request against the target branch.
+3. Mark it as **Draft** while the change is still moving, or **Ready** when reviewers should act.
+4. Review the diff, comments, checks, and stack position.
+5. Update the branch or stack in response to feedback.
+6. Use **Merge when ready** or enqueue the pull request after it satisfies review and check requirements.
+
 ## Create a pull request
 
 Before you create a pull request, push your source branch to the repository.
@@ -58,6 +77,8 @@ A stacked PR is a pull request that depends on another pull request in the same 
 
 Final Git validates the stack before it saves it. The parent pull request must be an ancestor of the child pull request.
 
+Stacks work best when each pull request is understandable on its own. The lower pull requests should establish foundations, and the higher pull requests should build on them. Reviewers can then approve early pieces while later pieces are still changing.
+
 <Steps>
   <Step title="Create the base pull request">
     Create the first pull request against the target branch.
@@ -74,6 +95,16 @@ Final Git validates the stack before it saves it. The parent pull request must b
 </Steps>
 
 To create a stacked pull request with the API, pass `parentPullRequestId` to the [create a pull request endpoint](/api-references/pull-requests/create).
+
+For a deeper guide, see [stacked PRs](/developer-guides/git/stacked-prs).
+
+## Review stacked PRs
+
+Start with the pull request closest to the target branch. That is the root of the stack. Review upward from there when you are assigned to multiple pull requests in the same stack.
+
+Treat each pull request as an independent review unit. If a pull request only makes sense after reading the entire stack, split it differently or move code between pull requests before review.
+
+Use **Draft** for pull requests that are still being reshaped. Use **Ready** when the pull request is ready for reviewer action, even if higher pull requests in the stack are still in progress.
 
 ## Update a stack
 
@@ -110,3 +141,11 @@ For a partial landing, click a **Through #** button to queue only the lower part
 </Warning>
 
 Use the [enqueue a pull request endpoint](/api-references/merge-queues/enqueue) to add a pull request or stack range to a merge queue.
+
+## Stack design guidance
+
+Keep stack roots small and stable. A volatile root forces more updates up the stack and makes review harder.
+
+Split by review boundary, not by file count. Good stack slices include a schema change, a backend behavior change, a UI integration, or a cleanup that can be reviewed independently.
+
+Queue the full stack when every open pull request in the range is ready. Queue a lower range when you want to land foundations first and keep higher work open.

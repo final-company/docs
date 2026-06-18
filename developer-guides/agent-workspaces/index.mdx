@@ -3,9 +3,48 @@ title: "Agent Workspaces"
 description: "Create agent workspaces, send messages, and poll session state with the public REST API."
 ---
 
-Agent Workspaces let you start agent work from the public API. A workspace contains one or more sessions. A session receives messages, runs work, and exposes state you can poll.
+Agent Workspaces let you start and manage Final agent work from your product or automation. A workspace is the durable container for the work. A session is one agent conversation or run inside that workspace.
 
-Use the [Agent Workspaces API reference](/api-references/agent-workspaces) for endpoint details.
+Use Agent Workspaces when you want to turn user intent, operational events, or internal tickets into agent tasks that you can track through an API. You create the workspace, send messages, poll state, read messages, and stop or archive the work when it is done.
+
+<Card title="Agent Workspaces API reference" icon="folder-code" href="/api-references/agent-workspaces">
+  Browse endpoints for workspaces, sessions, and messages.
+</Card>
+
+<Card title="Session lifecycle" icon="messages-square" href="/developer-guides/agent-workspaces/session-lifecycle">
+  Create workspaces, send messages, poll state, stop sessions, and archive completed work.
+</Card>
+
+<Card title="Execution modes" icon="cpu" href="/developer-guides/agent-workspaces/execution-modes">
+  Choose cloud execution, local execution, or a specific Final Node for agent sessions.
+</Card>
+
+<Card title="Product integration" icon="blocks" href="/developer-guides/agent-workspaces/product-integration">
+  Build task buttons, background jobs, review surfaces, and realtime progress around agent sessions.
+</Card>
+
+## What you can build
+
+| Use case | How Agent Workspaces helps |
+| --- | --- |
+| In-app agent tasks | Let users ask an agent to investigate, change, or explain something from inside your application. |
+| Repository maintenance | Start work against a Final Git repository and keep the session history tied to the task. |
+| Support and operations triage | Convert an incident, ticket, or alert into a workspace that an agent can investigate. |
+| Review workflows | Send follow-up instructions, inspect state, and collect the session messages for a review surface. |
+| Local or cloud execution | Use `cloud` for Final-managed execution, or `local` when work should run on a local Final Node. |
+
+Agent Workspaces is the orchestration surface. Pair it with [Agent Disk](/developer-guides/agent-disk) when the agent needs persistent file state, [Git](/developer-guides/git) when work should attach to repositories and pull requests, and the [WebSocket Gateway](/developer-guides/websocket-gateway) when your UI needs realtime progress.
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| Workspace | The top-level unit of agent work. It has a title, owner scope, optional repository context, and one or more sessions. |
+| Session | A run or conversation inside a workspace. Sessions receive messages and expose state. |
+| Message | A user instruction or agent response in a session. |
+| State | A lightweight view of session progress, including cursors you can use to fetch new messages. |
+| Agent profile | The agent configuration used by organization-owned and team-owned keys. |
+| Execution mode | `cloud` for Final-managed cloud execution or `local` for a local Final Node. |
 
 ## Before you begin
 
@@ -16,6 +55,15 @@ Organization-owned keys can create workspaces for an agent profile. Team-owned k
 Organization-owned and team-owned keys must include `agentProfileId` when they create a workspace or session.
 
 Every new workspace or session must include `executionMode`. Use `cloud` for Final-managed cloud execution. Use `local` when you want the session to run on a local Final Node. You can also pass `finalNodeId` to target an existing node.
+
+## Typical lifecycle
+
+1. Create a workspace with a title, execution mode, and optional first message.
+2. Store the returned `workspace.id` and `session.id` in your application.
+3. Poll the session state to learn whether there is new output.
+4. Fetch messages with the cursor returned by the state endpoint.
+5. Send follow-up messages when the user or your automation needs to steer the task.
+6. Stop a session if it should not continue, and archive completed workspaces when they leave your active queue.
 
 ## Create a workspace
 
@@ -37,6 +85,8 @@ curl -X POST "https://api.final.ai/v1/agent-workspaces" \
 
 The response includes a `workspace`, its main `session`, and a `command` when you include `message`.
 
+Use an `Idempotency-Key` when the request comes from a button click, webhook, or retrying job. That keeps a transient network failure from creating duplicate workspaces for the same intent.
+
 See [create an agent workspace](/api-references/agent-workspaces/workspaces/create).
 
 ## Send another message
@@ -51,6 +101,8 @@ curl -X POST "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/
     "message": "Focus on the API client tests first."
   }'
 ```
+
+Use follow-up messages for clarification, changed priorities, approvals, or task boundaries. Keep messages specific and observable. For example, ask the agent to inspect a failing test file, update a small module, or summarize what it found before continuing.
 
 See [send a session message](/api-references/agent-workspaces/messages/send).
 
@@ -70,7 +122,18 @@ curl "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/${SESSIO
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
+Store the last cursor you processed. That lets your UI, webhook worker, or background sync job fetch only the new messages since the last read.
+
 See [get session state](/api-references/agent-workspaces/sessions/state) and [list session messages](/api-references/agent-workspaces/messages/list).
+
+## Choose cloud or local execution
+
+| Mode | Use it when |
+| --- | --- |
+| `cloud` | You want Final-managed execution and do not need the session to run on infrastructure you operate. |
+| `local` | The task needs local network access, local credentials, a specific machine, or a local Final Node. |
+
+Pass `finalNodeId` when you need a specific existing node. Otherwise, let Final choose the runtime for the requested execution mode.
 
 ## Stop or archive work
 
@@ -84,3 +147,11 @@ curl -X POST "https://api.final.ai/v1/agent-workspaces/${WORKSPACE_ID}/sessions/
 Archive completed workspaces to remove them from active lists.
 
 See [stop a running session](/api-references/agent-workspaces/sessions/stop) and [archive an agent workspace](/api-references/agent-workspaces/workspaces/archive).
+
+## Integration patterns
+
+For an interactive UI, create the workspace from your server, show the title and session state immediately, then poll state until new messages are available. Add the [WebSocket Gateway](/developer-guides/websocket-gateway) when you want to push progress to the browser instead of polling.
+
+For an automation queue, create one workspace per job, persist the IDs with the job record, and archive the workspace after your downstream system records the result.
+
+For repository work, include `repositoryId` when you create the workspace, then use the Git and pull request APIs to inspect or publish changes.

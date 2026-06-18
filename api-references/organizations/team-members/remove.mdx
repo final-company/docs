@@ -1,0 +1,17 @@
+---
+title: "Remove team member"
+description: "Remove a user from a team."
+api: "DELETE /v1/organizations/current/teams/{teamId}/members/{userId}"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+team_id="team_123"
+user_id="usr_123"
+
+curl -X DELETE "https://api.final.ai/v1/organizations/current/teams/${team_id}/members/${user_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Returns `{ "removed": true }`.

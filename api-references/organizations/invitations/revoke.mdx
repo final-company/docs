@@ -1,0 +1,16 @@
+---
+title: "Revoke invitation"
+description: "Revoke an organization invitation."
+api: "DELETE /v1/organizations/current/invitations/{invitationId}"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+invitation_id="invitation_123"
+
+curl -X DELETE "https://api.final.ai/v1/organizations/current/invitations/${invitation_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Returns the revoked invitation.

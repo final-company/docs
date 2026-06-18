@@ -1,0 +1,16 @@
+---
+title: "List roles"
+description: "List available organization roles."
+api: "GET /v1/organizations/current/roles"
+---
+
+Returns available environment and organization roles.
+
+Requires `organizations:read`.
+
+```bash
+curl "https://api.final.ai/v1/organizations/current/roles" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Role objects include `id`, `name`, `slug`, `description`, `permissions`, and `type`.

@@ -1,0 +1,55 @@
+---
+title: "Access and sharing"
+description: "Create disk-scoped users, rotate credentials, and share Agent Disk artifacts with signed URLs."
+---
+
+Agent Disk access should be narrower than your Final API key. Create disk users for runtimes that mount or read a disk, and use share links for one-off artifact access.
+
+## Choose an access method
+
+| Need | Use |
+| --- | --- |
+| A runtime needs to mount or access a disk | Create a disk user. |
+| A system needs object-storage style access | Create an `s3-credential` disk user. |
+| A cloud runtime needs temporary cloud credentials | Create an `awssts` disk user. |
+| A person or external system needs one output file | Create a signed share link. |
+
+## Create a disk user
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/users" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "token",
+    "nickname": "worker"
+  }'
+```
+
+Token and S3 credential secrets are returned only when they are created. Store them immediately.
+
+See [create a disk user](/api-references/agent-disk/users/create).
+
+## Rotate access
+
+1. Create a new disk user for the runtime.
+2. Update the runtime to use the new credential.
+3. Confirm the runtime can access the disk.
+4. Delete the old disk user.
+
+Do not put disk credentials in agent prompts or logs. Store them in your server environment or [Secrets](/developer-guides/secrets).
+
+## Share an artifact
+
+Create a signed URL for one disk path:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/share/artifacts/report.json?expiresIn=86400" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Allowed expiry values are `3600`, `28800`, `86400`, and `604800` seconds.
+
+Use share links for outputs such as reports, logs, generated previews, and data exports. Use disk users for ongoing programmatic access.
+
+See [create a share link](/api-references/agent-disk/share/create).

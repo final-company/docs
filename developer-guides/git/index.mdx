@@ -1,16 +1,22 @@
 ---
 title: "Git"
-description: "A headless Git implementation."
+description: "Use Final Git for repositories, pull requests, stacked changes, merge queues, and GitHub sync."
 ---
 
-Final Git is a headless Git implementation. Use Git-compatible HTTPS remotes with short-lived scoped credentials.
+Final Git is a headless Git implementation for agent and automation workflows. Use Git-compatible HTTPS remotes with short-lived scoped credentials, then manage pull requests, stacked changes, reviews, checks, and merge queues through Final.
+
+Use Final Git when your product needs real Git semantics without asking every agent, job, or user to hold a long-lived Git provider credential. A repository can be cloned by standard Git clients, updated by automation, reviewed in Final, synchronized with GitHub, and protected by a merge queue.
 
 <Card title="Clone and work with a repository" icon="git-branch" href="/developer-guides/git/clone">
   Mint Git credentials, clone a repository, and push changes.
 </Card>
 
 <Card title="Review pull requests" icon="git-pull-request" href="/developer-guides/git/pull-requests">
-  Create pull requests, review changes, and work with stacked PRs.
+  Create pull requests, review changes, and prepare work for merge.
+</Card>
+
+<Card title="Use stacked PRs" icon="git-compare-arrows" href="/developer-guides/git/stacked-prs">
+  Split large changes into reviewable pull requests that depend on each other.
 </Card>
 
 <Card title="Use merge queues" icon="list-checks" href="/developer-guides/git/merge-queues">
@@ -28,3 +34,37 @@ Final Git is a headless Git implementation. Use Git-compatible HTTPS remotes wit
 <Card title="API reference" icon="braces" href="/api-references">
   Browse every REST endpoint for repositories, pull requests, merge queues, and checks.
 </Card>
+
+## What you can build
+
+| Use case | How Final Git helps |
+| --- | --- |
+| Agent-authored code changes | Let an agent clone a repository, push a branch, and open a pull request with a short-lived credential. |
+| Small-review workflows | Split large changes into stacked pull requests that reviewers can inspect one step at a time. |
+| Protected branch landing | Queue approved work and test the exact candidate SHA before it lands on `main`. |
+| GitHub-connected workflows | Sync selected branches between Final Git and GitHub while keeping Final as the agent-facing control plane. |
+| Internal code storage | Create repositories and perform normal clone, fetch, push, and pull request operations from your own product. |
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| Repository | A Git-backed repository with a `gsr_` ID and a default branch. |
+| Git credential | A short-lived HTTPS username and password for clone, fetch, or push. |
+| Pull request | A review object for one source branch targeting one branch. |
+| Stack | A dependency chain of pull requests in the same repository and target branch. |
+| Merge queue | A branch protection system that creates candidate commits and waits for required checks before landing work. |
+| Check | A commit status or check run reported against a SHA. Merge queues require checks on the candidate SHA. |
+| GitHub sync | A branch reconciliation process between selected Final Git branches and GitHub branches. |
+
+## Typical agent flow
+
+1. Create or select a Final Git repository.
+2. Mint a short-lived Git credential for the job.
+3. Clone the repository with normal Git commands.
+4. Make a branch and push changes.
+5. Create a pull request, or create a stack when the work is easier to review in smaller pieces.
+6. Report checks on the pull request or merge queue candidate SHA.
+7. Land approved work through the merge queue when the target branch is protected.
+
+For a first hands-on flow, start with [clone and work with a repository](/developer-guides/git/clone).

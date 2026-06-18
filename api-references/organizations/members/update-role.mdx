@@ -1,0 +1,26 @@
+---
+title: "Update member role"
+description: "Update an organization member role."
+api: "PATCH /v1/organizations/current/members/{membershipId}"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+Directory-managed memberships cannot be changed through this endpoint. Final also prevents removing the last active admin.
+
+```bash
+membership_id="om_123"
+
+curl -X PATCH "https://api.final.ai/v1/organizations/current/members/${membership_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "roleSlug": "admin"
+  }'
+```
+
+## Body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `roleSlug` | string | Yes | Role slug to assign. |

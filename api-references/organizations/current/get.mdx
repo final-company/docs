@@ -1,0 +1,28 @@
+---
+title: "Get current organization"
+description: "Read the organization associated with the API key."
+api: "GET /v1/organizations/current"
+---
+
+Returns the organization associated with the API key.
+
+Requires `organizations:read`.
+
+```bash
+curl "https://api.final.ai/v1/organizations/current" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+```json
+{
+  "organization": {
+    "id": "org_123",
+    "name": "Acme",
+    "slug": "acme",
+    "externalId": "acme-001",
+    "metadata": {},
+    "createdAt": "2026-06-17T12:00:00.000Z",
+    "updatedAt": "2026-06-17T12:00:00.000Z"
+  }
+}
+```

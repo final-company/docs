@@ -1,0 +1,14 @@
+---
+title: "List members"
+description: "List organization members."
+api: "GET /v1/organizations/current/members"
+---
+
+Requires `organizations:read`.
+
+```bash
+curl "https://api.final.ai/v1/organizations/current/members" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Member objects include the membership `id`, `workosMembershipId`, `status`, `roleSlug`, `directoryManaged`, timestamps, and a nested `user` object.

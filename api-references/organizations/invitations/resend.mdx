@@ -1,0 +1,16 @@
+---
+title: "Resend invitation"
+description: "Resend an organization invitation."
+api: "POST /v1/organizations/current/invitations/{invitationId}/resend"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+invitation_id="invitation_123"
+
+curl -X POST "https://api.final.ai/v1/organizations/current/invitations/${invitation_id}/resend" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Returns the resent invitation.

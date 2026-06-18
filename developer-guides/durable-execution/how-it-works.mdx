@@ -1,0 +1,79 @@
+---
+title: "How durable execution works"
+description: "Understand the Durable Execution runtime model for steps, waits, retries, events, workers, and run history."
+---
+
+Durable Execution lets workflow code survive process restarts, retries, waits, and delayed external events. The runtime records progress as the workflow runs, so completed steps do not repeat after a retry or resume.
+
+Use it when a background workflow needs more than a best-effort job queue. Good fits include approval flows, multi-step agent work, delayed follow-ups, external callbacks, and workflows that need an audit trail.
+
+## Runtime model
+
+| Concept | What it does |
+| --- | --- |
+| Workflow | A registered function version with triggers and retry settings. |
+| Run | One execution of a workflow. |
+| Step | A durable unit of work whose result can be stored and reused. |
+| Wait | A suspended point that resumes after an event, signal, or timeout. |
+| Event | A named payload that can start workflows or resume waiting runs. |
+| Worker | Your process that connects over WebSocket and executes leased workflow work. |
+| History | Ordered run events that show what happened and when. |
+
+## What makes a workflow durable
+
+A normal background job usually restarts from the beginning after failure. A durable workflow records completed step output. When a run retries or resumes, the runtime can skip completed steps and continue from the next unfinished point.
+
+That lets you write workflows that:
+
+- Retry transient failures without repeating completed side effects.
+- Sleep or wait without keeping a process busy.
+- Resume after a webhook, approval, or correlated event.
+- Show run history for debugging and audit.
+- Survive worker deploys and restarts.
+
+## Step lifecycle
+
+1. A worker leases a run.
+2. The workflow executes until it reaches a step.
+3. The step runs and records its output.
+4. If the workflow retries later, the step output can be reused.
+5. The run continues to the next step, wait, or completion.
+
+Use `step.run()` for work you do not want to repeat after it succeeds, such as loading data, calling a provider, or generating an artifact.
+
+## Waits and events
+
+Use waits when a workflow needs external input before it can continue. A run can wait for a matching event, a signal, or a timeout.
+
+Examples:
+
+| Workflow | Waits for |
+| --- | --- |
+| Approval flow | A human approval signal. |
+| Billing workflow | An `invoice.paid` event. |
+| Agent task | A review decision or follow-up instruction. |
+| Retryable import | A delayed retry window or provider callback. |
+
+Send events through the [send events endpoint](/api-references/durable-execution/events/send) or the TypeScript SDK.
+
+## Workers
+
+Workers connect to Final over WebSocket. The SDK uses your Final API key to register workflow manifests, mint a short-lived `durable_worker` delegated credential, and connect to the worker queue.
+
+Workers should stay alive while they can accept work. On shutdown, the SDK drains in-flight work so deploys do not interrupt active runs abruptly.
+
+See [TypeScript SDK and workers](/developer-guides/durable-execution/typescript-sdk).
+
+## Runs and history
+
+Runs move through states such as `queued`, `running`, `waiting`, `completed`, `failed`, and `cancelled`.
+
+Use run history when you need to answer:
+
+- Which event started this workflow?
+- Which worker leased it?
+- Which step completed before the failure?
+- Why is the run waiting?
+- Was a retry scheduled?
+
+See [runs and signals](/developer-guides/durable-execution/runs).

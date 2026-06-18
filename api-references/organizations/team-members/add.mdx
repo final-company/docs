@@ -1,0 +1,19 @@
+---
+title: "Add team member"
+description: "Add an organization user to a team."
+api: "POST /v1/organizations/current/teams/{teamId}/members"
+---
+
+Requires `organizations:write` and an organization-owned API key. The user must already belong to the organization.
+
+```bash
+team_id="team_123"
+user_id="usr_123"
+
+curl -X POST "https://api.final.ai/v1/organizations/current/teams/${team_id}/members" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":\"${user_id}\"}"
+```
+
+Returns `{ "added": true }`.

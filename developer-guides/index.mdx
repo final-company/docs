@@ -1,0 +1,68 @@
+---
+title: "Overview"
+description: "Understand the Final developer API and the products you can build with it."
+---
+
+The Final developer API gives you the building blocks for agent-native software. You can start agent work, give agents durable files, let them change code, stream progress to users, run long-lived workflows, manage credentials, and operate cloud computers from one API surface.
+
+Use Final when you want agents and automation to do real work inside your product, not only answer questions. A typical integration starts from a user action, creates an agent workspace, gives it code or files, streams progress to the UI, stores credentials safely, and lands reviewed changes through Git and merge queues.
+
+The public API is available at:
+
+```text
+https://api.final.ai/v1
+```
+
+## What you can build
+
+| Goal | Start with |
+| --- | --- |
+| Add an agent task button to your app | [Agent Workspaces](/developer-guides/agent-workspaces) |
+| Give agents persistent file state | [Agent Disk](/developer-guides/agent-disk) |
+| Let agents clone, change, review, and land code | [Git](/developer-guides/git) |
+| Split large code changes into reviewable pieces | [Stacked PRs](/developer-guides/git/stacked-prs) |
+| Keep `main` green while many changes land | [Merge queues](/developer-guides/git/merge-queues) |
+| Stream progress to browsers and connected workers | [WebSocket Gateway](/developer-guides/websocket-gateway) |
+| Run workflows that retry, wait, and resume | [Durable Execution](/developer-guides/durable-execution) |
+| Run commands on cloud machines | [Computers](/developer-guides/computers) |
+| Store credentials for trusted automation | [Secrets](/developer-guides/secrets) |
+
+## How the pieces fit
+
+| Surface | What it gives you |
+| --- | --- |
+| [Agent Workspaces](/developer-guides/agent-workspaces) | A public API for creating agent tasks, sending messages, polling state, and archiving work. |
+| [Agent Disk](/developer-guides/agent-disk) | Persistent filesystems with branches, checkpoints, disk-scoped users, share links, and usage tracking. |
+| [Git](/developer-guides/git) | Git repositories, short-lived Git credentials, pull requests, stacked PRs, merge queues, checks, and GitHub sync. |
+| [WebSocket Gateway](/developer-guides/websocket-gateway) | Short-lived realtime tokens, scoped channel grants, server-side publishing, and worker queues. |
+| [Durable Execution](/developer-guides/durable-execution) | Event-driven workflows with durable steps, retries, waits, signals, workers, and run history. |
+| [Computers](/developer-guides/computers) | Cloud machines from container images with command execution, files, SSH, HTTP access, shares, and domains. |
+| [Secrets](/developer-guides/secrets) | User-scoped secret storage for provider tokens, deploy credentials, webhook signing secrets, and agent tooling. |
+| [Platform](/developer-guides/authentication) | API keys, organizations, teams, permissions, and delegated credentials for protocol-specific access. |
+
+## A common architecture
+
+1. A user clicks a product action such as **Investigate**, **Fix**, **Review**, or **Generate**.
+2. Your server creates an [Agent Workspace](/developer-guides/agent-workspaces) with the task and stores the returned IDs.
+3. The task uses [Git](/developer-guides/git), [Agent Disk](/developer-guides/agent-disk), or [Computers](/developer-guides/computers) depending on what the agent needs to touch.
+4. Your server reads [Secrets](/developer-guides/secrets) only when trusted tooling needs credentials.
+5. The UI receives progress through polling or the [WebSocket Gateway](/developer-guides/websocket-gateway).
+6. Long-running flows move into [Durable Execution](/developer-guides/durable-execution) when they need retries, waits, callbacks, or run history.
+7. Code changes become pull requests, stacked PRs, or merge queue entries when they need human review.
+
+## API model
+
+Use a Final API key for public REST requests. Create API keys in Final under **Settings** > **API Keys**, then send them as bearer credentials:
+
+```bash
+curl "https://api.final.ai/v1/agent-workspaces" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Some protocols use delegated credentials instead of API keys. For example, Git clients use short-lived Git usernames and passwords, WebSocket clients use short-lived gateway tokens, and Durable Execution workers use short-lived worker credentials. Your server mints those credentials from a Final API key and gives clients only the access they need.
+
+Start with [authentication](/developer-guides/authentication) when you are choosing key ownership, permissions, and delegated credentials.
+
+## Start quickly
+
+If you already know what you want to build, jump straight to the product guide. If you are still mapping the system, start with [Quickstart](/developer-guides/quickstart), then use the sidebar to drill into the feature that owns your workflow.

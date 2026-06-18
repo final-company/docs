@@ -1,0 +1,21 @@
+---
+title: "Update team member role"
+description: "Update a team-specific member role."
+api: "PATCH /v1/organizations/current/teams/{teamId}/members/{userId}"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+team_id="team_123"
+user_id="usr_123"
+
+curl -X PATCH "https://api.final.ai/v1/organizations/current/teams/${team_id}/members/${user_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "maintainer"
+  }'
+```
+
+Pass `null` for `role` to clear the team-specific role.

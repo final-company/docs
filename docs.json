@@ -25,6 +25,13 @@
         "tab": "Developer Guides",
         "pages": [
           {
+            "group": "Overview",
+            "pages": [
+              "developer-guides/index",
+              "developer-guides/quickstart"
+            ]
+          },
+          {
             "group": "Platform",
             "pages": [
               "developer-guides/authentication",
@@ -35,7 +42,9 @@
           {
             "group": "Secrets",
             "pages": [
-              "developer-guides/secrets"
+              "developer-guides/secrets/index",
+              "developer-guides/secrets/store-and-rotate-secrets",
+              "developer-guides/secrets/use-secrets-with-agents"
             ]
           },
           {
@@ -44,6 +53,7 @@
               "developer-guides/git/index",
               "developer-guides/git/clone",
               "developer-guides/git/pull-requests",
+              "developer-guides/git/stacked-prs",
               "developer-guides/git/merge-queues",
               "developer-guides/git/github-sync",
               "developer-guides/git/manage"
@@ -64,19 +74,29 @@
           {
             "group": "Agent Disk",
             "pages": [
-              "developer-guides/agent-disk/index"
+              "developer-guides/agent-disk/index",
+              "developer-guides/agent-disk/create-and-seed-disks",
+              "developer-guides/agent-disk/branches-and-checkpoints",
+              "developer-guides/agent-disk/access-and-sharing",
+              "developer-guides/agent-disk/usage-and-lifecycle"
             ]
           },
           {
             "group": "Agent Workspaces",
             "pages": [
-              "developer-guides/agent-workspaces/index"
+              "developer-guides/agent-workspaces/index",
+              "developer-guides/agent-workspaces/session-lifecycle",
+              "developer-guides/agent-workspaces/execution-modes",
+              "developer-guides/agent-workspaces/product-integration"
             ]
           },
           {
             "group": "WebSocket Gateway",
             "pages": [
-              "developer-guides/websocket-gateway/index"
+              "developer-guides/websocket-gateway/index",
+              "developer-guides/websocket-gateway/session-tokens-and-grants",
+              "developer-guides/websocket-gateway/channels",
+              "developer-guides/websocket-gateway/work-queues"
             ]
           },
           {
@@ -84,6 +104,7 @@
             "pages": [
               "developer-guides/durable-execution/index",
               "developer-guides/durable-execution/quickstart",
+              "developer-guides/durable-execution/how-it-works",
               "developer-guides/durable-execution/typescript-sdk",
               "developer-guides/durable-execution/workflows-and-events",
               "developer-guides/durable-execution/runs"
@@ -109,11 +130,50 @@
                 "group": "Organizations",
                 "pages": [
                   "api-references/organizations/index",
-                  "api-references/organizations/current",
-                  "api-references/organizations/members",
-                  "api-references/organizations/invitations",
-                  "api-references/organizations/teams",
-                  "api-references/organizations/team-members"
+                  {
+                    "group": "Current organization",
+                    "pages": [
+                      "api-references/organizations/current/get",
+                      "api-references/organizations/current/update",
+                      "api-references/organizations/roles/list"
+                    ]
+                  },
+                  {
+                    "group": "Members",
+                    "pages": [
+                      "api-references/organizations/members/list",
+                      "api-references/organizations/members/update-role",
+                      "api-references/organizations/members/remove"
+                    ]
+                  },
+                  {
+                    "group": "Invitations",
+                    "pages": [
+                      "api-references/organizations/invitations/list",
+                      "api-references/organizations/invitations/create",
+                      "api-references/organizations/invitations/resend",
+                      "api-references/organizations/invitations/revoke"
+                    ]
+                  },
+                  {
+                    "group": "Teams",
+                    "pages": [
+                      "api-references/organizations/teams/list",
+                      "api-references/organizations/teams/create",
+                      "api-references/organizations/teams/get",
+                      "api-references/organizations/teams/update",
+                      "api-references/organizations/teams/delete"
+                    ]
+                  },
+                  {
+                    "group": "Team members",
+                    "pages": [
+                      "api-references/organizations/team-members/list",
+                      "api-references/organizations/team-members/add",
+                      "api-references/organizations/team-members/update-role",
+                      "api-references/organizations/team-members/remove"
+                    ]
+                  }
                 ]
               },
               {

@@ -1,0 +1,57 @@
+---
+title: "Work queues"
+description: "Offer work to connected workers over the WebSocket Gateway."
+---
+
+Work queues let connected workers receive leases over WebSocket. Use them when workers should stay connected, receive jobs quickly, heartbeat while processing, and complete or fail work explicitly.
+
+## When to use work queues
+
+| Use work queues when | Use channels when |
+| --- | --- |
+| A worker must lease and complete a job. | Clients only need to receive events. |
+| The server needs to know whether work was accepted or failed. | The event is informational. |
+| Workers keep long-lived connections. | Clients can reconnect and resubscribe. |
+
+## Create a worker token
+
+```bash
+curl -X POST "https://api.final.ai/v1/websocket-gateway/sessions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "worker_1",
+    "grants": {
+      "workQueues": [
+        {
+          "name": "customer-jobs",
+          "access": ["lease", "heartbeat", "complete", "fail"]
+        }
+      ]
+    }
+  }'
+```
+
+## Offer work
+
+```bash
+curl -X POST "https://api.final.ai/v1/websocket-gateway/work-queues/customer-jobs/offers" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leaseId": "lease_001",
+    "payload": {
+      "jobId": "job_001"
+    }
+  }'
+```
+
+Connected workers receive a `work.offer` frame. They should accept the lease, heartbeat while processing, and complete or fail the lease when finished.
+
+See [offer work](/api-references/websocket-gateway/work-queues/offer).
+
+## Design guidance
+
+Use stable queue names such as `customer-jobs`, `agent-runs`, or `preview-builds`. Use unique `leaseId` values so retries do not create ambiguous work.
+
+Keep payloads focused on the job ID and routing information. Let workers fetch larger job data from your API after they accept the lease.

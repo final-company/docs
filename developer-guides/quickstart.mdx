@@ -3,8 +3,46 @@ title: "Quickstart"
 description: "Start with a Final product quickstart."
 ---
 
-Final quickstarts live under each product namespace.
+Final gives you API surfaces for agent work, durable storage, realtime connections, cloud computers, Git workflows, secrets, and durable execution. Start with the product that owns the job you want to automate.
+
+<Card title="Agent Workspaces" icon="folder-code" href="/developer-guides/agent-workspaces">
+  Start agent work from your application, send follow-up messages, poll state, and archive completed sessions.
+</Card>
+
+<Card title="Agent Disk" icon="hard-drive" href="/developer-guides/agent-disk">
+  Give agents persistent file state, checkpoints, branches, disk-scoped access, and shareable artifacts.
+</Card>
+
+<Card title="WebSocket Gateway" icon="radio" href="/developer-guides/websocket-gateway">
+  Connect browsers, services, and workers with short-lived realtime tokens and scoped grants.
+</Card>
+
+<Card title="Secrets" icon="lock-keyhole" href="/developer-guides/secrets">
+  Store credentials for automation without putting plaintext values in code, prompts, logs, or config files.
+</Card>
 
 <Card title="Git" icon="git-branch" href="/developer-guides/git">
-  Headless Git storage for Final products.
+  Create repositories, mint Git credentials, manage pull requests, and operate merge queues.
 </Card>
+
+<Card title="Computers" icon="server" href="/developer-guides/computers">
+  Create cloud machines from container images, run commands, manage files, and expose services.
+</Card>
+
+<Card title="Durable Execution" icon="workflow" href="/developer-guides/durable-execution">
+  Run workflows that can retry, wait for events, sleep, resume, and expose run history.
+</Card>
+
+## Common starting points
+
+| Goal | Start here |
+| --- | --- |
+| Add an agent task button to your app | [Agent Workspaces](/developer-guides/agent-workspaces) |
+| Keep files across agent runs | [Agent Disk](/developer-guides/agent-disk) |
+| Stream progress to a browser | [WebSocket Gateway](/developer-guides/websocket-gateway) |
+| Store tokens used by automation | [Secrets](/developer-guides/secrets) |
+| Run a command on a managed machine | [Computers](/developer-guides/computers/quickstart) |
+| Clone, push, or review repository changes | [Git](/developer-guides/git) |
+| Run a workflow that waits and resumes | [Durable Execution](/developer-guides/durable-execution/quickstart) |
+
+Most integrations use more than one surface. For example, an in-app coding agent might create an Agent Workspace, attach repository context through Git, use Agent Disk for persistent files, store provider tokens in Secrets, and publish progress through the WebSocket Gateway.

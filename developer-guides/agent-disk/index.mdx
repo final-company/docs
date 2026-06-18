@@ -3,17 +3,53 @@ title: "Agent Disk"
 description: "Create persistent disks for agents and manage branches, checkpoints, users, shares, and usage."
 ---
 
-Agent Disk gives agents persistent storage that can be mounted, branched, checkpointed, shared, and billed independently from a computer or workspace.
+Agent Disk gives agents durable file state that can outlive a single run, branch from known-good points, and produce artifacts you can share outside the runtime.
 
-Use Agent Disk when an agent needs durable file state across runs, reproducible branch points, or a disk that can be shared between agent workflows.
+Use Agent Disk when an agent needs a real filesystem with memory. A disk can hold dependency caches, cloned repositories, generated files, datasets, build output, and intermediate state between sessions. You can checkpoint the disk before risky work, create branches for parallel experiments, and inspect usage separately from the compute that mounted it.
 
-The public REST API is available at:
+<Card title="Agent Disk API reference" icon="hard-drive" href="/api-references/agent-disk">
+  Browse endpoints for disks, disk users, checkpoints, branches, share links, and usage.
+</Card>
 
-```text
-https://api.final.ai/v1/agent-disk
-```
+<Card title="Create and seed disks" icon="database" href="/developer-guides/agent-disk/create-and-seed-disks">
+  Create private or team-owned disks, store mount credentials, and seed files from object storage.
+</Card>
 
-For endpoint details, see the [Agent Disk API reference](/api-references/agent-disk).
+<Card title="Branches and checkpoints" icon="git-branch" href="/developer-guides/agent-disk/branches-and-checkpoints">
+  Save known-good disk state and branch it for parallel experiments or reproducible reviews.
+</Card>
+
+<Card title="Access and sharing" icon="key-round" href="/developer-guides/agent-disk/access-and-sharing">
+  Create disk users, rotate disk-scoped access, and publish artifacts with signed links.
+</Card>
+
+<Card title="Usage and lifecycle" icon="chart-column" href="/developer-guides/agent-disk/usage-and-lifecycle">
+  Track active bytes, GiB-hours, branch usage, and cleanup decisions.
+</Card>
+
+## What you can build
+
+| Use case | How Agent Disk helps |
+| --- | --- |
+| Long-running coding agents | Keep repository state, build caches, and generated files across multiple agent sessions. |
+| Parallel experiments | Create a checkpoint, branch from it, and let different agents test competing approaches without overwriting each other. |
+| Reproducible reviews | Checkpoint a disk before a refactor, migration, or generated change so you can recreate the file state that led to an artifact. |
+| Artifact publishing | Share a path such as `artifacts/report.json` or `preview/index.html` with a signed URL. |
+| Data-backed agents | Seed a disk from object storage with `dataSource`, then let the agent read or write against a mounted filesystem. |
+| Team-owned agent infrastructure | Create team disks that multiple automation flows can use under the same organization boundary. |
+
+Agent Disk is a storage primitive. Pair it with [Agent Workspaces](/developer-guides/agent-workspaces) when you want Final to run agent sessions, or with [Computers](/developer-guides/computers) when you operate the compute environment directly.
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| Disk | A persistent filesystem resource with a `dsk_` ID. |
+| Branch | A named disk line of work. Use branches to isolate changes and run experiments. |
+| Checkpoint | A sealed branch state that can seed a new branch. |
+| Disk user | Disk-scoped access for clients and integrations. User types include `token`, `awssts`, and `s3-credential`. |
+| Share link | A signed URL for one path on a disk branch. |
+| Usage | Active bytes, GiB-hours, disk count, and per-branch usage visible to the API key. |
 
 ## Ownership
 
@@ -24,7 +60,7 @@ Agent Disk supports user-owned and team-owned disks.
 | User-owned API key | Omit `teamId` to create a private disk, or pass `teamId` to create a team-owned disk. | Private disks owned by the user and disks for teams the user belongs to. |
 | Organization-owned API key | Pass `teamId` when creating a disk. Organization-only disks are not supported. | Disks in the organization. |
 
-Agent Disk IDs use the `dsk_` prefix. Team-owned disk requests use a `team_` ID for `teamId`.
+Team-owned disk requests use a `team_` ID for `teamId`.
 
 ## Create a disk
 
@@ -55,7 +91,11 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
 
 The create response includes a default disk token once. Store it immediately if you need token-based mount access.
 
-## List and inspect disks
+You can also seed a disk from external object storage with `dataSource`. Use this when the agent needs a large dataset or existing bucket prefix available as files. See [create a disk](/api-references/agent-disk/disks/create) for supported providers and auth fields.
+
+## Find and inspect disks
+
+List disks visible to the API key:
 
 ```bash
 curl "https://api.final.ai/v1/agent-disk/disks" \
@@ -76,9 +116,9 @@ curl "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
-## Manage access
+## Manage disk access
 
-Create disk users when a client or integration needs disk-scoped access.
+Create disk users when a client, runtime, or integration needs disk-scoped access instead of a broad Final API key.
 
 ```bash
 curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/users" \
@@ -90,9 +130,9 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/
   }'
 ```
 
-User types are `token`, `awssts`, and `s3-credential`. Token and S3 credential secrets are only returned when they are created.
+Token and S3 credential secrets are only returned when they are created. Store them at creation time, and create a new disk user when you need to rotate access.
 
-## Checkpoint and branch
+## Checkpoint before risky work
 
 Create a checkpoint from the current branch state:
 
@@ -123,7 +163,7 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/
 
 Branches created from checkpoints may start in `creating` status while Agent Disk places and opens the branch replicas. Wait until the branch status is `available` before mounting it or creating a share link from it.
 
-## Share a path
+## Share artifacts
 
 Create a signed URL for a path on a disk:
 
@@ -133,6 +173,19 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/
 ```
 
 Allowed expiry values are `3600`, `28800`, `86400`, and `604800` seconds.
+
+Use share links for outputs you want another system or person to read without granting disk access. For ongoing programmatic access, create a disk user instead.
+
+## Track usage
+
+Use the usage endpoint to attribute storage cost and find branches that should be archived or deleted:
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/usage" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+The response includes active bytes, GiB-hours, disk count, and per-disk branch usage.
 
 ## Use the TypeScript SDK
 
@@ -153,3 +206,9 @@ const { disk, token } = await agentDisk.createDisk({
 
 console.log(disk.id, token);
 ```
+
+## Design guidance
+
+Start with one disk per durable agent workflow when the workflow owns its state. Use branches when you need multiple versions of the same state. Use checkpoints at handoff points, before risky changes, and before publishing artifacts.
+
+Keep long-lived credentials out of agent prompts and logs. Store Final API keys in your server environment or [Secrets](/developer-guides/secrets), then issue disk-scoped users for the runtime that needs filesystem access.

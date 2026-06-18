@@ -1,0 +1,89 @@
+---
+title: "Stacked PRs"
+description: "Split large changes into dependent pull requests that reviewers can understand and land safely."
+---
+
+Stacked PRs let you break a large change into a chain of smaller pull requests. Each pull request targets the same branch, and each child pull request depends on the pull request below it.
+
+Use stacks when one large pull request would mix setup, behavior changes, UI work, generated code, and cleanup in one review. A stack lets reviewers approve the foundation while you keep building higher-level changes.
+
+## When to use a stack
+
+| Use a stack when | Prefer one pull request when |
+| --- | --- |
+| The change has clear layers or phases. | The diff is already small and self-contained. |
+| Reviewers can approve lower changes before higher changes finish. | The change cannot run or make sense until every file changes together. |
+| You want to keep agent work moving while humans review. | The work is a single mechanical update. |
+| The merge queue should validate a range of dependent changes together. | The branch can land independently. |
+
+## Stack model
+
+```text
+main
+  -> pr_101 add API type
+    -> pr_102 implement endpoint
+      -> pr_103 add UI
+```
+
+In this stack, `pr_102` depends on `pr_101`, and `pr_103` depends on `pr_102`. Final Git validates that the parent pull request is an ancestor of the child pull request before saving the stack relationship.
+
+## Create a stack
+
+<Steps>
+  <Step title="Create the root pull request">
+    Push the first branch and create a pull request against the target branch.
+  </Step>
+  <Step title="Branch from the root branch">
+    Create the next branch from the root branch, make the next focused change, and push it.
+  </Step>
+  <Step title="Create the child pull request">
+    Create another pull request against the same target branch.
+  </Step>
+  <Step title="Set the parent">
+    Use the **Parent** menu to choose the pull request that the child depends on.
+  </Step>
+</Steps>
+
+To create a stacked pull request from automation, pass `parentPullRequestId` to [create a pull request](/api-references/pull-requests/create).
+
+## Review a stack
+
+Review from the pull request closest to the target branch upward. That keeps feedback grounded in the code that later pull requests depend on.
+
+Each pull request should make sense as its own review unit. If a reviewer needs to inspect the whole stack to understand one pull request, split the stack differently or move code between pull requests.
+
+Use **Draft** while a pull request is still changing. Use **Ready** when reviewers should act, even if pull requests above it are still in progress.
+
+## Update a stack
+
+Use stack controls when dependencies change:
+
+| Control | What it does |
+| --- | --- |
+| **Parent** | Sets or clears the pull request that this pull request depends on. |
+| **Repair stack** | Refreshes stack metadata after branch heads change. |
+| **Split** | Detaches this pull request and the pull requests above it from the lower stack. |
+| **Move earlier** | Moves a pull request closer to the stack root. |
+| **Move later** | Moves a pull request farther from the stack root. |
+
+If a stack change affects queued work, Final Git removes the affected queue entries. Enqueue the updated stack again after the stack is valid.
+
+## Queue a stack
+
+Click **Enqueue** on the top pull request to queue the full stack. Final Git includes the open pull requests from the stack root through the selected pull request.
+
+For a partial landing, click a **Through #** button to queue only the lower part of the stack through that pull request.
+
+<Warning>
+  Final Git blocks queue entries that omit open pull requests above the selected range. This prevents landing a middle pull request while its dependent pull requests remain open.
+</Warning>
+
+Use the [enqueue a pull request endpoint](/api-references/merge-queues/enqueue) to add a pull request or stack range to a merge queue.
+
+## Design guidance
+
+Keep the stack root small and stable. A volatile root forces updates up the stack and slows review.
+
+Split by review boundary, not by file count. Good slices include a schema change, a backend behavior change, a UI integration, or a cleanup that can be reviewed independently.
+
+Give each pull request a title that explains its role in the stack. Reviewers should be able to scan the stack and understand the path from foundation to final behavior.

@@ -1,0 +1,40 @@
+---
+title: "Usage and lifecycle"
+description: "Track Agent Disk usage and clean up disks or branches that no longer need durable state."
+---
+
+Agent Disk usage is tracked independently from the compute that mounts the disk. Use usage data to attribute cost, identify old branches, and decide when to archive outputs elsewhere.
+
+## Inspect usage
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/usage" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+The response includes active bytes, GiB-hours, disk count, and per-disk branch usage visible to the API key.
+
+See [get usage](/api-references/agent-disk/usage/get).
+
+## Cleanup candidates
+
+| Resource | Cleanup signal |
+| --- | --- |
+| Experiment branch | The experiment is complete and useful artifacts were shared or copied out. |
+| Team disk | The workflow, repository, or dataset no longer exists. |
+| Disk user | The runtime was decommissioned or access was rotated. |
+| Share link | The artifact no longer needs public or external access. |
+
+## Lifecycle pattern
+
+1. Create a disk for durable workflow state.
+2. Checkpoint before handoffs, risky changes, or artifact publishing.
+3. Branch for experiments.
+4. Share outputs from stable paths.
+5. Review usage and delete branches or disks that no longer carry useful state.
+
+## Operating guidance
+
+Keep permanent state deliberate. If a job only needs scratch space, use a short-lived runtime volume instead of an Agent Disk.
+
+Name branches after the experiment or task. That makes usage reports easier to read when you need to decide what to keep.

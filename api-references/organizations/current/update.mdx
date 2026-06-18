@@ -1,0 +1,28 @@
+---
+title: "Update organization metadata"
+description: "Update metadata for the current organization."
+api: "PATCH /v1/organizations/current"
+---
+
+Updates organization metadata.
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+curl -X PATCH "https://api.final.ai/v1/organizations/current" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "costCenter": "platform"
+    }
+  }'
+```
+
+## Body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `metadata` | object | No | String key/value metadata for the organization. |
+
+Pass at least one field in the request body.

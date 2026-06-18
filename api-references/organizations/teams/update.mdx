@@ -1,0 +1,21 @@
+---
+title: "Update team"
+description: "Update an organization team."
+api: "PATCH /v1/organizations/current/teams/{teamId}"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+team_id="team_123"
+
+curl -X PATCH "https://api.final.ai/v1/organizations/current/teams/${team_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Customer Support",
+    "prefix": "CS"
+  }'
+```
+
+Pass at least one of `name` or `prefix`.

@@ -1,0 +1,26 @@
+---
+title: "Create invitation"
+description: "Invite a member to the organization by email."
+api: "POST /v1/organizations/current/invitations"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+curl -X POST "https://api.final.ai/v1/organizations/current/invitations" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "new.member@example.com",
+    "roleSlug": "member",
+    "expiresInDays": 30
+  }'
+```
+
+## Body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `email` | string | Yes | Invitee email address. |
+| `roleSlug` | string | No | Organization role slug. Defaults to `member`. |
+| `expiresInDays` | integer | No | Invitation lifetime from 1 to 90 days. Defaults to `30`. |

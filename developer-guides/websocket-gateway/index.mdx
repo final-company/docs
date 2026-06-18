@@ -11,6 +11,41 @@ Your server creates a short-lived gateway session token with the public REST API
   Browse the REST endpoints for gateway metadata, session tokens, channel publishing, and work offers.
 </Card>
 
+<Card title="Session tokens and grants" icon="key-round" href="/developer-guides/websocket-gateway/session-tokens-and-grants">
+  Mint short-lived WebSocket credentials with scoped access for browsers, services, and workers.
+</Card>
+
+<Card title="Channels" icon="radio" href="/developer-guides/websocket-gateway/channels">
+  Publish and subscribe to owner-scoped realtime events.
+</Card>
+
+<Card title="Work queues" icon="briefcase-business" href="/developer-guides/websocket-gateway/work-queues">
+  Dispatch leased work to connected workers over WebSocket.
+</Card>
+
+## What you can build
+
+| Use case | How the gateway helps |
+| --- | --- |
+| Live agent progress | Publish status, logs, or generated events from your server to a browser session. |
+| Collaborative product surfaces | Put browsers and services on owner-scoped channels such as `workspace:wksp_123`. |
+| Connected workers | Dispatch jobs over work queues to workers that maintain an open WebSocket connection. |
+| Scoped browser clients | Give a browser access to one channel or queue without sending it a Final API key. |
+| Service bridges and RPC | Use grants for RPC or bridges when services need direct realtime request and response paths. |
+
+The gateway is a transport layer. It does not decide what your events mean. Your application defines channel names, event names, payloads, and worker behavior.
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| Session token | A short-lived token minted by your server for a browser, service, or worker client. |
+| Grant | Scoped access to a channel, RPC name, bridge, or work queue. |
+| Channel | An owner-local pub/sub stream for application events. |
+| Work queue | A named queue that offers leases to connected workers. |
+| Client ID | An app-defined identifier for the connected client. |
+| Tenant scope | The owner boundary derived from the API key that minted the token. User-owned and team-owned channels with the same name are isolated. |
+
 ## Before you begin
 
 You need a user-owned or team-owned API key for `https://api.final.ai`. See [authentication](/developer-guides/authentication) for bearer auth examples.
@@ -28,6 +63,17 @@ Gateway resources are scoped to the API key owner. A user-owned key and a team-o
 | `websocket_gateway:rpc` | Grant RPC send or receive access. |
 | `websocket_gateway:bridge` | Grant bridge join, send, or receive access. |
 | `websocket_gateway:work` | Grant work queue access or offer work through the REST API. |
+
+## Gateway flow
+
+1. Your server authenticates to `api.final.ai` with a Final API key.
+2. Your server creates a gateway session token with narrow grants and a short TTL.
+3. Your browser, service, or worker connects to the returned WebSocket URL.
+4. The client sends an `auth` frame with the gateway token.
+5. The client subscribes, publishes, receives work, or performs the operations covered by its grants.
+6. Your server refreshes by minting a new token when the client needs to reconnect after expiry.
+
+Do not send the Final API key to the WebSocket client. The API key belongs on your server.
 
 ## Get gateway metadata
 
@@ -147,6 +193,8 @@ curl -X POST "https://api.final.ai/v1/websocket-gateway/channels/${CHANNEL_NAME}
   }'
 ```
 
+Use `idempotencyKey` when the publish is tied to a retried job, webhook, or database transaction.
+
 See [publish a channel event](/api-references/websocket-gateway/channels/publish).
 
 ## Dispatch work to connected workers
@@ -200,3 +248,11 @@ See [offer work](/api-references/websocket-gateway/work-queues/offer).
 | `workQueues` | `lease`, `heartbeat`, `complete`, `fail` |
 
 Use `limits` on a grant to restrict `maxFrameBytes`, `maxFramesPerMinute`, or `maxSubscriptions`.
+
+## Design guidance
+
+Mint tokens for one client purpose at a time. A browser that only reads progress needs `subscribe`, not `publish`. A worker that processes jobs needs work queue access, not channel access.
+
+Prefer channel names that map to your product model, such as `workspace:wksp_123`, `run:run_123`, or `room:billing`. They are app-defined strings, but consistent names make grants, logs, and debugging easier to reason about.
+
+Use REST publishing for server-originated events. Use WebSocket publishing for clients that already have a live connection and a publish grant.

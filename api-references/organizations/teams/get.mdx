@@ -1,0 +1,16 @@
+---
+title: "Get team"
+description: "Read an organization team."
+api: "GET /v1/organizations/current/teams/{teamId}"
+---
+
+Requires `organizations:read`.
+
+```bash
+team_id="team_123"
+
+curl "https://api.final.ai/v1/organizations/current/teams/${team_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Returns the team.

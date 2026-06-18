@@ -1,0 +1,80 @@
+---
+title: "Create and seed disks"
+description: "Create Agent Disks for durable agent file state and seed them from external object storage."
+---
+
+Create an Agent Disk when an agent needs files that survive beyond one run. A disk can hold repositories, dependency caches, generated artifacts, datasets, and intermediate state.
+
+## Choose an owner
+
+| Owner | Use it when |
+| --- | --- |
+| Private disk | One user or one user-owned automation owns the state. Omit `teamId`. |
+| Team-owned disk | A team workflow, agent profile, or shared automation owns the state. Pass `teamId`. |
+
+Organization-owned API keys must pass `teamId` because Agent Disk does not support organization-only disks.
+
+## Create a disk
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "agent-cache",
+    "region": "aws-us-east-1"
+  }'
+```
+
+The create response includes a default disk token once. Store it immediately if a runtime needs token-based mount access.
+
+See [create a disk](/api-references/agent-disk/disks/create) for request fields.
+
+## Seed from object storage
+
+Use `dataSource` when the agent should start from files that already live in S3, GCS, R2, or an S3-compatible bucket.
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-disk/disks" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "docs-dataset",
+    "region": "aws-us-east-1",
+    "dataSource": {
+      "provider": "s3",
+      "bucketName": "company-agent-data",
+      "bucketPrefix": "docs/",
+      "accessMode": "ro",
+      "auth": {
+        "type": "accessKeys",
+        "accessKeyId": "AKIAEXAMPLE",
+        "secretAccessKey": "secret"
+      }
+    }
+  }'
+```
+
+Use read-only data sources for reference material. Use read-write data sources only when the agent should write back to the source.
+
+## Find disks later
+
+List disks visible to the API key:
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Filter by exact name when your automation expects one disk:
+
+```bash
+curl "https://api.final.ai/v1/agent-disk/disks?name=agent-cache" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Design guidance
+
+Start with one disk per durable workflow. Reuse a disk when the state is part of the workflow identity. Create a new disk when the state should be isolated for a job, customer, repository, or experiment.
+
+Use names that encode purpose rather than implementation details, such as `repo-analysis-cache` or `customer-import-dataset`.

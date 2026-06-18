@@ -1,0 +1,14 @@
+---
+title: "List teams"
+description: "List organization teams."
+api: "GET /v1/organizations/current/teams"
+---
+
+Requires `organizations:read`.
+
+```bash
+curl "https://api.final.ai/v1/organizations/current/teams" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Team objects include `id`, `organizationId`, `name`, `prefix`, `metadata`, `createdAt`, and `updatedAt`.

@@ -1,0 +1,16 @@
+---
+title: "Delete team"
+description: "Delete an organization team."
+api: "DELETE /v1/organizations/current/teams/{teamId}"
+---
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+team_id="team_123"
+
+curl -X DELETE "https://api.final.ai/v1/organizations/current/teams/${team_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Deleting a team also revokes team-scoped API keys for that team.

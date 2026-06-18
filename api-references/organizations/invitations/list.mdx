@@ -1,0 +1,14 @@
+---
+title: "List invitations"
+description: "List pending and recent organization invitations."
+api: "GET /v1/organizations/current/invitations"
+---
+
+Requires `organizations:read`.
+
+```bash
+curl "https://api.final.ai/v1/organizations/current/invitations" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Invitation objects include `id`, `email`, `state`, `acceptedAt`, `revokedAt`, `expiresAt`, `organizationId`, `inviterUserId`, `acceptedUserId`, `createdAt`, and `updatedAt`.
