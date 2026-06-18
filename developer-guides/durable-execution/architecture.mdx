@@ -1,0 +1,30 @@
+---
+title: "Architecture"
+description: "How Durable Execution handles security, durability, consistency, scalability, and latency."
+---
+
+Durable Execution separates workflow state from worker processes. The service owns workflow manifests, run records, history, retries, waits, leases, and terminal state. Workers lease work and report results.
+
+## Security
+
+Durable Execution scopes namespaces under the API key owner. A worker receives delegated `durable_worker` credentials with queue-specific grants and a short TTL, rather than a broad Final API key.
+
+This lets a worker execute the queues it is assigned to without receiving access to unrelated namespaces or management operations.
+
+## Scalability and durability
+
+Workflow manifests, run records, history, idempotency keys, and terminal outcomes are stored outside worker memory. Workers are replaceable: a new worker can connect and continue leasing work for the same queues.
+
+Active scheduling uses hot state and queue coordination, while durable history remains the source for what happened to a run. The repair loop uses stored run records to recover when active queue state diverges.
+
+## Consistency
+
+The run record is the source of truth for workflow status, attempt number, active lease, and terminal outcome. Queue items are leases for work, not ownership of durable workflow state.
+
+Retry behavior is stored with the workflow manifest and applied by the service. Events and direct starts can carry idempotency keys so caller retries do not need to create duplicate runs.
+
+## Latency
+
+Durable Execution keeps workers connected over WebSockets so runnable work can be offered without polling the public API for each step.
+
+Hot state tracks active pauses, waits, and scheduling indexes so the service can resume work when a timer, event, or signal makes a run runnable again.

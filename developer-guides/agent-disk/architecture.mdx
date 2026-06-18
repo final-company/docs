@@ -1,0 +1,36 @@
+---
+title: "Architecture"
+description: "How Agent Disk handles security, durability, consistency, scalability, and latency."
+---
+
+Agent Disk gives agents a durable mounted filesystem. A disk is a named resource with branches, checkpoints, scoped access, and mount sessions. It is not tied to one agent run or one Computer.
+
+## Security
+
+Agent Disk separates management credentials from mount credentials. The API key that creates and manages disks does not need to be present inside the runtime mounting the disk.
+
+Runtime access uses disk users or time-bounded mount session tickets scoped to a specific disk branch. Share links are signed, path-scoped, and expire. Stored disk credentials are encrypted with AES-256-GCM before persistence.
+
+Disks are scoped to an organization and either a user or team, so mount access can be granted without broadening access to unrelated disks.
+
+## Scalability and durability
+
+Agent Disk splits the system into metadata, branch state, and file contents. Metadata lives in the control plane. File contents are split into extents and chunks that can be stored in S3-compatible object storage. Active branches can be served by storage nodes, while cold data can live in the object tier.
+
+Branches let independent runs diverge without copying the whole disk. Checkpoints seal a manifest that can seed a later branch, giving evaluators a concrete recovery point before risky work.
+
+Durability comes from keeping disk identity, branch metadata, checkpoint manifests, and file extents separate from the compute process. If an agent run or Computer is replaced, the disk resource and branch history remain.
+
+## Consistency
+
+Agent Disk treats a branch as the unit of mutable filesystem state. Filesystem operations are applied by the storage engine in commit order. Where replicated storage is deployed, Raft serializes branch state changes through a state machine.
+
+Writes are staged as extents, then committed into branch state. `fsync` and release paths flush dirty file data from the client to the storage engine. Owner-scoped delegations and epochs arbitrate mutable access to paths, so consistency is handled by the disk service rather than by each agent coordinating writes on its own.
+
+## Latency
+
+Agent Disk avoids sending every file operation through the public API. A mount session returns storage endpoints for the selected branch, and the mounted client keeps hot pages, file attributes, and directory reads close to the runtime where safe.
+
+The client cache tracks dirty byte ranges, so flush work is scoped to changed pages. File contents are chunked, and small chunks can be packed for more efficient object-tier access.
+
+This model is optimized for repeated access to active working sets such as source trees, dependency caches, generated files, and artifacts across agent runs.

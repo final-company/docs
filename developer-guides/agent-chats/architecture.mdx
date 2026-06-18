@@ -1,0 +1,30 @@
+---
+title: "Architecture"
+description: "How Agent Chats handles security, durability, consistency, scalability, and latency."
+---
+
+Agent Chats is the durable control plane for agent sessions. It stores the chat, session, and message history separately from the runtime doing the work, so sessions can be created, observed, stopped, and audited across client or runtime disconnects.
+
+## Security
+
+Agent Chats scopes work by organization, user, team, and API key. Organization-owned and team-owned keys bind work to an agent profile when required, so a session has an explicit owner and execution context.
+
+The runtime does not need broad management access to create or list unrelated chats. Applications store the public chat and session IDs returned by the API and use scoped credentials for follow-up operations.
+
+## Scalability and durability
+
+Agent Chats keeps long-lived control-plane state outside the agent runtime. Chat records, session records, status, metadata, and archive state remain available even if a client disconnects or the execution environment restarts.
+
+Message history is stored as session events with cursors. Clients can resume from the last cursor they processed instead of relying only on a live connection. Creation supports idempotency keys so retrying a request after a transient failure does not need to create duplicate work.
+
+## Consistency
+
+The session record is the source of truth for lifecycle state. Messages and runtime events are appended to the session event log, and readers use cursors to move through that ordered history.
+
+Stop and archive are explicit lifecycle operations. They do not depend on a browser tab, HTTP request, or WebSocket connection staying open.
+
+## Latency
+
+Agent Chats keeps observation lightweight. Clients can poll the session state endpoint for status and a latest cursor, then fetch only new messages after that cursor.
+
+For realtime interfaces, pair Agent Chats with WebSockets so progress can be pushed to a browser while the durable session and message history remain in Agent Chats.

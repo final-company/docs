@@ -1,0 +1,40 @@
+---
+title: "Architecture"
+description: "How Version Control handles security, durability, consistency, scalability, and latency."
+---
+
+Final Version Control uses Git as the default version control system, with service-managed repositories, short-lived credentials, pull requests, checks, and merge queues around it.
+
+The design goal is to let agents and automation work with standard Git while keeping repository access scoped, reviewable, and recoverable.
+
+## Security
+
+Repository API access is permissioned. Read operations require `repositories:read`; mutations and write credentials require `repositories:write`.
+
+Git clients do not need broad provider credentials. They use short-lived Git credentials scoped to one repository and access level. Stored provider credentials are encrypted before persistence.
+
+Repository archives and LFS objects are keyed by tenant and repository, so object storage does not become a shared namespace across customers.
+
+## Scalability and durability
+
+Git gives the storage layer content-addressed objects and refs. Final adds structured metadata for repositories, pull requests, checks, and merge queues so review state is not inferred only from a checkout.
+
+Repositories are placed on storage shards, with shard-group state used to track leaders and replicas. Large file data and cold repository archives live in S3-compatible object storage, while active repositories can be served from the storage shard.
+
+Durability comes from storing both the Git data and the control-plane records. A repository can have source history, pull request state, merge queue attempts, check results, LFS objects, and archive generations managed as separate records.
+
+## Consistency
+
+Git object IDs make committed content verifiable. Repository locks protect local bare repositories during mutation, and backend timeouts prevent long-running Git operations from holding resources indefinitely.
+
+Merge queues make landing decisions against candidate SHAs. Required checks attach to the exact candidate that may land, instead of trusting stale results from an earlier branch state.
+
+When shard health is insufficient, reads or writes can fail closed rather than accepting ambiguous repository state.
+
+## Latency
+
+Clone, fetch, and push use standard Git HTTPS flows, so clients can use normal Git tooling without an additional protocol bridge.
+
+Active repositories are served from their storage shard. Large file content is handled through the LFS object store, and cold repository archives are used for recovery rather than sitting in the hot path for normal Git operations.
+
+Background workers handle merge queue processing, archive work, and maintenance outside the interactive Git path, keeping user-facing operations focused on repository reads, writes, and review state.

@@ -1,0 +1,30 @@
+---
+title: "Architecture"
+description: "How WebSockets handles security, delivery, consistency, scalability, and latency."
+---
+
+WebSockets is a realtime transport layer for browsers, services, and workers. Long-lived Final API keys stay on trusted servers. Connected clients receive short-lived tokens scoped to the channels, RPC names, bridges, or work queues they need.
+
+## Security
+
+WebSocket clients do not receive Final API keys. A trusted server mints short-lived session tokens with narrow grants for the resources the client should access.
+
+Resource names are tenant-local. A channel or queue name is scoped to the owner derived from the API key that minted the token, so matching names in different owner scopes remain isolated.
+
+## Scalability and durability
+
+Gateway replicas can hold many long-lived client connections while the broker coordinates fanout and work delivery across replicas.
+
+WebSockets is not the durable source of truth for product state. Use it for realtime delivery, and keep durable state in the service that owns the workflow. REST publishing supports idempotency keys for server-originated events tied to retried jobs or transactions.
+
+## Consistency
+
+Consistency is defined by grants and resource scope. A token can only perform the channel, RPC, bridge, or work queue actions it was granted.
+
+Work queues use leases and heartbeats instead of assuming a connected worker will finish. If a worker stops reporting progress, the producer can treat the lease as abandoned and recover according to the workflow's rules.
+
+## Latency
+
+WebSockets keeps a persistent connection open, avoiding repeated request setup for realtime UI updates and worker dispatch.
+
+Server-originated events can be published through the REST API, so backends do not need to maintain their own WebSocket connection only to push progress to clients.

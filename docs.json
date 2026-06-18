@@ -43,6 +43,7 @@
             "group": "Agent Chats",
             "pages": [
               "developer-guides/agent-chats/index",
+              "developer-guides/agent-chats/architecture",
               "developer-guides/agent-chats/session-lifecycle",
               "developer-guides/agent-chats/execution-modes",
               "developer-guides/agent-chats/product-integration"
@@ -52,6 +53,7 @@
             "group": "Agent Disk",
             "pages": [
               "developer-guides/agent-disk/index",
+              "developer-guides/agent-disk/architecture",
               "developer-guides/agent-disk/create-and-seed-disks",
               "developer-guides/agent-disk/branches-and-checkpoints",
               "developer-guides/agent-disk/access-and-sharing",
@@ -62,6 +64,7 @@
             "group": "Computers",
             "pages": [
               "developer-guides/computers/index",
+              "developer-guides/computers/architecture",
               "developer-guides/computers/rest-api",
               "developer-guides/computers/quickstart",
               "developer-guides/computers/sdk",
@@ -74,6 +77,7 @@
             "group": "Version Control",
             "pages": [
               "developer-guides/git/index",
+              "developer-guides/git/architecture",
               "developer-guides/git/create-repository",
               "developer-guides/git/clone",
               "developer-guides/git/pull-requests",
@@ -87,6 +91,7 @@
             "group": "Secrets",
             "pages": [
               "developer-guides/secrets/index",
+              "developer-guides/secrets/architecture",
               "developer-guides/secrets/store-and-rotate-secrets",
               "developer-guides/secrets/use-secrets-with-agents"
             ]
@@ -95,6 +100,7 @@
             "group": "WebSockets",
             "pages": [
               "developer-guides/websockets/index",
+              "developer-guides/websockets/architecture",
               "developer-guides/websockets/session-tokens-and-grants",
               "developer-guides/websockets/channels",
               "developer-guides/websockets/work-queues"
@@ -104,6 +110,7 @@
             "group": "Durable Execution",
             "pages": [
               "developer-guides/durable-execution/index",
+              "developer-guides/durable-execution/architecture",
               "developer-guides/durable-execution/quickstart",
               "developer-guides/durable-execution/how-it-works",
               "developer-guides/durable-execution/typescript-sdk",

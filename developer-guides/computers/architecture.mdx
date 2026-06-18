@@ -1,0 +1,30 @@
+---
+title: "Architecture"
+description: "How Computers handles security, durability, consistency, scalability, and latency."
+---
+
+Computers is a desired-state compute system. The service stores what a Computer should be, observes what is running on hosts, and reconciles the two. That makes compute replaceable while preserving lifecycle state and access controls.
+
+## Security
+
+Computers are scoped by organization and owner. User-owned keys can create private Computers, and team-owned flows attach Computers to a team scope.
+
+Access is modeled as separate subresources. Computer tokens, SSH keys, shares, and public HTTP exposure can be rotated or revoked without replacing the Computer. Sensitive configuration should come from Secrets rather than being copied into long-lived machine state.
+
+## Scalability and durability
+
+The control plane stores desired state independently from the host currently running the workload. If a host disconnects, the Computer record, owner scope, lifecycle intent, and access records remain.
+
+Scheduling and capacity reservation are separate from the Computer record. Ephemeral Computers can be cleaned up when idle, while retained Computers can pause, stop, shelve, and resume as work returns.
+
+## Consistency
+
+Desired state is the source of truth. Hosts report observed state, and reconcilers compare it with the desired spec before issuing lifecycle operations.
+
+Lifecycle actions such as pause, resume, restart, stop, and delete are explicit. Command streams are separate from lifecycle metadata, so an interrupted exec session does not change the Computer's desired state.
+
+## Latency
+
+Computers keeps active command and file operations close to the host that owns the machine. The command router sends exec and file requests to the owning host instead of treating every operation as a new provisioning event.
+
+Auto-resume and retained lifecycle states avoid recreating long-lived environments when work returns. Ephemeral Computers keep short-lived jobs isolated without requiring cleanup work in the caller.
