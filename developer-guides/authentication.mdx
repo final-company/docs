@@ -19,7 +19,7 @@ https://api.final.ai
 
 | Credential | Use it for |
 | --- | --- |
-| Organization API key | Organization-scoped REST APIs, Computers team-owned creation with `teamId`, Agent Workspaces through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
+| Organization API key | Organization-scoped REST APIs, organization management, Computers team-owned creation with `teamId`, Agent Workspaces through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
 | Team API key | Team-scoped REST APIs and team-owned delegated credential minting for WebSocket Gateway and Durable Execution workers. |
 | User API key | User-scoped REST APIs and delegated credential minting for Git, WebSocket Gateway, and Durable Execution workers. |
 | Delegated credential | Short-lived protocol credentials returned by the API, such as Git HTTPS credentials, WebSocket Gateway tokens, and Durable Execution worker credentials. |
@@ -81,6 +81,14 @@ curl -X POST "https://api.final.ai/v1/api-keys" \
 ```
 
 The response includes the plaintext `value` once. Store it immediately.
+
+You can also [list organization API keys](/api-references/api-keys/list) and [revoke an organization API key](/api-references/api-keys/delete) with the same permission.
+
+## Manage organizations
+
+Organization management reads require `organizations:read`. Mutations require `organizations:write` and an organization-owned API key.
+
+Use organization management APIs to read the current organization, list roles and members, manage invitations, and manage teams. See [Organization management](/developer-guides/organizations) and the [Organizations API reference](/api-references/organizations).
 
 ## API key kinds and restrictions
 

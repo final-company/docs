@@ -1,0 +1,49 @@
+---
+title: "Members"
+description: "List and manage organization members."
+---
+
+## List members
+
+`GET /v1/organizations/current/members`
+
+```bash
+curl "https://api.final.ai/v1/organizations/current/members" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Member objects include the membership `id`, `workosMembershipId`, `status`, `roleSlug`, `directoryManaged`, timestamps, and a nested `user` object.
+
+## Update a member role
+
+`PATCH /v1/organizations/current/members/{membershipId}`
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+membership_id="om_123"
+
+curl -X PATCH "https://api.final.ai/v1/organizations/current/members/${membership_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "roleSlug": "admin"
+  }'
+```
+
+Directory-managed memberships cannot be changed through this endpoint. Final also prevents removing the last active admin.
+
+## Remove a member
+
+`DELETE /v1/organizations/current/members/{membershipId}`
+
+Requires `organizations:write` and an organization-owned API key.
+
+```bash
+membership_id="om_123"
+
+curl -X DELETE "https://api.final.ai/v1/organizations/current/members/${membership_id}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Returns `{ "deleted": true }`.

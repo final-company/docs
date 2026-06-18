@@ -9,6 +9,7 @@ security:
   - bearerAuth: []
 tags:
   - name: API keys
+  - name: Organizations
   - name: Agent workspaces
   - name: Agent sessions
   - name: Agent messages
@@ -18,6 +19,32 @@ tags:
   - name: Checks
 paths:
   /v1/api-keys:
+    get:
+      operationId: listApiKeys
+      tags: [API keys]
+      summary: List API keys
+      description: "List first-party Final organization API keys. The caller must use an organization-owned API key with the `api_keys:write` permission. Plaintext key values are not returned."
+      responses:
+        "200":
+          description: API keys were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apiKeys]
+                properties:
+                  apiKeys:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiKey"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
     post:
       operationId: createApiKey
       tags: [API keys]
@@ -45,6 +72,42 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
+          $ref: "#/components/responses/Error"
+        "502":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /v1/api-keys/{apiKeyId}:
+    delete:
+      operationId: deleteApiKey
+      tags: [API keys]
+      summary: Revoke an API key
+      description: "Revoke a first-party Final organization API key. The caller must use an organization-owned API key with the `api_keys:write` permission."
+      parameters:
+        - name: apiKeyId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: API key wire ID with the `ak_` prefix.
+      responses:
+        "200":
+          description: API key was revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
         "502":
           $ref: "#/components/responses/Error"

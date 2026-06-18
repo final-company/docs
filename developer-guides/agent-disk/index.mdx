@@ -121,6 +121,8 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/
   }'
 ```
 
+Branches created from checkpoints may start in `creating` status while Agent Disk places and opens the branch replicas. Wait until the branch status is `available` before mounting it or creating a share link from it.
+
 ## Share a path
 
 Create a signed URL for a path on a disk:

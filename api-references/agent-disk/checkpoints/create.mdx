@@ -61,3 +61,5 @@ Returns the created checkpoint in a JSON envelope.
 ```
 
 `manifestKey` identifies the checkpoint manifest stored by Agent Disk. `baseManifest` is the durable manifest used when creating a branch from the checkpoint.
+
+Create branches only from sealed checkpoints. Branches created from checkpoints become usable after their status changes to `available`.

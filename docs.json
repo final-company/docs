@@ -28,6 +28,7 @@
             "group": "Platform",
             "pages": [
               "developer-guides/authentication",
+              "developer-guides/organizations",
               "developer-guides/delegated-credentials"
             ]
           },
@@ -99,7 +100,20 @@
               {
                 "group": "API keys",
                 "pages": [
-                  "api-references/api-keys/create"
+                  "api-references/api-keys/list",
+                  "api-references/api-keys/create",
+                  "api-references/api-keys/delete"
+                ]
+              },
+              {
+                "group": "Organizations",
+                "pages": [
+                  "api-references/organizations/index",
+                  "api-references/organizations/current",
+                  "api-references/organizations/members",
+                  "api-references/organizations/invitations",
+                  "api-references/organizations/teams",
+                  "api-references/organizations/team-members"
                 ]
               },
               {

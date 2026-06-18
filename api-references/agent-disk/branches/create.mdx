@@ -8,6 +8,8 @@ Creates a branch from a sealed checkpoint.
 
 Agent Disk uses the checkpoint's `baseManifest` to seed the new branch, so the branch starts from the durable log entries exported when the checkpoint was sealed.
 
+The created branch may return with `status: "creating"` while Agent Disk places and opens the branch replicas. Poll [list branches](/api-references/agent-disk/branches/list) until the branch is `available` before mounting it or creating share links from it.
+
 ```bash
 curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/branches" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
@@ -36,3 +38,16 @@ curl -X POST "https://api.final.ai/v1/agent-disk/disks/dsk_1111117Hxt1fAWDjN7Ta/
 ## Response
 
 Returns the created branch.
+
+```json
+{
+  "data": {
+    "id": "0193b000-0000-7000-8000-000000000301",
+    "name": "experiment-a",
+    "status": "creating",
+    "createdAt": "2026-06-17T21:11:30.000Z"
+  }
+}
+```
+
+Branch statuses include `creating`, `available`, and `deleted`.

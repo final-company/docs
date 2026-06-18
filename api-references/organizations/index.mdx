@@ -1,0 +1,40 @@
+---
+title: "Organizations API"
+description: "Reference for organization management endpoints."
+---
+
+Use the Organizations API to read and update the current organization, list roles, manage members, manage invitations, and manage teams.
+
+Every request uses Final API key authentication:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+Reads require `organizations:read`. Mutations require `organizations:write` and an organization-owned API key.
+
+The public base URL is:
+
+```text
+https://api.final.ai/v1/organizations
+```
+
+<Card title="Current organization" icon="building-2" href="/api-references/organizations/current">
+  Read organization metadata, update metadata, and list roles.
+</Card>
+
+<Card title="Members" icon="users" href="/api-references/organizations/members">
+  List members, update member roles, and remove members.
+</Card>
+
+<Card title="Invitations" icon="mail-plus" href="/api-references/organizations/invitations">
+  List, create, resend, and revoke invitations.
+</Card>
+
+<Card title="Teams" icon="panels-top-left" href="/api-references/organizations/teams">
+  List, create, read, update, and delete teams.
+</Card>
+
+<Card title="Team members" icon="user-round-plus" href="/api-references/organizations/team-members">
+  List, add, update, and remove team members.
+</Card>

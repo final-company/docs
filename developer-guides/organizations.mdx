@@ -1,0 +1,83 @@
+---
+title: "Organization management"
+description: "Manage organization metadata, members, invitations, teams, and team membership."
+---
+
+Use the Organizations API to automate organization administration from the public Final API.
+
+<Card title="Organizations API reference" icon="building-2" href="/api-references/organizations">
+  Browse organization, member, invitation, team, and team membership endpoints.
+</Card>
+
+## Before you begin
+
+You need a Final API key for `https://api.final.ai`.
+
+Reads require `organizations:read`. Mutations require `organizations:write` and an organization-owned API key.
+
+```bash
+export FINAL_API_KEY="<organization-api-key>"
+```
+
+## Read organization state
+
+Read the organization associated with the API key:
+
+```bash
+curl "https://api.final.ai/v1/organizations/current" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+List available roles before assigning member or invitation roles:
+
+```bash
+curl "https://api.final.ai/v1/organizations/current/roles" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Invite members
+
+Create invitations by email. If you omit `roleSlug`, Final uses `member`. If you omit `expiresInDays`, Final uses `30`.
+
+```bash
+curl -X POST "https://api.final.ai/v1/organizations/current/invitations" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "new.member@example.com",
+    "roleSlug": "member",
+    "expiresInDays": 30
+  }'
+```
+
+Use the returned invitation `id` to resend or revoke the invitation.
+
+## Manage teams
+
+Teams let you scope API keys and product resources to a shared owner.
+
+```bash
+curl -X POST "https://api.final.ai/v1/organizations/current/teams" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Support",
+    "prefix": "SUP"
+  }'
+```
+
+Team prefixes must be uppercase letters and must be 2 to 5 characters long.
+
+Add an existing organization user to a team with the user's `usr_` ID:
+
+```bash
+team_id="team_123"
+user_id="usr_123"
+
+curl -X POST "https://api.final.ai/v1/organizations/current/teams/${team_id}/members" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "{\"userId\":\"${user_id}\"}"
+```
+
+Deleting a team also revokes team-scoped API keys for that team.
