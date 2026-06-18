@@ -4,7 +4,7 @@ description: "Inspect lifecycle metadata for a delegated credential."
 api: "GET /v1/delegated-credentials/{credentialId}"
 ---
 
-Returns delegated credential metadata for the same owner. Secret material such as Git passwords and gateway tokens is not returned.
+Returns delegated credential metadata for the same owner. Secret material such as Git passwords and session tokens is not returned.
 
 ```bash
 credential_id="dc_..."
@@ -17,8 +17,8 @@ curl "https://api.final.ai/v1/delegated-credentials/${credential_id}" \
 {
   "credential": {
     "id": "dc_0193b000-0000-7000-8000-000000000102",
-    "kind": "websocket",
-    "audience": "websocket-gateway",
+    "kind": "websockets",
+    "audience": "websockets",
     "subject": "user:usr_123",
     "grants": {
       "clientId": "browser_1",

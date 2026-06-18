@@ -1,0 +1,26 @@
+---
+title: "Get WebSockets metadata"
+description: "Read the active protocol version and WebSocket URL."
+api: "GET /v1/websockets/meta"
+---
+
+Returns the hosted WebSockets connection URL and protocol version.
+
+```bash
+curl "https://api.final.ai/v1/websockets/meta" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+## Response
+
+```json
+{
+  "protocolVersion": 1,
+  "url": "wss://ws.api.final.ai/connect"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `protocolVersion` | integer | Protocol version to pass when opening a WebSocket connection. |
+| `url` | string | WebSocket URL for clients. |

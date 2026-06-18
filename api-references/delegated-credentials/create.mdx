@@ -1,6 +1,6 @@
 ---
 title: "Create a delegated credential"
-description: "Mint a short-lived credential for Git, WebSocket Gateway, or Durable Execution workers."
+description: "Mint a short-lived credential for Git, WebSockets, or Durable Execution workers."
 api: "POST /v1/delegated-credentials"
 ---
 
@@ -11,7 +11,7 @@ The response includes lifecycle fields for every credential:
 | Field | Description |
 | --- | --- |
 | `id` | Delegated credential ID. |
-| `kind` | `git`, `websocket`, or `durable_worker`. |
+| `kind` | `git`, `websockets`, or `durable_worker`. |
 | `audience` | Protocol audience. Defaults from `kind`. |
 | `subject` | Subject represented by the credential. |
 | `grants` | Granted protocol access. |
@@ -26,8 +26,8 @@ The response includes lifecycle fields for every credential:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `kind` | string | Yes | `git`, `websocket`, or `durable_worker`. |
-| `audience` | string | No | Must match the kind. Defaults to `git`, `websocket-gateway`, or `durable-execution`. |
+| `kind` | string | Yes | `git`, `websockets`, or `durable_worker`. |
+| `audience` | string | No | Must match the kind. Defaults to `git`, `websockets`, or `durable-execution`. |
 | `grants` | object | Yes | Kind-specific grants. |
 
 ## Git grants
@@ -83,13 +83,13 @@ EOF
 }
 ```
 
-## WebSocket grants
+## WebSockets grants
 
-Requires a user-owned or team-owned API key. Organization-owned API keys cannot mint WebSocket delegated credentials.
+Requires a user-owned or team-owned API key. Organization-owned API keys cannot mint WebSockets delegated credentials.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `subject` | string | No | Subject for the gateway token. Defaults from the API key owner. |
+| `subject` | string | No | Subject for the session token. Defaults from the API key owner. |
 | `clientId` | string | No | Client identifier. Defaults from the API key owner. |
 | `ttlMs` | integer | No | Token lifetime in milliseconds. Maximum `600000`. |
 | `channels` | array | No | Channel grants. |
@@ -115,7 +115,7 @@ curl -X POST "https://api.final.ai/v1/delegated-credentials" \
   -H "Content-Type: application/json" \
   -d @- <<EOF
 {
-  "kind": "websocket",
+  "kind": "websockets",
   "grants": {
     "clientId": "browser_1",
     "ttlMs": 600000,
@@ -134,8 +134,8 @@ EOF
 {
   "credential": {
     "id": "dc_0193b000-0000-7000-8000-000000000102",
-    "kind": "websocket",
-    "audience": "websocket-gateway",
+    "kind": "websockets",
+    "audience": "websockets",
     "subject": "user:usr_123",
     "grants": {
       "clientId": "browser_1",
@@ -151,7 +151,7 @@ EOF
       "workQueues": [],
       "metadata": {}
     },
-    "token": "<gateway-token>",
+    "token": "<session-token>",
     "jti": "issued-token-1",
     "url": "wss://ws.api.final.ai/connect",
     "protocolVersion": 1,

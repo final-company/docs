@@ -1,0 +1,53 @@
+---
+title: "Product integration"
+description: "Embed Agent Chats in product flows, automation queues, and realtime progress surfaces."
+---
+
+Agent Chats are useful when agent work needs to become part of your product instead of a one-off chat. Store agent chat and session IDs in your own data model, then use session state and messages to power the user experience.
+
+## Common integration patterns
+
+| Pattern | How it works |
+| --- | --- |
+| Task button | A user clicks a button, your server creates an agent chat, and the UI shows progress for that session. |
+| Background automation | A webhook or scheduled job creates an agent chat and records the final result in your system. |
+| Review surface | Your UI shows session messages, changed files, and follow-up controls for a human reviewer. |
+| Realtime progress | Your server publishes session progress through the [WebSockets](/developer-guides/websockets). |
+| Repository task | The agent chat includes `repositoryId`, and the agent produces a branch or pull request through the default Git workflow. |
+
+## Minimal task button flow
+
+1. User clicks **Investigate** in your product.
+2. Your server creates an agent chat with an initial message.
+3. Your server stores `agentChat.id` and `session.id` on the task.
+4. The UI polls session state or receives realtime progress.
+5. The user sends follow-up messages from the task view.
+6. Your system archives the agent chat when the task is complete.
+
+## Realtime progress
+
+Polling session state is enough for many internal tools. Add the [WebSockets](/developer-guides/websockets) when you want browser clients to receive progress without polling.
+
+A typical flow is:
+
+1. Create the Agent Chat from your server.
+2. Mint a WebSockets token for a channel such as `agent-chat:chat_123`.
+3. Connect the browser to that channel.
+4. Publish agent progress or task state from your server.
+
+## Store IDs
+
+Store these IDs with your product object:
+
+| ID | Why to store it |
+| --- | --- |
+| `agentChat.id` | Opens, updates, or archives the top-level work item. |
+| `session.id` | Sends messages, polls state, and reads messages. |
+| `repositoryId` | Connects agent work to source code and pull requests. |
+| `finalNodeId` | Explains where local sessions were targeted, when used. |
+
+## Design guidance
+
+Make the first message concrete. Instead of asking an agent to "look into this," include the failing test, repository, customer issue, alert payload, or file path that defines the task.
+
+Give users a visible stop control for long-running work. Use the stop endpoint when the user cancels, the underlying task is closed, or your product detects that the request is stale.

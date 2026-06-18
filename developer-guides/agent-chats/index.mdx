@@ -1,0 +1,157 @@
+---
+title: "Agent Chats"
+description: "Create agent chats, send messages, and poll session state with the public REST API."
+---
+
+Agent Chats let you start and manage Final agent work from your product or automation. An agent chat is the durable container for the work. A session is one agent conversation or run inside that agent chat.
+
+Use Agent Chats when you want to turn user intent, operational events, or internal tickets into agent tasks that you can track through an API. You create the agent chat, send messages, poll state, read messages, and stop or archive the work when it is done.
+
+<Card title="Agent Chats API reference" icon="folder-code" href="/api-references/agent-chats">
+  Browse endpoints for agent chats, sessions, and messages.
+</Card>
+
+<Card title="Session lifecycle" icon="messages-square" href="/developer-guides/agent-chats/session-lifecycle">
+  Create agent chats, send messages, poll state, stop sessions, and archive completed work.
+</Card>
+
+<Card title="Execution modes" icon="cpu" href="/developer-guides/agent-chats/execution-modes">
+  Choose cloud execution, local execution, or a specific Final Node for agent sessions.
+</Card>
+
+<Card title="Product integration" icon="blocks" href="/developer-guides/agent-chats/product-integration">
+  Build task buttons, background jobs, review surfaces, and realtime progress around agent sessions.
+</Card>
+
+## What you can build
+
+| Use case | How Agent Chats helps |
+| --- | --- |
+| In-app agent tasks | Let users ask an agent to investigate, change, or explain something from inside your application. |
+| Repository maintenance | Start work against a version-controlled repository and keep the session history tied to the task. |
+| Support and operations triage | Convert an incident, ticket, or alert into an agent chat that an agent can investigate. |
+| Review workflows | Send follow-up instructions, inspect state, and collect the session messages for a review surface. |
+| Local or cloud execution | Use `cloud` for Final-managed execution, or `local` when work should run on a local Final Node. |
+
+Agent Chats is the orchestration surface. Pair it with [Agent Disk](/developer-guides/agent-disk) when the agent needs persistent file state, [version control with Git](/developer-guides/git) when work should attach to repositories and pull requests, and [WebSockets](/developer-guides/websockets) when your UI needs realtime progress.
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| Agent chat | The top-level unit of agent work. It has a title, owner scope, optional repository context, and one or more sessions. |
+| Session | A run or conversation inside an agent chat. Sessions receive messages and expose state. |
+| Message | A user instruction or agent response in a session. |
+| State | A lightweight view of session progress, including cursors you can use to fetch new messages. |
+| Agent profile | The agent configuration used by organization-owned and team-owned keys. |
+| Execution mode | `cloud` for Final-managed cloud execution or `local` for a local Final Node. |
+
+## Before you begin
+
+You need an API key. See [authentication](/developer-guides/authentication) for credential types and bearer auth examples.
+
+Organization-owned keys can create agent chats for an agent profile. Team-owned keys create agent chats for agent profiles that belong to the same team as the key. User-owned keys create agent chats as the key owner.
+
+Organization-owned and team-owned keys must include `agentProfileId` when they create an agent chat or session.
+
+Every new agent chat or session must include `executionMode`. Use `cloud` for Final-managed cloud execution. Use `local` when you want the session to run on a local Final Node. You can also pass `finalNodeId` to target an existing node.
+
+## Typical lifecycle
+
+1. Create an agent chat with a title, execution mode, and optional first message.
+2. Store the returned `agentChat.id` and `session.id` in your application.
+3. Poll the session state to learn whether there is new output.
+4. Fetch messages with the cursor returned by the state endpoint.
+5. Send follow-up messages when the user or your automation needs to steer the task.
+6. Stop a session if it should not continue, and archive completed agent chats when they leave your active queue.
+
+## Create an agent chat
+
+Create an agent chat and optionally send the first message:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-chats" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: agent-chat-001" \
+  -d '{
+    "agentProfileId": "prof_123",
+    "title": "Investigate failing tests",
+    "repositoryId": "gsr_123",
+    "executionMode": "cloud",
+    "message": "Find the failing tests and propose a fix."
+  }'
+```
+
+The response includes an `agentChat`, its main `session`, and a `command` when you include `message`.
+
+Use an `Idempotency-Key` when the request comes from a button click, webhook, or retrying job. That keeps a transient network failure from creating duplicate agent chats for the same intent.
+
+See [create an agent chat](/api-references/agent-chats/chats/create).
+
+## Send another message
+
+Post follow-up work to a session:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-chats/${AGENT_CHAT_ID}/sessions/${SESSION_ID}/messages" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Focus on the API client tests first."
+  }'
+```
+
+Use follow-up messages for clarification, changed priorities, approvals, or task boundaries. Keep messages specific and observable. For example, ask the agent to inspect a failing test file, update a small module, or summarize what it found before continuing.
+
+See [send a session message](/api-references/agent-chats/messages/send).
+
+## Poll state and messages
+
+Poll session state to decide when to fetch new messages:
+
+```bash
+curl "https://api.final.ai/v1/agent-chats/${AGENT_CHAT_ID}/sessions/${SESSION_ID}/state" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Use `latestMessageCursor` from the state response with the messages endpoint:
+
+```bash
+curl "https://api.final.ai/v1/agent-chats/${AGENT_CHAT_ID}/sessions/${SESSION_ID}/messages?cursor=${CURSOR}" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Store the last cursor you processed. That lets your UI, webhook worker, or background sync job fetch only the new messages since the last read.
+
+See [get session state](/api-references/agent-chats/sessions/state) and [list session messages](/api-references/agent-chats/messages/list).
+
+## Choose cloud or local execution
+
+| Mode | Use it when |
+| --- | --- |
+| `cloud` | You want Final-managed execution and do not need the session to run on infrastructure you operate. |
+| `local` | The task needs local network access, local credentials, a specific machine, or a local Final Node. |
+
+Pass `finalNodeId` when you need a specific existing node. Otherwise, let Final choose the runtime for the requested execution mode.
+
+## Stop or archive work
+
+Stop a running session when you no longer want it to continue:
+
+```bash
+curl -X POST "https://api.final.ai/v1/agent-chats/${AGENT_CHAT_ID}/sessions/${SESSION_ID}/stop" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Archive completed agent chats to remove them from active lists.
+
+See [stop a running session](/api-references/agent-chats/sessions/stop) and [archive an agent chat](/api-references/agent-chats/chats/archive).
+
+## Integration patterns
+
+For an interactive UI, create the agent chat from your server, show the title and session state immediately, then poll state until new messages are available. Add the [WebSockets](/developer-guides/websockets) when you want to push progress to the browser instead of polling.
+
+For an automation queue, create one agent chat per job, persist the IDs with the job record, and archive the agent chat after your downstream system records the result.
+
+For repository work, include `repositoryId` when you create the agent chat, then use the version control and pull request APIs to inspect or publish changes.

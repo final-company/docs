@@ -1,14 +1,18 @@
 ---
-title: "Git"
-description: "Use Final Git for repositories, pull requests, stacked changes, merge queues, and GitHub sync."
+title: "Version control with Git"
+description: "Use Final's default Git-compatible workflow for repositories, pull requests, stacked changes, merge queues, and GitHub sync."
 ---
 
-Final Git is a headless Git implementation for agent and automation workflows. Use Git-compatible HTTPS remotes with short-lived scoped credentials, then manage pull requests, stacked changes, reviews, checks, and merge queues through Final.
+Final uses Git as its default version control system for agent and automation workflows. Use Git-compatible HTTPS remotes with short-lived scoped credentials, then manage pull requests, stacked changes, reviews, checks, and merge queues through Final.
 
-Use Final Git when your product needs real Git semantics without asking every agent, job, or user to hold a long-lived Git provider credential. A repository can be cloned by standard Git clients, updated by automation, reviewed in Final, synchronized with GitHub, and protected by a merge queue.
+Use this workflow when your product needs version-controlled code changes without asking every agent, job, or user to hold a long-lived provider credential. A repository can be cloned by standard Git clients, updated by automation, reviewed in Final, synchronized with GitHub, and protected by a merge queue.
 
 <Card title="Clone and work with a repository" icon="git-branch" href="/developer-guides/git/clone">
   Mint Git credentials, clone a repository, and push changes.
+</Card>
+
+<Card title="Create a Git repository" icon="folder-plus" href="/developer-guides/git/create-repository">
+  Create a Git-backed repository with the Final API.
 </Card>
 
 <Card title="Review pull requests" icon="git-pull-request" href="/developer-guides/git/pull-requests">
@@ -37,13 +41,13 @@ Use Final Git when your product needs real Git semantics without asking every ag
 
 ## What you can build
 
-| Use case | How Final Git helps |
+| Use case | How version control helps |
 | --- | --- |
 | Agent-authored code changes | Let an agent clone a repository, push a branch, and open a pull request with a short-lived credential. |
 | Small-review workflows | Split large changes into stacked pull requests that reviewers can inspect one step at a time. |
 | Protected branch landing | Queue approved work and test the exact candidate SHA before it lands on `main`. |
 | GitHub-connected workflows | Sync selected branches between Final Git and GitHub while keeping Final as the agent-facing control plane. |
-| Internal code storage | Create repositories and perform normal clone, fetch, push, and pull request operations from your own product. |
+| Version-controlled code storage | Create repositories and perform normal clone, fetch, push, and pull request operations from your own product. |
 
 ## Core concepts
 
@@ -59,7 +63,7 @@ Use Final Git when your product needs real Git semantics without asking every ag
 
 ## Typical agent flow
 
-1. Create or select a Final Git repository.
+1. Create or select a Git-backed repository.
 2. Mint a short-lived Git credential for the job.
 3. Clone the repository with normal Git commands.
 4. Make a branch and push changes.

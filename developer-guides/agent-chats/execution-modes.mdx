@@ -1,0 +1,51 @@
+---
+title: "Execution modes"
+description: "Choose cloud or local execution for Agent Chat sessions."
+---
+
+Every new agent chat or session must include `executionMode`. The execution mode controls where the agent session runs.
+
+## Choose a mode
+
+| Mode | Use it when |
+| --- | --- |
+| `cloud` | You want Final-managed execution and do not need the session to run on infrastructure you operate. |
+| `local` | The task needs local network access, local credentials, a specific machine, or a local Final Node. |
+
+Pass `finalNodeId` when you want to target a specific existing Final Node.
+
+## Cloud execution
+
+Use `cloud` for product flows where Final should manage the runtime. This is a good default for tasks that operate through Final APIs, version-controlled repositories, or other cloud-accessible services.
+
+```json
+{
+  "title": "Review pull request",
+  "repositoryId": "gsr_123",
+  "executionMode": "cloud",
+  "message": "Review the open pull request and identify risky changes."
+}
+```
+
+## Local execution
+
+Use `local` when the session must run near your own environment. Local execution is useful for private networks, local credentials, specific developer machines, or internal services that are not available from Final-managed cloud execution.
+
+```json
+{
+  "title": "Investigate local test failure",
+  "executionMode": "local",
+  "finalNodeId": "fnod_123",
+  "message": "Run the failing integration test and summarize the root cause."
+}
+```
+
+## API key requirements
+
+Organization-owned and team-owned keys must include `agentProfileId` when they create an agent chat or session. User-owned keys create agent chats as the key owner and do not require `agentProfileId`.
+
+See [authenticate Agent Chats](/developer-guides/authentication#authenticate-agent-chats).
+
+## Design guidance
+
+Default to `cloud` unless the task needs local reachability or local credentials. Keep local sessions scoped to tasks that genuinely need that placement, because local execution depends on the availability and configuration of the target node.

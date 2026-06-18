@@ -3,9 +3,9 @@ title: "Quickstart"
 description: "Start with a Final product quickstart."
 ---
 
-Final gives you API surfaces for agent work, durable storage, realtime connections, cloud computers, Git workflows, secrets, and durable execution. Start with the product that owns the job you want to automate.
+Final gives you API surfaces for agent work, durable storage, realtime connections, cloud computers, version control, secrets, and durable execution. Start with the product that owns the job you want to automate.
 
-<Card title="Agent Workspaces" icon="folder-code" href="/developer-guides/agent-workspaces">
+<Card title="Agent Chats" icon="folder-code" href="/developer-guides/agent-chats">
   Start agent work from your application, send follow-up messages, poll state, and archive completed sessions.
 </Card>
 
@@ -13,7 +13,7 @@ Final gives you API surfaces for agent work, durable storage, realtime connectio
   Give agents persistent file state, checkpoints, branches, disk-scoped access, and shareable artifacts.
 </Card>
 
-<Card title="WebSocket Gateway" icon="radio" href="/developer-guides/websocket-gateway">
+<Card title="WebSockets" icon="radio" href="/developer-guides/websockets">
   Connect browsers, services, and workers with short-lived realtime tokens and scoped grants.
 </Card>
 
@@ -21,12 +21,12 @@ Final gives you API surfaces for agent work, durable storage, realtime connectio
   Store credentials for automation without putting plaintext values in code, prompts, logs, or config files.
 </Card>
 
-<Card title="Git" icon="git-branch" href="/developer-guides/git">
-  Create repositories, mint Git credentials, manage pull requests, and operate merge queues.
-</Card>
-
 <Card title="Computers" icon="server" href="/developer-guides/computers">
   Create cloud machines from container images, run commands, manage files, and expose services.
+</Card>
+
+<Card title="Version Control" icon="git-branch" href="/developer-guides/git">
+  Use the default Git-compatible workflow for repositories, pull requests, checks, and merge queues.
 </Card>
 
 <Card title="Durable Execution" icon="workflow" href="/developer-guides/durable-execution">
@@ -37,12 +37,12 @@ Final gives you API surfaces for agent work, durable storage, realtime connectio
 
 | Goal | Start here |
 | --- | --- |
-| Add an agent task button to your app | [Agent Workspaces](/developer-guides/agent-workspaces) |
+| Add an agent task button to your app | [Agent Chats](/developer-guides/agent-chats) |
 | Keep files across agent runs | [Agent Disk](/developer-guides/agent-disk) |
-| Stream progress to a browser | [WebSocket Gateway](/developer-guides/websocket-gateway) |
+| Stream progress to a browser | [WebSockets](/developer-guides/websockets) |
 | Store tokens used by automation | [Secrets](/developer-guides/secrets) |
 | Run a command on a managed machine | [Computers](/developer-guides/computers/quickstart) |
-| Clone, push, or review repository changes | [Git](/developer-guides/git) |
 | Run a workflow that waits and resumes | [Durable Execution](/developer-guides/durable-execution/quickstart) |
+| Clone, push, or review repository changes | [Version control with Git](/developer-guides/git) |
 
-Most integrations use more than one surface. For example, an in-app coding agent might create an Agent Workspace, attach repository context through Git, use Agent Disk for persistent files, store provider tokens in Secrets, and publish progress through the WebSocket Gateway.
+Most integrations use more than one surface. For example, an in-app coding agent might create an Agent Chat, attach repository context through the default Git workflow, use Agent Disk for persistent files, store provider tokens in Secrets, and publish progress through WebSockets.

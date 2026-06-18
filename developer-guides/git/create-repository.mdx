@@ -1,0 +1,57 @@
+---
+title: "Create a Git repository"
+description: "Create a Git-backed repository with the Final API."
+---
+
+Create a Git-backed repository when your product or automation needs a version-controlled place for code changes, pull requests, checks, and merge queues.
+
+You need a Final API key with `repositories:write`. See [authentication](/developer-guides/authentication) for bearer auth examples.
+
+```bash
+export FINAL_API_KEY="<api-key>"
+```
+
+## Create the repository
+
+Send a `POST` request to `/v1/repositories`. `displayName` is required. Use `registrySlug` when you want a stable repository slug, and set `defaultBranch` when the default should be something other than the platform default.
+
+```bash
+curl -X POST "https://api.final.ai/v1/repositories" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "displayName": "Docs",
+    "registrySlug": "docs",
+    "defaultBranch": "main"
+  }'
+```
+
+The response includes the repository object:
+
+```json
+{
+  "repository": {
+    "id": "gsr_123",
+    "displayName": "Docs",
+    "registrySlug": "docs",
+    "defaultBranch": "main"
+  }
+}
+```
+
+Store `repository.id`. You use it when you mint Git credentials, create agent chats with repository context, create pull requests, or configure merge queues.
+
+## Choose repository fields
+
+| Field | Required | Use it for |
+| --- | --- | --- |
+| `displayName` | Yes | The human-readable repository name shown in Final. |
+| `registrySlug` | No | A stable slug for repository paths and lookup. |
+| `defaultBranch` | No | The branch new work should target, such as `main` or `trunk`. |
+
+Omit advanced fields unless your integration needs explicit repository grants. For the full request and response schema, see [create a repository](/api-references/repositories/create).
+
+## Next steps
+
+Mint short-lived Git credentials before a client clones or pushes to the repository. Use [clone and work with a repository](/developer-guides/git/clone) for a hands-on flow, or [manage repositories](/developer-guides/git/manage) for lifecycle operations such as listing, reading, archiving, and deleting repositories.
+

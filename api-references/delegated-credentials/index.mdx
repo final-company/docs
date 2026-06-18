@@ -18,7 +18,7 @@ https://api.final.ai/v1/delegated-credentials
 ```
 
 <Card title="Create a delegated credential" icon="key-round" href="/api-references/delegated-credentials/create">
-  Mint a `git`, `websocket`, or `durable_worker` credential.
+  Mint a `git`, `websockets`, or `durable_worker` credential.
 </Card>
 
 <Card title="Get a delegated credential" icon="search" href="/api-references/delegated-credentials/get">
@@ -30,7 +30,7 @@ https://api.final.ai/v1/delegated-credentials
 </Card>
 
 <Card title="Revoke a delegated credential" icon="ban" href="/api-references/delegated-credentials/revoke">
-  Revoke the credential and any gateway token recorded for it.
+  Revoke the credential and any session token recorded for it.
 </Card>
 
 ## Credential kinds
@@ -38,7 +38,7 @@ https://api.final.ai/v1/delegated-credentials
 | Kind | Audience | Returned secret material |
 | --- | --- | --- |
 | `git` | `git` | `username`, `password` |
-| `websocket` | `websocket-gateway` | `token`, `jti`, `url`, `protocolVersion` |
+| `websockets` | `websockets` | `token`, `jti`, `url`, `protocolVersion` |
 | `durable_worker` | `durable-execution` | `token`, `session` |
 
 Short-lived credentials are not REST API bearer tokens. Use them only for the protocol they were minted for.

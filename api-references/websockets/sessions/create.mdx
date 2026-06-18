@@ -1,0 +1,91 @@
+---
+title: "Create a WebSockets session"
+description: "Mint a short-lived session token with scoped realtime grants."
+api: "POST /v1/websockets/sessions"
+---
+
+Creates a short-lived token for connecting to the hosted WebSockets.
+
+Requires a user-owned or team-owned API key with `websockets:connect`.
+
+API-key-backed sessions are minted through the delegated credential lifecycle internally, but this endpoint returns the compact session response for compatibility. Use [create a delegated credential](/api-references/delegated-credentials/create) with `kind: "websockets"` when you need the credential `id`, `refreshAfter`, and `refreshBefore` fields.
+
+Set `CHANNEL_NAME` to the channel your application uses. Channel names are owner-local resource names scoped to the API key owner. Send `chat`, `room:123`, or another app-defined name. Do not prefix resource names with `user:` or `team:`.
+
+```bash
+CHANNEL_NAME="chat"
+
+curl -X POST "https://api.final.ai/v1/websockets/sessions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "clientId": "browser_1",
+  "ttlMs": 600000,
+  "grants": {
+    "channels": [
+      {
+        "name": "${CHANNEL_NAME}",
+        "access": ["subscribe", "publish"]
+      }
+    ]
+  }
+}
+EOF
+```
+
+## Request body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `subject` | string | No | Subject for the session token. Defaults to `user:<workosUserId>` when available, `user:<usr_...>` for user-owned keys without a WorkOS user ID, or `team:<team_...>` for team-owned keys. |
+| `clientId` | string | No | Client identifier. Defaults to the owner `usr_...` ID for user-owned keys or the `team_...` ID for team-owned keys. |
+| `ttlMs` | integer | No | Token lifetime in milliseconds. Maximum `600000`. |
+| `grants` | object | Yes | Scoped access grants. At least one grant is required. |
+| `metadata` | object | No | Additional token metadata. |
+
+## Grants
+
+| Grant | Access values |
+| --- | --- |
+| `channels` | `subscribe`, `publish`, `history`, `presence` |
+| `rpc` | `send`, `receive` |
+| `bridges` | `join`, `send`, `receive` |
+| `workQueues` | `lease`, `heartbeat`, `complete`, `fail` |
+
+Each grant item has:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Owner-local resource name, such as a channel name, RPC name, bridge name, or work queue name. Do not prefix with `user:` or `team:`. |
+| `access` | string[] | Yes | Access values for the grant type. |
+| `limits` | object | No | Optional `maxFrameBytes`, `maxFramesPerMinute`, and `maxSubscriptions` limits. |
+
+## Response
+
+```json
+{
+  "protocolVersion": 1,
+  "url": "wss://ws.api.final.ai/connect",
+  "token": "<session-token>",
+  "expiresAt": "2026-06-15T12:10:00.000Z",
+  "jti": "issued-token-1"
+}
+```
+
+Connect with the returned `url` and `protocolVersion`. Send the returned `token` in an `auth` frame after the socket opens. Query-string token auth is not supported.
+
+```js
+const authRequestId = "auth-1";
+const socket = new WebSocket("wss://ws.api.final.ai/connect?protocolVersion=1");
+
+socket.addEventListener("open", () => {
+  socket.send(JSON.stringify({
+    id: authRequestId,
+    type: "auth",
+    token: "<session-token>",
+  }));
+});
+```
+
+If you inspect the session token while debugging, use the `tenantId` claim to identify the owner scope. Tenant IDs contain public wire IDs, such as `user:org_...:usr_...` or `team:org_...:team_...`.

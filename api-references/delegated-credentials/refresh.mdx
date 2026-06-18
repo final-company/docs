@@ -22,7 +22,7 @@ You can pass `grants` to narrow the replacement credential. Refresh cannot chang
 | Kind | Refresh constraints |
 | --- | --- |
 | `git` | Same `repositoryId`. `read` can replace `write`, but `write` cannot replace `read`. |
-| `websocket` | Same `subject` and `clientId`; lifetime cannot increase; resource grants and limits must be narrower than or equivalent to the current grants. |
+| `websockets` | Same `subject` and `clientId`; lifetime cannot increase; resource grants and limits must be narrower than or equivalent to the current grants. |
 | `durable_worker` | Same scope and `instanceId`; concurrency cannot increase; functions must be a subset of the current workflow keys and versions. |
 
 ```json
@@ -34,4 +34,4 @@ You can pass `grants` to narrow the replacement credential. Refresh cannot chang
 }
 ```
 
-For WebSocket and Durable Execution worker credentials, refreshing revokes the gateway token recorded on the previous credential.
+For WebSocket and Durable Execution worker credentials, refreshing revokes the session token recorded on the previous credential.

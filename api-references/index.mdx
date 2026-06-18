@@ -11,21 +11,7 @@ Public REST endpoints use a Final API key. See [authentication](/developer-guide
 Authorization: Bearer <api-key>
 ```
 
-<Card title="Repositories" icon="folder-git-2" href="/api-references/repositories/list">
-  Create repositories, manage repository lifecycle, and mint Git credentials.
-</Card>
-
-<Card title="Pull requests" icon="git-pull-request" href="/api-references/pull-requests/list">
-  Create, review, update, and stack pull requests.
-</Card>
-
-<Card title="Merge queues" icon="list-checks" href="/api-references/merge-queues/list">
-  Configure queues, enqueue pull requests, and inspect queue activity.
-</Card>
-
-<Card title="Checks" icon="badge-check" href="/api-references/checks/create-commit-status">
-  Report commit statuses and check runs for pull request and merge queue CI.
-</Card>
+## Platform
 
 <Card title="API keys" icon="key-round" href="/api-references/api-keys/create">
   List, create, and revoke organization API keys for automation.
@@ -43,12 +29,14 @@ Authorization: Bearer <api-key>
   Store, read, rotate, and delete user-owned automation secrets.
 </Card>
 
-<Card title="Agent Workspaces" icon="folder-code" href="/api-references/agent-workspaces">
-  Create workspaces, send messages, poll state, and archive agent work.
+## Agent runtime
+
+<Card title="Agent Chats" icon="folder-code" href="/api-references/agent-chats">
+  Create agent chats, send messages, poll state, and archive agent work.
 </Card>
 
-<Card title="WebSocket Gateway" icon="radio" href="/api-references/websocket-gateway">
-  Create gateway sessions, publish channel events, and offer work to workers.
+<Card title="WebSockets" icon="radio" href="/api-references/websockets">
+  Create sessions, publish channel events, and offer work to workers.
 </Card>
 
 <Card title="Computers" icon="server" href="/api-references/computers">
@@ -61,4 +49,24 @@ Authorization: Bearer <api-key>
 
 <Card title="Durable Execution" icon="workflow" href="/api-references/durable-execution">
   Register workflows, send events, inspect runs, and signal waiting work.
+</Card>
+
+## Version Control
+
+Git is Final's default version control implementation. Use these endpoints when agent or automation work needs repositories, pull requests, checks, or protected branch landing.
+
+<Card title="Repositories" icon="folder-git-2" href="/api-references/repositories/list">
+  Create repositories, manage repository lifecycle, and mint Git credentials.
+</Card>
+
+<Card title="Pull requests" icon="git-pull-request" href="/api-references/pull-requests/list">
+  Create, review, update, and stack pull requests.
+</Card>
+
+<Card title="Merge queues" icon="list-checks" href="/api-references/merge-queues/list">
+  Configure queues, enqueue pull requests, and inspect queue activity.
+</Card>
+
+<Card title="Checks" icon="badge-check" href="/api-references/checks/create-commit-status">
+  Report commit statuses and check runs for pull request and merge queue CI.
 </Card>

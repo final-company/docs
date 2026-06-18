@@ -40,23 +40,22 @@
             ]
           },
           {
-            "group": "Secrets",
+            "group": "Agent Chats",
             "pages": [
-              "developer-guides/secrets/index",
-              "developer-guides/secrets/store-and-rotate-secrets",
-              "developer-guides/secrets/use-secrets-with-agents"
+              "developer-guides/agent-chats/index",
+              "developer-guides/agent-chats/session-lifecycle",
+              "developer-guides/agent-chats/execution-modes",
+              "developer-guides/agent-chats/product-integration"
             ]
           },
           {
-            "group": "Git",
+            "group": "Agent Disk",
             "pages": [
-              "developer-guides/git/index",
-              "developer-guides/git/clone",
-              "developer-guides/git/pull-requests",
-              "developer-guides/git/stacked-prs",
-              "developer-guides/git/merge-queues",
-              "developer-guides/git/github-sync",
-              "developer-guides/git/manage"
+              "developer-guides/agent-disk/index",
+              "developer-guides/agent-disk/create-and-seed-disks",
+              "developer-guides/agent-disk/branches-and-checkpoints",
+              "developer-guides/agent-disk/access-and-sharing",
+              "developer-guides/agent-disk/usage-and-lifecycle"
             ]
           },
           {
@@ -72,31 +71,33 @@
             ]
           },
           {
-            "group": "Agent Disk",
+            "group": "Version Control",
             "pages": [
-              "developer-guides/agent-disk/index",
-              "developer-guides/agent-disk/create-and-seed-disks",
-              "developer-guides/agent-disk/branches-and-checkpoints",
-              "developer-guides/agent-disk/access-and-sharing",
-              "developer-guides/agent-disk/usage-and-lifecycle"
+              "developer-guides/git/index",
+              "developer-guides/git/create-repository",
+              "developer-guides/git/clone",
+              "developer-guides/git/pull-requests",
+              "developer-guides/git/stacked-prs",
+              "developer-guides/git/merge-queues",
+              "developer-guides/git/github-sync",
+              "developer-guides/git/manage"
             ]
           },
           {
-            "group": "Agent Workspaces",
+            "group": "Secrets",
             "pages": [
-              "developer-guides/agent-workspaces/index",
-              "developer-guides/agent-workspaces/session-lifecycle",
-              "developer-guides/agent-workspaces/execution-modes",
-              "developer-guides/agent-workspaces/product-integration"
+              "developer-guides/secrets/index",
+              "developer-guides/secrets/store-and-rotate-secrets",
+              "developer-guides/secrets/use-secrets-with-agents"
             ]
           },
           {
-            "group": "WebSocket Gateway",
+            "group": "WebSockets",
             "pages": [
-              "developer-guides/websocket-gateway/index",
-              "developer-guides/websocket-gateway/session-tokens-and-grants",
-              "developer-guides/websocket-gateway/channels",
-              "developer-guides/websocket-gateway/work-queues"
+              "developer-guides/websockets/index",
+              "developer-guides/websockets/session-tokens-and-grants",
+              "developer-guides/websockets/channels",
+              "developer-guides/websockets/work-queues"
             ]
           },
           {
@@ -115,6 +116,7 @@
       {
         "tab": "API Reference",
         "pages": [
+          "api-references/index",
           {
             "group": "Platform",
             "pages": [
@@ -189,127 +191,85 @@
             ]
           },
           {
-            "group": "Secrets",
+            "group": "Agent Chats",
             "pages": [
-              "api-references/secrets/list",
-              "api-references/secrets/create",
-              "api-references/secrets/get",
-              "api-references/secrets/update",
-              "api-references/secrets/delete",
-              "api-references/secrets/read-value",
-              "api-references/secrets/write-value"
-            ]
-          },
-          {
-            "group": "Git",
-            "pages": [
-              "api-references/index",
+              "api-references/agent-chats/index",
               {
-                "group": "Repositories",
+                "group": "Chats",
                 "pages": [
-                  "api-references/repositories/list",
-                  "api-references/repositories/create",
-                  "api-references/repositories/get",
-                  "api-references/repositories/archive",
-                  "api-references/repositories/delete",
-                  "api-references/repositories/mint-git-credentials"
-                ]
-              },
-              {
-                "group": "Pull requests",
-                "pages": [
-                  "api-references/pull-requests/list",
-                  "api-references/pull-requests/create",
-                  "api-references/pull-requests/get",
-                  "api-references/pull-requests/get-diff",
-                  "api-references/pull-requests/update",
-                  "api-references/pull-requests/create-review",
-                  "api-references/pull-requests/set-parent",
-                  "api-references/pull-requests/detach",
-                  "api-references/pull-requests/repair-stack",
-                  "api-references/pull-requests/split-stack",
-                  "api-references/pull-requests/reorder-stack"
-                ]
-              },
-              {
-                "group": "Merge queues",
-                "pages": [
-                  "api-references/merge-queues/list",
-                  "api-references/merge-queues/create-or-update",
-                  "api-references/merge-queues/enqueue",
-                  "api-references/merge-queues/list-entries",
-                  "api-references/merge-queues/list-attempts",
-                  "api-references/merge-queues/list-activity",
-                  "api-references/merge-queues/update-entry",
-                  "api-references/merge-queues/dequeue-entry",
-                  "api-references/merge-queues/reorder-entries"
-                ]
-              },
-              {
-                "group": "Checks",
-                "pages": [
-                  "api-references/checks/create-commit-status",
-                  "api-references/checks/create-check-run"
-                ]
-              }
-            ]
-          },
-          {
-            "group": "Agent Workspaces",
-            "pages": [
-              "api-references/agent-workspaces/index",
-              {
-                "group": "Workspaces",
-                "pages": [
-                  "api-references/agent-workspaces/workspaces/list",
-                  "api-references/agent-workspaces/workspaces/create",
-                  "api-references/agent-workspaces/workspaces/get",
-                  "api-references/agent-workspaces/workspaces/update",
-                  "api-references/agent-workspaces/workspaces/archive"
+                  "api-references/agent-chats/chats/list",
+                  "api-references/agent-chats/chats/create",
+                  "api-references/agent-chats/chats/get",
+                  "api-references/agent-chats/chats/update",
+                  "api-references/agent-chats/chats/archive"
                 ]
               },
               {
                 "group": "Sessions",
                 "pages": [
-                  "api-references/agent-workspaces/sessions/list",
-                  "api-references/agent-workspaces/sessions/create",
-                  "api-references/agent-workspaces/sessions/get",
-                  "api-references/agent-workspaces/sessions/update",
-                  "api-references/agent-workspaces/sessions/state",
-                  "api-references/agent-workspaces/sessions/stop",
-                  "api-references/agent-workspaces/sessions/archive"
+                  "api-references/agent-chats/sessions/list",
+                  "api-references/agent-chats/sessions/create",
+                  "api-references/agent-chats/sessions/get",
+                  "api-references/agent-chats/sessions/update",
+                  "api-references/agent-chats/sessions/state",
+                  "api-references/agent-chats/sessions/stop",
+                  "api-references/agent-chats/sessions/archive"
                 ]
               },
               {
                 "group": "Messages",
                 "pages": [
-                  "api-references/agent-workspaces/messages/list",
-                  "api-references/agent-workspaces/messages/send"
+                  "api-references/agent-chats/messages/list",
+                  "api-references/agent-chats/messages/send"
                 ]
               }
             ]
           },
           {
-            "group": "WebSocket Gateway",
+            "group": "Agent Disk",
             "pages": [
-              "api-references/websocket-gateway/index",
-              "api-references/websocket-gateway/meta",
+              "api-references/agent-disk/index",
               {
-                "group": "Sessions",
+                "group": "Disks",
                 "pages": [
-                  "api-references/websocket-gateway/sessions/create"
+                  "api-references/agent-disk/disks/list",
+                  "api-references/agent-disk/disks/create",
+                  "api-references/agent-disk/disks/get",
+                  "api-references/agent-disk/disks/delete"
                 ]
               },
               {
-                "group": "Channels",
+                "group": "Disk users",
                 "pages": [
-                  "api-references/websocket-gateway/channels/publish"
+                  "api-references/agent-disk/users/create",
+                  "api-references/agent-disk/users/delete"
                 ]
               },
               {
-                "group": "Work queues",
+                "group": "Checkpoints",
                 "pages": [
-                  "api-references/websocket-gateway/work-queues/offer"
+                  "api-references/agent-disk/checkpoints/list",
+                  "api-references/agent-disk/checkpoints/create"
+                ]
+              },
+              {
+                "group": "Branches",
+                "pages": [
+                  "api-references/agent-disk/branches/list",
+                  "api-references/agent-disk/branches/create",
+                  "api-references/agent-disk/branches/delete"
+                ]
+              },
+              {
+                "group": "Share links",
+                "pages": [
+                  "api-references/agent-disk/share/create"
+                ]
+              },
+              {
+                "group": "Usage",
+                "pages": [
+                  "api-references/agent-disk/usage/get"
                 ]
               }
             ]
@@ -388,50 +348,91 @@
             ]
           },
           {
-            "group": "Agent Disk",
+            "group": "Version Control",
             "pages": [
-              "api-references/agent-disk/index",
               {
-                "group": "Disks",
+                "group": "Repositories",
                 "pages": [
-                  "api-references/agent-disk/disks/list",
-                  "api-references/agent-disk/disks/create",
-                  "api-references/agent-disk/disks/get",
-                  "api-references/agent-disk/disks/delete"
+                  "api-references/repositories/list",
+                  "api-references/repositories/create",
+                  "api-references/repositories/get",
+                  "api-references/repositories/archive",
+                  "api-references/repositories/delete",
+                  "api-references/repositories/mint-git-credentials"
                 ]
               },
               {
-                "group": "Disk users",
+                "group": "Pull requests",
                 "pages": [
-                  "api-references/agent-disk/users/create",
-                  "api-references/agent-disk/users/delete"
+                  "api-references/pull-requests/list",
+                  "api-references/pull-requests/create",
+                  "api-references/pull-requests/get",
+                  "api-references/pull-requests/get-diff",
+                  "api-references/pull-requests/update",
+                  "api-references/pull-requests/create-review",
+                  "api-references/pull-requests/set-parent",
+                  "api-references/pull-requests/detach",
+                  "api-references/pull-requests/repair-stack",
+                  "api-references/pull-requests/split-stack",
+                  "api-references/pull-requests/reorder-stack"
                 ]
               },
               {
-                "group": "Checkpoints",
+                "group": "Merge queues",
                 "pages": [
-                  "api-references/agent-disk/checkpoints/list",
-                  "api-references/agent-disk/checkpoints/create"
+                  "api-references/merge-queues/list",
+                  "api-references/merge-queues/create-or-update",
+                  "api-references/merge-queues/enqueue",
+                  "api-references/merge-queues/list-entries",
+                  "api-references/merge-queues/list-attempts",
+                  "api-references/merge-queues/list-activity",
+                  "api-references/merge-queues/update-entry",
+                  "api-references/merge-queues/dequeue-entry",
+                  "api-references/merge-queues/reorder-entries"
                 ]
               },
               {
-                "group": "Branches",
+                "group": "Checks",
                 "pages": [
-                  "api-references/agent-disk/branches/list",
-                  "api-references/agent-disk/branches/create",
-                  "api-references/agent-disk/branches/delete"
+                  "api-references/checks/create-commit-status",
+                  "api-references/checks/create-check-run"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Secrets",
+            "pages": [
+              "api-references/secrets/list",
+              "api-references/secrets/create",
+              "api-references/secrets/get",
+              "api-references/secrets/update",
+              "api-references/secrets/delete",
+              "api-references/secrets/read-value",
+              "api-references/secrets/write-value"
+            ]
+          },
+          {
+            "group": "WebSockets",
+            "pages": [
+              "api-references/websockets/index",
+              "api-references/websockets/meta",
+              {
+                "group": "Sessions",
+                "pages": [
+                  "api-references/websockets/sessions/create"
                 ]
               },
               {
-                "group": "Share links",
+                "group": "Channels",
                 "pages": [
-                  "api-references/agent-disk/share/create"
+                  "api-references/websockets/channels/publish"
                 ]
               },
               {
-                "group": "Usage",
+                "group": "Work queues",
                 "pages": [
-                  "api-references/agent-disk/usage/get"
+                  "api-references/websockets/work-queues/offer"
                 ]
               }
             ]
@@ -478,72 +479,8 @@
   },
   "redirects": [
     {
-      "source": "/agent-workspaces",
-      "destination": "/developer-guides/agent-workspaces"
-    },
-    {
       "source": "/api-reference",
       "destination": "/api-references"
-    },
-    {
-      "source": "/api-reference/agent-workspaces",
-      "destination": "/api-references/agent-workspaces"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/messages/list",
-      "destination": "/api-references/agent-workspaces/messages/list"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/messages/send",
-      "destination": "/api-references/agent-workspaces/messages/send"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/sessions/archive",
-      "destination": "/api-references/agent-workspaces/sessions/archive"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/sessions/create",
-      "destination": "/api-references/agent-workspaces/sessions/create"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/sessions/get",
-      "destination": "/api-references/agent-workspaces/sessions/get"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/sessions/list",
-      "destination": "/api-references/agent-workspaces/sessions/list"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/sessions/state",
-      "destination": "/api-references/agent-workspaces/sessions/state"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/sessions/stop",
-      "destination": "/api-references/agent-workspaces/sessions/stop"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/sessions/update",
-      "destination": "/api-references/agent-workspaces/sessions/update"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/workspaces/archive",
-      "destination": "/api-references/agent-workspaces/workspaces/archive"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/workspaces/create",
-      "destination": "/api-references/agent-workspaces/workspaces/create"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/workspaces/get",
-      "destination": "/api-references/agent-workspaces/workspaces/get"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/workspaces/list",
-      "destination": "/api-references/agent-workspaces/workspaces/list"
-    },
-    {
-      "source": "/api-reference/agent-workspaces/workspaces/update",
-      "destination": "/api-references/agent-workspaces/workspaces/update"
     },
     {
       "source": "/api-reference/api-keys/create",

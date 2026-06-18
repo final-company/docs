@@ -1,0 +1,258 @@
+---
+title: "WebSockets"
+description: "Create scoped realtime sessions, publish channel events, and dispatch work over hosted WebSockets."
+---
+
+WebSockets gives your applications a hosted realtime connection layer. Use it to connect browser clients, backend services, and workers without exposing long-lived API keys to WebSocket clients.
+
+Your server creates a short-lived WebSockets session token with the public REST API. The client then connects to the returned WebSocket URL with that token. API-key-backed sessions use the delegated credential lifecycle internally.
+
+<Card title="WebSockets API reference" icon="book-open" href="/api-references/websockets">
+  Browse the REST endpoints for WebSockets metadata, session tokens, channel publishing, and work offers.
+</Card>
+
+<Card title="Session tokens and grants" icon="key-round" href="/developer-guides/websockets/session-tokens-and-grants">
+  Mint short-lived WebSocket credentials with scoped access for browsers, services, and workers.
+</Card>
+
+<Card title="Channels" icon="radio" href="/developer-guides/websockets/channels">
+  Publish and subscribe to owner-scoped realtime events.
+</Card>
+
+<Card title="Work queues" icon="briefcase-business" href="/developer-guides/websockets/work-queues">
+  Dispatch leased work to connected workers over WebSocket.
+</Card>
+
+## What you can build
+
+| Use case | How WebSockets helps |
+| --- | --- |
+| Live agent progress | Publish status, logs, or generated events from your server to a browser session. |
+| Collaborative product surfaces | Put browsers and services on owner-scoped channels such as `agent-chat:chat_123`. |
+| Connected workers | Dispatch jobs over work queues to workers that maintain an open WebSocket connection. |
+| Scoped browser clients | Give a browser access to one channel or queue without sending it a Final API key. |
+| Service bridges and RPC | Use grants for RPC or bridges when services need direct realtime request and response paths. |
+
+WebSockets is a transport layer. It does not decide what your events mean. Your application defines channel names, event names, payloads, and worker behavior.
+
+## Core concepts
+
+| Concept | Description |
+| --- | --- |
+| Session token | A short-lived token minted by your server for a browser, service, or worker client. |
+| Grant | Scoped access to a channel, RPC name, bridge, or work queue. |
+| Channel | An owner-local pub/sub stream for application events. |
+| Work queue | A named queue that offers leases to connected workers. |
+| Client ID | An app-defined identifier for the connected client. |
+| Tenant scope | The owner boundary derived from the API key that minted the token. User-owned and team-owned channels with the same name are isolated. |
+
+## Before you begin
+
+You need a user-owned or team-owned API key for `https://api.final.ai`. See [authentication](/developer-guides/authentication) for bearer auth examples.
+
+The API key must have WebSockets permissions required by the grants or operation you request.
+
+WebSockets resources are scoped to the API key owner. A user-owned key and a team-owned key can both use a channel named `chat`, but those channels are isolated from each other.
+
+| Permission | Enables |
+| --- | --- |
+| `websockets:connect` | Create WebSockets session tokens. |
+| `websockets:publish` | Grant channel publish access or publish channel events through the REST API. |
+| `websockets:history` | Grant channel history access. |
+| `websockets:presence` | Grant channel presence access. |
+| `websockets:rpc` | Grant RPC send or receive access. |
+| `websockets:bridge` | Grant bridge join, send, or receive access. |
+| `websockets:work` | Grant work queue access or offer work through the REST API. |
+
+## Connection flow
+
+1. Your server authenticates to `api.final.ai` with a Final API key.
+2. Your server creates a WebSockets session token with narrow grants and a short TTL.
+3. Your browser, service, or worker connects to the returned WebSocket URL.
+4. The client sends an `auth` frame with the session token.
+5. The client subscribes, publishes, receives work, or performs the operations covered by its grants.
+6. Your server refreshes by minting a new token when the client needs to reconnect after expiry.
+
+Do not send the Final API key to the WebSocket client. The API key belongs on your server.
+
+## Get WebSockets metadata
+
+Read the active protocol version and WebSocket URL:
+
+```bash
+curl "https://api.final.ai/v1/websockets/meta" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+The response includes the WebSocket URL clients should connect to:
+
+```json
+{
+  "protocolVersion": 1,
+  "url": "wss://ws.api.final.ai/connect"
+}
+```
+
+## Create a session token
+
+Create a short-lived token with the least access the client needs.
+
+Set `CHANNEL_NAME` to the channel your application uses for chat messages. Channel names are owner-local. Final derives the user or team scope from the API key when it mints the session token.
+
+```bash
+CHANNEL_NAME="chat"
+
+curl -X POST "https://api.final.ai/v1/websockets/sessions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "clientId": "browser_1",
+  "ttlMs": 600000,
+  "grants": {
+    "channels": [
+      {
+        "name": "${CHANNEL_NAME}",
+        "access": ["subscribe", "publish"]
+      }
+    ]
+  },
+  "metadata": {
+    "app": "customer-portal"
+  }
+}
+EOF
+```
+
+The response includes `url`, `protocolVersion`, `token`, `expiresAt`, and `jti`.
+
+For clients that need explicit credential lifecycle fields such as `id`, `refreshAfter`, and `refreshBefore`, mint a `websockets` delegated credential with [create a delegated credential](/api-references/delegated-credentials/create).
+
+Send `chat`, `room:123`, or another app-defined channel name. Do not prefix resource names with `user:` or `team:`.
+
+If you decode a session token while debugging, use the `tenantId` claim to identify the owner scope. User-owned keys use a user tenant, and team-owned keys use a team tenant. Tenant IDs contain public wire IDs, such as `user:org_...:usr_...` or `team:org_...:team_...`.
+
+## Connect over WebSocket
+
+Pass `protocolVersion` in the URL. Then send the session token as the first frame after the socket opens. Do not put the token in the query string.
+
+```js
+const channelName = "chat";
+const authRequestId = "auth-1";
+
+const socket = new WebSocket(
+  `${session.url}?protocolVersion=${session.protocolVersion}`,
+);
+
+socket.addEventListener("open", () => {
+  socket.send(JSON.stringify({
+    id: authRequestId,
+    type: "auth",
+    token: session.token,
+  }));
+});
+
+socket.addEventListener("message", (event) => {
+  const frame = JSON.parse(event.data);
+
+  if (
+    frame.type === "ack" &&
+    frame.operation === "auth" &&
+    frame.requestId === authRequestId
+  ) {
+    socket.send(JSON.stringify({
+      type: "channel.subscribe",
+      channel: channelName,
+    }));
+  }
+
+  if (frame.type === "channel.message") {
+    console.log(frame.message.name, frame.message.data);
+  }
+});
+```
+
+## Publish a channel event from your server
+
+For server-originated events, publish through the REST API. The API creates a WebSockets-scoped publish token internally, so you do not need to hold a WebSocket connection open.
+
+Set `CHANNEL_NAME` to the same app-defined channel name used in the session grant.
+
+```bash
+CHANNEL_NAME="chat"
+
+curl -X POST "https://api.final.ai/v1/websockets/channels/${CHANNEL_NAME}/events" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "message.created",
+    "data": {
+      "text": "hello"
+    },
+    "idempotencyKey": "message_001"
+  }'
+```
+
+Use `idempotencyKey` when the publish is tied to a retried job, webhook, or database transaction.
+
+See [publish a channel event](/api-references/websockets/channels/publish).
+
+## Dispatch work to connected workers
+
+Use work queues when you need connected workers to lease and complete jobs.
+
+Create a worker session token with work queue access:
+
+```bash
+curl -X POST "https://api.final.ai/v1/websockets/sessions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "worker_1",
+    "grants": {
+      "workQueues": [
+        {
+          "name": "customer-jobs",
+          "access": ["lease", "heartbeat", "complete", "fail"]
+        }
+      ]
+    }
+  }'
+```
+
+Offer work through the REST API:
+
+```bash
+curl -X POST "https://api.final.ai/v1/websockets/work-queues/customer-jobs/offers" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leaseId": "lease_001",
+    "payload": {
+      "jobId": "job_001"
+    }
+  }'
+```
+
+Connected workers receive a `work.offer` frame. They should accept the lease, send heartbeats while processing, and complete or fail the lease when finished.
+
+See [offer work](/api-references/websockets/work-queues/offer).
+
+## Grant types
+
+| Grant | Access values |
+| --- | --- |
+| `channels` | `subscribe`, `publish`, `history`, `presence` |
+| `rpc` | `send`, `receive` |
+| `bridges` | `join`, `send`, `receive` |
+| `workQueues` | `lease`, `heartbeat`, `complete`, `fail` |
+
+Use `limits` on a grant to restrict `maxFrameBytes`, `maxFramesPerMinute`, or `maxSubscriptions`.
+
+## Design guidance
+
+Mint tokens for one client purpose at a time. A browser that only reads progress needs `subscribe`, not `publish`. A worker that processes jobs needs work queue access, not channel access.
+
+Prefer channel names that map to your product model, such as `agent-chat:chat_123`, `run:run_123`, or `room:billing`. They are app-defined strings, but consistent names make grants, logs, and debugging easier to reason about.
+
+Use REST publishing for server-originated events. Use WebSocket publishing for clients that already have a live connection and a publish grant.

@@ -10,7 +10,7 @@ security:
 tags:
   - name: API keys
   - name: Organizations
-  - name: Agent workspaces
+  - name: Agent chats
   - name: Agent sessions
   - name: Agent messages
   - name: Repositories
@@ -113,34 +113,34 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces:
+  /v1/agent-chats:
     get:
-      operationId: listAgentWorkspaces
-      tags: [Agent workspaces]
-      summary: List agent workspaces
-      description: List active agent workspaces visible to the authenticated API key.
+      operationId: listAgentChats
+      tags: [Agent chats]
+      summary: List agent chats
+      description: List active agent chats visible to the authenticated API key.
       parameters:
         - $ref: "#/components/parameters/Limit"
       responses:
         "200":
-          description: Agent workspaces were returned.
+          description: Agent chats were returned.
           content:
             application/json:
               schema:
                 type: object
-                required: [workspaces]
+                required: [agentChats]
                 properties:
-                  workspaces:
+                  agentChats:
                     type: array
                     items:
-                      $ref: "#/components/schemas/AgentWorkspace"
+                      $ref: "#/components/schemas/AgentChat"
         "401":
           $ref: "#/components/responses/Unauthorized"
     post:
-      operationId: createAgentWorkspace
-      tags: [Agent workspaces]
-      summary: Create an agent workspace
-      description: "Create an agent workspace and its main session. Organization-owned and team-owned API keys must provide `agentProfileId`."
+      operationId: createAgentChat
+      tags: [Agent chats]
+      summary: Create an agent chat
+      description: "Create an agent chat and its main session. Organization-owned and team-owned API keys must provide `agentProfileId`."
       parameters:
         - name: Idempotency-Key
           in: header
@@ -150,7 +150,7 @@ paths:
         - name: expand
           in: query
           required: false
-          description: Optional expansion forwarded to the workspace service.
+          description: Optional expansion forwarded to the agent chat service.
           schema:
             type: string
             example: mainSession
@@ -159,18 +159,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateAgentWorkspaceRequest"
+              $ref: "#/components/schemas/CreateAgentChatRequest"
       responses:
         "201":
-          description: Agent workspace was created.
+          description: Agent chat was created.
           content:
             application/json:
               schema:
                 type: object
-                required: [workspace, session]
+                required: [agentChat, session]
                 properties:
-                  workspace:
-                    $ref: "#/components/schemas/AgentWorkspace"
+                  agentChat:
+                    $ref: "#/components/schemas/AgentChat"
                   session:
                     $ref: "#/components/schemas/AgentSession"
                   command:
@@ -185,65 +185,65 @@ paths:
           $ref: "#/components/responses/Error"
         "412":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}:
+  /v1/agent-chats/{agentChatId}:
     parameters:
-      - $ref: "#/components/parameters/AgentWorkspaceId"
+      - $ref: "#/components/parameters/AgentChatId"
     get:
-      operationId: getAgentWorkspace
-      tags: [Agent workspaces]
-      summary: Get an agent workspace
+      operationId: getAgentChat
+      tags: [Agent chats]
+      summary: Get an agent chat
       responses:
         "200":
-          description: Agent workspace was returned.
+          description: Agent chat was returned.
           content:
             application/json:
               schema:
                 type: object
-                required: [workspace]
+                required: [agentChat]
                 properties:
-                  workspace:
-                    $ref: "#/components/schemas/AgentWorkspace"
+                  agentChat:
+                    $ref: "#/components/schemas/AgentChat"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
     patch:
-      operationId: updateAgentWorkspace
-      tags: [Agent workspaces]
-      summary: Update an agent workspace
+      operationId: updateAgentChat
+      tags: [Agent chats]
+      summary: Update an agent chat
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateAgentWorkspaceRequest"
+              $ref: "#/components/schemas/UpdateAgentChatRequest"
       responses:
         "200":
-          description: Agent workspace was updated.
+          description: Agent chat was updated.
           content:
             application/json:
               schema:
                 type: object
-                required: [workspace]
+                required: [agentChat]
                 properties:
-                  workspace:
-                    $ref: "#/components/schemas/AgentWorkspace"
+                  agentChat:
+                    $ref: "#/components/schemas/AgentChat"
         "400":
           $ref: "#/components/responses/InvalidRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}/archive:
+  /v1/agent-chats/{agentChatId}/archive:
     post:
-      operationId: archiveAgentWorkspace
-      tags: [Agent workspaces]
-      summary: Archive an agent workspace
+      operationId: archiveAgentChat
+      tags: [Agent chats]
+      summary: Archive an agent chat
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
       responses:
         "200":
-          description: Agent workspace was archived.
+          description: Agent chat was archived.
           content:
             application/json:
               schema:
@@ -256,13 +256,13 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}/sessions:
+  /v1/agent-chats/{agentChatId}/sessions:
     get:
-      operationId: listAgentWorkspaceSessions
+      operationId: listAgentChatSessions
       tags: [Agent sessions]
-      summary: List workspace sessions
+      summary: List agent chat sessions
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
         - $ref: "#/components/parameters/Limit"
       responses:
         "200":
@@ -282,11 +282,11 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     post:
-      operationId: createAgentWorkspaceSession
+      operationId: createAgentChatSession
       tags: [Agent sessions]
-      summary: Create a workspace session
+      summary: Create an agent chat session
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
       requestBody:
         required: true
         content:
@@ -310,14 +310,14 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}:
+  /v1/agent-chats/{agentChatId}/sessions/{sessionId}:
     parameters:
-      - $ref: "#/components/parameters/AgentWorkspaceId"
+      - $ref: "#/components/parameters/AgentChatId"
       - $ref: "#/components/parameters/AgentSessionId"
     get:
-      operationId: getAgentWorkspaceSession
+      operationId: getAgentChatSession
       tags: [Agent sessions]
-      summary: Get a workspace session
+      summary: Get an agent chat session
       responses:
         "200":
           description: Session was returned.
@@ -334,9 +334,9 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     patch:
-      operationId: updateAgentWorkspaceSession
+      operationId: updateAgentChatSession
       tags: [Agent sessions]
-      summary: Update a workspace session
+      summary: Update an agent chat session
       requestBody:
         required: true
         content:
@@ -360,13 +360,13 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/archive:
+  /v1/agent-chats/{agentChatId}/sessions/{sessionId}/archive:
     post:
-      operationId: archiveAgentWorkspaceSession
+      operationId: archiveAgentChatSession
       tags: [Agent sessions]
-      summary: Archive a workspace session
+      summary: Archive an agent chat session
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
         - $ref: "#/components/parameters/AgentSessionId"
       responses:
         "200":
@@ -383,13 +383,13 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/messages:
+  /v1/agent-chats/{agentChatId}/sessions/{sessionId}/messages:
     get:
-      operationId: listAgentWorkspaceSessionMessages
+      operationId: listAgentChatSessionMessages
       tags: [Agent messages]
       summary: List session messages
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
         - $ref: "#/components/parameters/AgentSessionId"
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
@@ -414,11 +414,11 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
     post:
-      operationId: sendAgentWorkspaceSessionMessage
+      operationId: sendAgentChatSessionMessage
       tags: [Agent messages]
       summary: Send a session message
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
         - $ref: "#/components/parameters/AgentSessionId"
       requestBody:
         required: true
@@ -444,13 +444,13 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/state:
+  /v1/agent-chats/{agentChatId}/sessions/{sessionId}/state:
     get:
-      operationId: getAgentWorkspaceSessionState
+      operationId: getAgentChatSessionState
       tags: [Agent sessions]
       summary: Get session state
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
         - $ref: "#/components/parameters/AgentSessionId"
       responses:
         "200":
@@ -467,13 +467,13 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/Error"
-  /v1/agent-workspaces/{workspaceId}/sessions/{sessionId}/stop:
+  /v1/agent-chats/{agentChatId}/sessions/{sessionId}/stop:
     post:
-      operationId: stopAgentWorkspaceSession
+      operationId: stopAgentChatSession
       tags: [Agent sessions]
       summary: Stop a running session
       parameters:
-        - $ref: "#/components/parameters/AgentWorkspaceId"
+        - $ref: "#/components/parameters/AgentChatId"
         - $ref: "#/components/parameters/AgentSessionId"
       responses:
         "200":
@@ -1216,13 +1216,13 @@ components:
       schema:
         type: string
       description: Merge queue entry ID.
-    AgentWorkspaceId:
-      name: workspaceId
+    AgentChatId:
+      name: agentChatId
       in: path
       required: true
       schema:
         type: string
-      description: Encoded agent workspace ID.
+      description: Encoded agent chat ID.
     AgentSessionId:
       name: sessionId
       in: path
@@ -1332,7 +1332,7 @@ components:
         kind:
           type: string
           nullable: true
-          enum: [general, durable_worker, repository_automation, websocket_issuer]
+          enum: [general, durable_worker, repository_automation, websockets_issuer]
           description: API key kind. Specialized kinds can mint only matching delegated credential kinds.
           example: repository_automation
         resourceRestrictions:
@@ -1387,7 +1387,7 @@ components:
         kind:
           type: string
           nullable: true
-          enum: [general, durable_worker, repository_automation, websocket_issuer]
+          enum: [general, durable_worker, repository_automation, websockets_issuer]
           description: Optional key kind. If the caller key has a specialized kind, the child key must use the same kind.
           example: repository_automation
         resourceRestrictions:
@@ -1403,7 +1403,7 @@ components:
           format: date-time
           nullable: true
           description: "Expiration time for the key. Omit or pass `null` for no expiration."
-    AgentWorkspace:
+    AgentChat:
       type: object
       required:
         - id
@@ -1420,7 +1420,7 @@ components:
       properties:
         id:
           type: string
-          example: wksp_123
+          example: chat_123
         title:
           type: string
           nullable: true
@@ -1458,7 +1458,7 @@ components:
       type: object
       required:
         - id
-        - workspaceId
+        - agentChatId
         - title
         - provider
         - modelId
@@ -1475,10 +1475,10 @@ components:
         id:
           type: string
           example: sess_123
-        workspaceId:
+        agentChatId:
           type: string
           nullable: true
-          example: wksp_123
+          example: chat_123
         title:
           type: string
           nullable: true
@@ -1518,7 +1518,7 @@ components:
         lastActivityAt:
           type: string
           format: date-time
-    CreateAgentWorkspaceRequest:
+    CreateAgentChatRequest:
       type: object
       required: [executionMode]
       additionalProperties: false
@@ -1533,7 +1533,7 @@ components:
         repositoryId:
           type: string
           nullable: true
-          description: Repository to mount into the workspace.
+          description: Repository to mount into the agent chat.
           example: gsr_123
         workspaceDir:
           type: string
@@ -1550,7 +1550,7 @@ components:
           description: Where the session should run. Use `cloud` for Final-managed cloud execution or `local` to target local execution.
         message:
           type: string
-          description: Optional first user message to submit after the workspace is created.
+          description: Optional first user message to submit after the agent chat is created.
           example: Start work
     CreateAgentSessionRequest:
       type: object
@@ -1567,7 +1567,7 @@ components:
         repositoryId:
           type: string
           nullable: true
-          description: Repository to mount for this session when the workspace does not already have one.
+          description: Repository to mount for this session when the agent chat does not already have one.
           example: gsr_123
         workspaceDir:
           type: string
@@ -1576,13 +1576,13 @@ components:
         finalNodeId:
           type: string
           nullable: true
-          description: Existing Final Node to run on. Defaults to the workspace node when present.
+          description: Existing Final Node to run on. Defaults to the agent chat node when present.
           example: fnod_123
         executionMode:
           type: string
           enum: [local, cloud]
           description: Where the session should run. Use `cloud` for Final-managed cloud execution or `local` to target local execution.
-    UpdateAgentWorkspaceRequest:
+    UpdateAgentChatRequest:
       type: object
       properties:
         title:

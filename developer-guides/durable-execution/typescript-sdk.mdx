@@ -107,7 +107,7 @@ const connection = await connect({
 1. It builds function manifests from your SDK definitions.
 2. It calls the REST API with your Final API key.
 3. It creates a short-lived `durable_worker` delegated credential.
-4. It receives the WebSocket gateway URL, worker queues, and a short-lived gateway token.
+4. It receives the WebSocket URL, worker queues, and a short-lived session token.
 5. It opens the WebSocket worker connection and refreshes credentials as soon as they are refreshable.
 6. It drains in-flight work on `SIGTERM` and `SIGINT` by default.
 
@@ -166,6 +166,6 @@ The SDK mints short-lived `durable_worker` delegated credentials through the RES
 
 ## Runtime model
 
-Durable Execution workers are WebSocket-only. New workflow registrations use the `websocket` runtime, with the gateway URL and queue assigned during worker connection.
+Durable Execution workers are WebSocket-only. New workflow registrations use the `websocket` runtime, with the WebSocket URL and queue assigned during worker connection.
 
 For the raw endpoint shape, see [register a workflow](/api-references/durable-execution/workflows/register).

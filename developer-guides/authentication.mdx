@@ -19,10 +19,10 @@ https://api.final.ai
 
 | Credential | Use it for |
 | --- | --- |
-| Organization API key | Organization-scoped REST APIs, organization management, Computers team-owned creation with `teamId`, Agent Workspaces through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
-| Team API key | Team-scoped REST APIs and team-owned delegated credential minting for WebSocket Gateway and Durable Execution workers. |
-| User API key | User-scoped REST APIs and delegated credential minting for Git, WebSocket Gateway, and Durable Execution workers. |
-| Delegated credential | Short-lived protocol credentials returned by the API, such as Git HTTPS credentials, WebSocket Gateway tokens, and Durable Execution worker credentials. |
+| Organization API key | Organization-scoped REST APIs, organization management, Computers team-owned creation with `teamId`, Agent Chats through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
+| Team API key | Team-scoped REST APIs and team-owned delegated credential minting for WebSockets and Durable Execution workers. |
+| User API key | User-scoped REST APIs and delegated credential minting for Git, WebSockets, and Durable Execution workers. |
+| Delegated credential | Short-lived protocol credentials returned by the API, such as Git HTTPS credentials, WebSockets tokens, and Durable Execution worker credentials. |
 | computer token | Scoped Computer access where computer tokens are supported. computer tokens do not authenticate public API requests to `api.final.ai`. |
 
 ## Use API keys
@@ -40,11 +40,11 @@ export FINAL_API_KEY="<api-key>"
 Call public API endpoints with bearer auth:
 
 ```bash
-curl "https://api.final.ai/v1/agent-workspaces" \
+curl "https://api.final.ai/v1/agent-chats" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
-API keys are the only customer credentials accepted as bearer tokens on the public REST API. Do not send Git credentials, WebSocket Gateway tokens, Durable worker tokens, computer tokens, or console session cookies to `api.final.ai`.
+API keys are the only customer credentials accepted as bearer tokens on the public REST API. Do not send Git credentials, WebSockets tokens, Durable worker tokens, computer tokens, or console session cookies to `api.final.ai`.
 
 ## Use delegated credentials
 
@@ -53,7 +53,7 @@ Delegated credentials are short-lived credentials minted from a Final API key. T
 | Kind | Use it for |
 | --- | --- |
 | `git` | Git clone, fetch, and push against one repository. |
-| `websocket` | WebSocket Gateway client sessions. |
+| `websockets` | WebSockets client sessions. |
 | `durable_worker` | Durable Execution worker WebSocket sessions. |
 
 Refresh a delegated credential only during its refresh window. Refresh and revoke requests must use the same API key that created the credential. See [Delegated credentials](/developer-guides/delegated-credentials) and the [Delegated credentials API reference](/api-references/delegated-credentials).
@@ -98,15 +98,15 @@ Use API key kinds and resource restrictions to limit what a key can mint.
 | --- | --- |
 | `general` | Any credential allowed by the key permissions and restrictions. |
 | `repository_automation` | `git` credentials. |
-| `websocket_issuer` | `websocket` credentials. |
+| `websockets_issuer` | `websockets` credentials. |
 | `durable_worker` | `durable_worker` credentials. |
 
 | Restriction | Applies to | Example |
 | --- | --- | --- |
-| `audiences` | All delegated credentials | `["git"]`, `["websocket-gateway"]`, `["durable-execution"]` |
+| `audiences` | All delegated credentials | `["git"]`, `["websockets"]`, `["durable-execution"]` |
 | `repositories` | Git credentials | `["gsr_123"]` |
 | `namespaces` | Durable worker credentials | `["billing"]` |
-| `websocketResources` | WebSocket credentials | `["channel:chat", "work:customer-jobs"]` |
+| `websocketsResources` | WebSockets credentials | `["channel:chat", "work:customer-jobs"]` |
 
 Use `*` inside a restriction list to allow every value for that restriction. An empty list denies every value.
 
@@ -114,29 +114,29 @@ Use `*` inside a restriction list to allow every value for that restriction. An 
 
 Most public APIs return Final wire IDs for Final-minted resources. Use these IDs in API requests instead of raw UUIDs when an endpoint returns a prefixed ID.
 
-Common prefixes include `org_` for organizations, `usr_` for users, `team_` for teams, `ak_` for API keys, `prof_` for agent profiles, `wksp_` for agent workspaces, `sess_` for agent sessions, `fnod_` for Final Nodes, `gsr_` for Git repositories, `dsk_` for Agent Disks, and `comp_` for Computers. Computer subresources use prefixes such as `cshr_` for shares, `cdmn_` for custom domains, `ctok_` for computer tokens, and `cssh_` for SSH keys.
+Common prefixes include `org_` for organizations, `usr_` for users, `team_` for teams, `ak_` for API keys, `prof_` for agent profiles, `chat_` for agent chats, `sess_` for agent sessions, `fnod_` for Final Nodes, `gsr_` for Git repositories, `dsk_` for Agent Disks, and `comp_` for Computers. Computer subresources use prefixes such as `cshr_` for shares, `cdmn_` for custom domains, `ctok_` for computer tokens, and `cssh_` for SSH keys.
 
 Secrets are an exception. The Secrets API returns UUID secret IDs, and you can use either the UUID or the secret name in `secretId` path parameters.
 
-## Authenticate Agent Workspaces
+## Authenticate Agent Chats
 
-Agent Workspaces accepts organization-owned, team-owned, and user-owned API keys.
+Agent Chats accepts organization-owned, team-owned, and user-owned API keys.
 
-Organization-owned keys create workspaces through an agent profile. Include `agentProfileId` when you create a workspace or session.
+Organization-owned keys create agent chats through an agent profile. Include `agentProfileId` when you create an agent chat or session.
 
-Team-owned keys also require `agentProfileId`. The profile must belong to the same team as the API key, and list/get/update requests are scoped to that team's workspaces.
+Team-owned keys also require `agentProfileId`. The profile must belong to the same team as the API key, and list/get/update requests are scoped to that team's agent chats.
 
-User-owned keys create workspaces as the key owner and do not require `agentProfileId`.
+User-owned keys create agent chats as the key owner and do not require `agentProfileId`.
 
-See [Agent Workspaces](/developer-guides/agent-workspaces) and the [Agent Workspaces API reference](/api-references/agent-workspaces).
+See [Agent Chats](/developer-guides/agent-chats) and the [Agent Chats API reference](/api-references/agent-chats).
 
-## Authenticate WebSocket Gateway requests
+## Authenticate WebSockets requests
 
-Use a user-owned or team-owned API key to create short-lived WebSocket Gateway session tokens and to publish server-side channel or work queue events. Organization-owned API keys cannot mint or use gateway-scoped resources.
+Use a user-owned or team-owned API key to create short-lived WebSockets session tokens and to publish server-side channel or work queue events. Organization-owned API keys cannot mint or use WebSockets-scoped resources.
 
-Gateway session tokens are scoped to the API key owner and expire quickly. API-key backed session creation uses the delegated credential lifecycle internally. Do not send your API key to browser or worker clients. Create a session token from your server, then pass the returned token and gateway URL to the client.
+WebSockets session tokens are scoped to the API key owner and expire quickly. API-key-backed session creation uses the delegated credential lifecycle internally. Do not send your API key to browser or worker clients. Create a session token from your server, then pass the returned token and WebSocket URL to the client.
 
-See [WebSocket Gateway](/developer-guides/websocket-gateway) and the [WebSocket Gateway API reference](/api-references/websocket-gateway).
+See [WebSockets](/developer-guides/websockets) and the [WebSockets API reference](/api-references/websockets).
 
 ## Authenticate Computers requests
 
