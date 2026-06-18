@@ -27,7 +27,8 @@
           {
             "group": "Platform",
             "pages": [
-              "developer-guides/authentication"
+              "developer-guides/authentication",
+              "developer-guides/delegated-credentials"
             ]
           },
           {
@@ -99,6 +100,16 @@
                 "group": "API keys",
                 "pages": [
                   "api-references/api-keys/create"
+                ]
+              },
+              {
+                "group": "Delegated credentials",
+                "pages": [
+                  "api-references/delegated-credentials/index",
+                  "api-references/delegated-credentials/create",
+                  "api-references/delegated-credentials/get",
+                  "api-references/delegated-credentials/refresh",
+                  "api-references/delegated-credentials/revoke"
                 ]
               }
             ]

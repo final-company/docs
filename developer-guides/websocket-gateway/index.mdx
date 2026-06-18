@@ -5,7 +5,7 @@ description: "Create scoped realtime sessions, publish channel events, and dispa
 
 The WebSocket Gateway gives your applications a hosted realtime connection layer. Use it to connect browser clients, backend services, and workers without exposing long-lived API keys to WebSocket clients.
 
-Your server creates a short-lived gateway session token with the public REST API. The client then connects to the returned WebSocket URL with that token.
+Your server creates a short-lived gateway session token with the public REST API. The client then connects to the returned WebSocket URL with that token. API-key backed sessions use the delegated credential lifecycle internally.
 
 <Card title="WebSocket Gateway API reference" icon="book-open" href="/api-references/websocket-gateway">
   Browse the REST endpoints for gateway metadata, session tokens, channel publishing, and work offers.
@@ -79,6 +79,8 @@ EOF
 ```
 
 The response includes `url`, `protocolVersion`, `token`, `expiresAt`, and `jti`.
+
+For clients that need explicit credential lifecycle fields such as `id`, `refreshAfter`, and `refreshBefore`, mint a `websocket` delegated credential with [create a delegated credential](/api-references/delegated-credentials/create).
 
 Send `chat`, `room:123`, or another app-defined channel name. Do not prefix resource names with `user:` or `team:`.
 

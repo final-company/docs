@@ -10,13 +10,12 @@ Use the Durable Execution TypeScript SDK to define functions and connect workers
 You need:
 
 - A user-owned or team-owned API key for public REST API calls.
-- A Durable Execution connect key for the namespace worker.
 - Your Final organization ID, as an `org_` ID.
 - Your Final user ID (`usr_`) or team ID (`team_`).
 
 Organization admins can create API keys in Final under **Settings** > **API Keys**.
 
-Set the base URL, API key, namespace, organization ID, owner user ID, and connect key:
+Set the base URL, API key, namespace, organization ID, and owner user ID:
 
 ```bash
 export FINAL_API_URL="https://api.final.ai"
@@ -24,7 +23,6 @@ export FINAL_API_KEY="<api-key>"
 export FINAL_DURABLE_NAMESPACE="billing"
 export FINAL_ORGANIZATION_ID="org_1111117Hxt1fAWDjN7TW"
 export FINAL_OWNER_USER_ID="usr_1111117Hxt1fAWDjN7TX"
-export FINAL_DURABLE_CONNECT_KEY="<connect-key>"
 ```
 
 For a team-owned durable namespace, use a team-owned API key and pass a `team_` ID as `teamId` to the SDK instead of `ownerUserId`.
@@ -70,6 +68,7 @@ export const durable = createDurableExecution({
   },
   api: {
     baseUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
+    apiKey: process.env.FINAL_API_KEY!,
   },
 });
 
@@ -116,7 +115,7 @@ const connection = await connect({
   client: durable,
   functions: [sendReceipt],
   apiUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
-  connectKey: process.env.FINAL_DURABLE_CONNECT_KEY!,
+  apiKey: process.env.FINAL_API_KEY!,
   instanceId: `worker-${crypto.randomUUID()}`,
   appVersion: '2026-06-15',
   maxWorkerConcurrency: 10,
@@ -125,7 +124,7 @@ const connection = await connect({
 await connection.closed;
 ```
 
-`connect()` registers function manifests, creates a short-lived WebSocket session, opens the worker connection, refreshes tokens, and drains in-flight work during shutdown.
+`connect()` registers function manifests, mints a short-lived `durable_worker` delegated credential, opens the worker connection, refreshes credentials, and drains in-flight work during shutdown.
 
 See [TypeScript SDK and workers](/developer-guides/durable-execution/typescript-sdk).
 

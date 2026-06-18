@@ -1,0 +1,186 @@
+---
+title: "Create a delegated credential"
+description: "Mint a short-lived credential for Git, WebSocket Gateway, or Durable Execution workers."
+api: "POST /v1/delegated-credentials"
+---
+
+Creates a short-lived delegated credential from a Final API key.
+
+The response includes lifecycle fields for every credential:
+
+| Field | Description |
+| --- | --- |
+| `id` | Delegated credential ID. |
+| `kind` | `git`, `websocket`, or `durable_worker`. |
+| `audience` | Protocol audience. Defaults from `kind`. |
+| `subject` | Subject represented by the credential. |
+| `grants` | Granted protocol access. |
+| `expiresAt` | Time when the credential expires. |
+| `refreshAfter` | Earliest refresh time. |
+| `refreshBefore` | Latest refresh time. |
+| `createdFromApiKeyId` | API key that minted the credential. |
+| `status` | Credential lifecycle status. |
+| `protocolMetadata` | Non-secret protocol metadata. |
+
+## Request body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `kind` | string | Yes | `git`, `websocket`, or `durable_worker`. |
+| `audience` | string | No | Must match the kind. Defaults to `git`, `websocket-gateway`, or `durable-execution`. |
+| `grants` | object | Yes | Kind-specific grants. |
+
+## Git grants
+
+Requires a user-owned API key. `read` requires `repositories:read`; `write` requires `repositories:write`.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `repositoryId` | string | Yes | Repository wire ID, such as `gsr_123`. |
+| `access` | string | No | `read` or `write`. Defaults to `read`. |
+
+```bash
+repository_id="gsr_123"
+
+curl -X POST "https://api.final.ai/v1/delegated-credentials" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "kind": "git",
+  "grants": {
+    "repositoryId": "${repository_id}",
+    "access": "write"
+  }
+}
+EOF
+```
+
+```json
+{
+  "credential": {
+    "id": "dc_0193b000-0000-7000-8000-000000000101",
+    "kind": "git",
+    "audience": "git",
+    "subject": "user:usr_123",
+    "grants": {
+      "repositoryId": "gsr_123",
+      "access": "write"
+    },
+    "username": "final",
+    "password": "<git-password>",
+    "expiresAt": "2026-06-17T12:15:00.000Z",
+    "refreshAfter": "2026-06-17T12:07:30.000Z",
+    "refreshBefore": "2026-06-17T12:14:30.000Z",
+    "createdFromApiKeyId": "ak_123",
+    "status": "active",
+    "protocolMetadata": {
+      "repositoryId": "gsr_123",
+      "access": "write",
+      "username": "final"
+    }
+  }
+}
+```
+
+## WebSocket grants
+
+Requires a user-owned or team-owned API key. Organization-owned API keys cannot mint WebSocket delegated credentials.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `subject` | string | No | Subject for the gateway token. Defaults from the API key owner. |
+| `clientId` | string | No | Client identifier. Defaults from the API key owner. |
+| `ttlMs` | integer | No | Token lifetime in milliseconds. Maximum `600000`. |
+| `channels` | array | No | Channel grants. |
+| `rpc` | array | No | RPC grants. |
+| `bridges` | array | No | Bridge grants. |
+| `workQueues` | array | No | Work queue grants. |
+| `metadata` | object | No | Token metadata. |
+
+At least one `channels`, `rpc`, `bridges`, or `workQueues` grant is required.
+
+| Grant | Access values |
+| --- | --- |
+| `channels` | `subscribe`, `publish`, `history`, `presence` |
+| `rpc` | `send`, `receive` |
+| `bridges` | `join`, `send`, `receive` |
+| `workQueues` | `lease`, `heartbeat`, `complete`, `fail` |
+
+```bash
+CHANNEL_NAME="chat"
+
+curl -X POST "https://api.final.ai/v1/delegated-credentials" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "kind": "websocket",
+  "grants": {
+    "clientId": "browser_1",
+    "ttlMs": 600000,
+    "channels": [
+      {
+        "name": "${CHANNEL_NAME}",
+        "access": ["subscribe", "publish"]
+      }
+    ]
+  }
+}
+EOF
+```
+
+```json
+{
+  "credential": {
+    "id": "dc_0193b000-0000-7000-8000-000000000102",
+    "kind": "websocket",
+    "audience": "websocket-gateway",
+    "subject": "user:usr_123",
+    "grants": {
+      "clientId": "browser_1",
+      "ttlMs": 600000,
+      "channels": [
+        {
+          "name": "chat",
+          "access": ["subscribe", "publish"]
+        }
+      ],
+      "rpc": [],
+      "bridges": [],
+      "workQueues": [],
+      "metadata": {}
+    },
+    "token": "<gateway-token>",
+    "jti": "issued-token-1",
+    "url": "wss://ws.api.final.ai/connect",
+    "protocolVersion": 1,
+    "expiresAt": "2026-06-17T12:10:00.000Z",
+    "refreshAfter": "2026-06-17T12:05:00.000Z",
+    "refreshBefore": "2026-06-17T12:09:30.000Z",
+    "createdFromApiKeyId": "ak_123",
+    "status": "active",
+    "protocolMetadata": {
+      "jti": "issued-token-1",
+      "url": "wss://ws.api.final.ai/connect",
+      "protocolVersion": 1
+    }
+  }
+}
+```
+
+## Durable worker grants
+
+The Durable Execution SDK calls this endpoint for workers. Most applications should use the SDK instead of hand-authoring `durable_worker` requests.
+
+Requires a user-owned or team-owned API key with `durable_execution:connect`. The `scope` must match the API key owner.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `scope` | object | No | Durable scope. Defaults from the API key owner. |
+| `instanceId` | string | Yes | Worker instance ID. |
+| `appVersion` | string | No | Application version for the worker. |
+| `maxWorkerConcurrency` | integer | No | Maximum concurrent work items. Defaults to `1`. |
+| `functions` | array | Yes | Workflow manifests to register. |
+
+The response includes `token` and `session`. The session contains the worker `sessionId`, resolved `scope`, `gatewayUrl`, `queues`, `token`, `tokenExpiresAt`, and registered `workflows`.

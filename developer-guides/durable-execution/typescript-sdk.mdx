@@ -5,7 +5,7 @@ description: "Use the Durable Execution SDK to define typed functions and run We
 
 The Durable Execution SDK is the recommended way to define workflow functions and run workers.
 
-Workers connect to Final over WebSocket with a namespace-scoped connect key. You do not expose a worker HTTP endpoint, and you do not pass an `environment` field to the SDK.
+Workers connect to Final over WebSocket with a short-lived `durable_worker` delegated credential. You pass a Final API key to the SDK; the SDK uses it only to call the REST API, then mints and refreshes worker credentials for the WebSocket connection. You do not expose a worker HTTP endpoint, and you do not pass an `environment` field to the SDK.
 
 ## Install
 
@@ -37,6 +37,7 @@ export const durable = createDurableExecution({
   },
   api: {
     baseUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
+    apiKey: process.env.FINAL_API_KEY!,
   },
 });
 ```
@@ -94,7 +95,7 @@ const connection = await connect({
   client: durable,
   functions: [approvalWorkflow],
   apiUrl: process.env.FINAL_API_URL ?? 'https://api.final.ai',
-  connectKey: process.env.FINAL_DURABLE_CONNECT_KEY!,
+  apiKey: process.env.FINAL_API_KEY!,
   instanceId: `worker-${crypto.randomUUID()}`,
   appVersion: '2026-06-15',
   maxWorkerConcurrency: 10,
@@ -104,10 +105,11 @@ const connection = await connect({
 `connect()` performs the worker setup:
 
 1. It builds function manifests from your SDK definitions.
-2. It creates a worker session with your app connect key.
-3. It receives the WebSocket gateway URL, worker queues, and a short-lived gateway token.
-4. It opens the WebSocket worker connection and refreshes tokens as needed.
-5. It drains in-flight work on `SIGTERM` and `SIGINT` by default.
+2. It calls the REST API with your Final API key.
+3. It creates a short-lived `durable_worker` delegated credential.
+4. It receives the WebSocket gateway URL, worker queues, and a short-lived gateway token.
+5. It opens the WebSocket worker connection and refreshes credentials as soon as they are refreshable.
+6. It drains in-flight work on `SIGTERM` and `SIGINT` by default.
 
 Keep the process alive for as long as the worker should accept work:
 
@@ -156,11 +158,11 @@ The returned `run` has the same shape as [get a run](/api-references/durable-exe
 
 ## Worker credentials
 
-Use a user-owned or team-owned API key for REST API calls such as sending events, triggering runs, and reading run history.
+Use a user-owned or team-owned API key for REST API calls such as sending events, triggering runs, reading run history, and connecting workers.
 
-Use a Durable Execution connect key only for worker connections. Connect keys are namespace-scoped secrets. Store them in your secret manager and load them into worker processes as `FINAL_DURABLE_CONNECT_KEY`.
+Store the API key in your secret manager and load it into worker processes as `FINAL_API_KEY`.
 
-The SDK exchanges the connect key for short-lived WebSocket gateway tokens. Do not send connect keys to browsers or untrusted clients.
+The SDK mints short-lived `durable_worker` delegated credentials through the REST API. It tracks `id`, `expiresAt`, `refreshAfter`, and `refreshBefore`, then refreshes credentials without requiring app code. Do not send worker API keys or worker credentials to browsers or untrusted clients.
 
 ## Runtime model
 

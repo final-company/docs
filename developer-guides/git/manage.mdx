@@ -56,6 +56,29 @@ curl "https://api.final.ai/v1/repositories/${repository_id}" \
 
 ## Mint Git credentials
 
+For most automation, mint a `git` delegated credential. It returns a short-lived Git `username` and `password` inside the shared delegated credential lifecycle, including `expiresAt`, `refreshAfter`, and `refreshBefore`.
+
+```bash
+repository_id="<repository-id>"
+
+curl -X POST "https://api.final.ai/v1/delegated-credentials" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @- <<EOF
+{
+  "kind": "git",
+  "grants": {
+    "repositoryId": "${repository_id}",
+    "access": "write"
+  }
+}
+EOF
+```
+
+See [create a delegated credential](/api-references/delegated-credentials/create) for the full response shape.
+
+If you need the API to return the repository remote URL with the credentials, use the repository Git credential endpoint.
+
 See [mint Git credentials](/api-references/repositories/mint-git-credentials) for request and response fields.
 
 ```bash
@@ -79,7 +102,7 @@ curl -X POST "https://api.final.ai/v1/repositories/${repository_id}/git-credenti
 }
 ```
 
-The `username` and `password` fields are HTTPS Git credentials.
+The `username` and `password` fields are HTTPS Git credentials. Do not use them as REST API bearer tokens.
 
 ## Delete a repository
 

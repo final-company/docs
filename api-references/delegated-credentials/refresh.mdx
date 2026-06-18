@@ -1,0 +1,37 @@
+---
+title: "Refresh a delegated credential"
+description: "Rotate an active delegated credential during its refresh window."
+api: "POST /v1/delegated-credentials/{credentialId}/refresh"
+---
+
+Refreshes a delegated credential and returns a replacement credential.
+
+The request must use the same Final API key that created the current credential. The credential must be `active`, and the current time must be after `refreshAfter` and before `refreshBefore`.
+
+```bash
+credential_id="dc_..."
+
+curl -X POST "https://api.final.ai/v1/delegated-credentials/${credential_id}/refresh" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+You can pass `grants` to narrow the replacement credential. Refresh cannot change `kind` or `audience`, and replacement grants cannot exceed the current credential.
+
+| Kind | Refresh constraints |
+| --- | --- |
+| `git` | Same `repositoryId`. `read` can replace `write`, but `write` cannot replace `read`. |
+| `websocket` | Same `subject` and `clientId`; lifetime cannot increase; resource grants and limits must be narrower than or equivalent to the current grants. |
+| `durable_worker` | Same scope and `instanceId`; concurrency cannot increase; functions must be a subset of the current workflow keys and versions. |
+
+```json
+{
+  "grants": {
+    "repositoryId": "gsr_123",
+    "access": "read"
+  }
+}
+```
+
+For WebSocket and Durable Execution worker credentials, refreshing revokes the gateway token recorded on the previous credential.

@@ -5,6 +5,8 @@ description: "Reference for the public WebSocket Gateway REST API."
 
 Use the WebSocket Gateway API to discover the hosted gateway URL, create short-lived session tokens, publish channel events, and offer work to connected workers.
 
+API-key backed session tokens are minted through the delegated credential lifecycle internally. Use [Delegated credentials](/api-references/delegated-credentials) when you need centralized lifecycle fields such as `id`, `refreshAfter`, and `refreshBefore`.
+
 Every request uses API key authentication:
 
 ```bash

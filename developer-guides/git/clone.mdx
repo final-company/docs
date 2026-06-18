@@ -5,6 +5,8 @@ description: "Mint Git credentials, clone a Final Git repository, and push chang
 
 Use a repository ID to mint short-lived Git credentials. Then use the returned HTTPS remote with normal Git commands.
 
+The repository Git credential endpoint returns both the remote URL and the Git `username` and `password`, which makes it convenient for clone workflows. If you already know the remote URL, you can also mint a `git` delegated credential with the [Delegated credentials API](/api-references/delegated-credentials/create).
+
 ## Full example
 
 ```bash
@@ -37,7 +39,7 @@ git push origin HEAD
 
 Use `access: "read"` for clone and fetch. Use `access: "write"` for push.
 
-Tokens expire after 10 minutes. Mint a new credential set for each workflow run. See the [mint Git credentials API reference](/api-references/repositories/mint-git-credentials) for request and response fields.
+Tokens expire quickly. Mint a new credential set for each workflow run. See the [mint Git credentials API reference](/api-references/repositories/mint-git-credentials) for request and response fields.
 
 ## Fetch later
 

@@ -1,0 +1,51 @@
+---
+title: "Revoke a delegated credential"
+description: "Revoke a short-lived delegated credential."
+api: "POST /v1/delegated-credentials/{credentialId}/revoke"
+---
+
+Revokes a delegated credential created by the same Final API key.
+
+```bash
+credential_id="dc_..."
+
+curl -X POST "https://api.final.ai/v1/delegated-credentials/${credential_id}/revoke" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+```json
+{
+  "credential": {
+    "id": "dc_0193b000-0000-7000-8000-000000000102",
+    "kind": "websocket",
+    "audience": "websocket-gateway",
+    "subject": "user:usr_123",
+    "grants": {
+      "clientId": "browser_1",
+      "ttlMs": 600000,
+      "channels": [
+        {
+          "name": "chat",
+          "access": ["subscribe", "publish"]
+        }
+      ],
+      "rpc": [],
+      "bridges": [],
+      "workQueues": [],
+      "metadata": {}
+    },
+    "expiresAt": "2026-06-17T12:10:00.000Z",
+    "refreshAfter": "2026-06-17T12:05:00.000Z",
+    "refreshBefore": "2026-06-17T12:09:30.000Z",
+    "createdFromApiKeyId": "ak_123",
+    "status": "revoked",
+    "protocolMetadata": {
+      "jti": "issued-token-1",
+      "url": "wss://ws.api.final.ai/connect",
+      "protocolVersion": 1
+    }
+  }
+}
+```
+
+For `websocket` and `durable_worker` credentials, revoke also invalidates the gateway token recorded for the credential.

@@ -5,7 +5,7 @@ description: "Reference for the public Durable Execution REST API."
 
 Use the Durable Execution API to send events, start runs, inspect history, cancel, retry, signal waiting runs, and inspect workflow registrations.
 
-For worker setup, use the [Durable Execution TypeScript SDK](/developer-guides/durable-execution/typescript-sdk). SDK workers connect over WebSocket with a namespace-scoped connect key.
+For worker setup, use the [Durable Execution TypeScript SDK](/developer-guides/durable-execution/typescript-sdk). SDK workers connect over WebSocket with short-lived `durable_worker` delegated credentials minted from a Final API key.
 
 Every machine-facing request uses user-owned or team-owned API key authentication:
 

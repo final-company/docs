@@ -1,0 +1,44 @@
+---
+title: "Delegated credentials API"
+description: "Reference for short-lived Final credentials."
+---
+
+Use delegated credentials to issue short-lived protocol credentials from a Final API key.
+
+Every request uses Final API key authentication:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+The public base URL is:
+
+```text
+https://api.final.ai/v1/delegated-credentials
+```
+
+<Card title="Create a delegated credential" icon="key-round" href="/api-references/delegated-credentials/create">
+  Mint a `git`, `websocket`, or `durable_worker` credential.
+</Card>
+
+<Card title="Get a delegated credential" icon="search" href="/api-references/delegated-credentials/get">
+  Inspect lifecycle metadata without returning secret material.
+</Card>
+
+<Card title="Refresh a delegated credential" icon="refresh-cw" href="/api-references/delegated-credentials/refresh">
+  Rotate an active credential during its refresh window.
+</Card>
+
+<Card title="Revoke a delegated credential" icon="ban" href="/api-references/delegated-credentials/revoke">
+  Revoke the credential and any gateway token recorded for it.
+</Card>
+
+## Credential kinds
+
+| Kind | Audience | Returned secret material |
+| --- | --- | --- |
+| `git` | `git` | `username`, `password` |
+| `websocket` | `websocket-gateway` | `token`, `jti`, `url`, `protocolVersion` |
+| `durable_worker` | `durable-execution` | `token`, `session` |
+
+Short-lived credentials are not REST API bearer tokens. Use them only for the protocol they were minted for.

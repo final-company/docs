@@ -1266,6 +1266,20 @@ components:
           items:
             type: string
           example: ["apps:read"]
+        kind:
+          type: string
+          nullable: true
+          enum: [general, durable_worker, repository_automation, websocket_issuer]
+          description: API key kind. Specialized kinds can mint only matching delegated credential kinds.
+          example: repository_automation
+        resourceRestrictions:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Resource restrictions that limit delegated credentials minted by this key.
+          example:
+            audiences: ["git"]
+            repositories: ["gsr_123"]
         owner:
           type: object
           required: [type, id]
@@ -1307,6 +1321,20 @@ components:
             type: string
           description: Permissions for the new key. These cannot exceed the caller key's permissions.
           example: ["apps:read"]
+        kind:
+          type: string
+          nullable: true
+          enum: [general, durable_worker, repository_automation, websocket_issuer]
+          description: Optional key kind. If the caller key has a specialized kind, the child key must use the same kind.
+          example: repository_automation
+        resourceRestrictions:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Optional restrictions for delegated credential minting. Child key restrictions cannot be broader than the caller key's restrictions.
+          example:
+            audiences: ["git"]
+            repositories: ["gsr_123"]
         expiresAt:
           type: string
           format: date-time

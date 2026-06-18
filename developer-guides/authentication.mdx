@@ -20,9 +20,9 @@ https://api.final.ai
 | Credential | Use it for |
 | --- | --- |
 | Organization API key | Organization-scoped REST APIs, Computers team-owned creation with `teamId`, Agent Workspaces through an agent profile, Agent Disk team-owned disk creation with `teamId`, and API key management. |
-| Team API key | Team-scoped Agent Workspaces, WebSocket Gateway, and Durable Execution requests. |
-| User API key | User-scoped Agent Workspaces, WebSocket Gateway, Durable Execution, Secrets, Git repositories, private or team-owned Computers, and private or team-owned Agent Disk requests. |
-| Minted Git credentials | Short-lived Git HTTPS clone, fetch, and push operations. |
+| Team API key | Team-scoped REST APIs and team-owned delegated credential minting for WebSocket Gateway and Durable Execution workers. |
+| User API key | User-scoped REST APIs and delegated credential minting for Git, WebSocket Gateway, and Durable Execution workers. |
+| Delegated credential | Short-lived protocol credentials returned by the API, such as Git HTTPS credentials, WebSocket Gateway tokens, and Durable Execution worker credentials. |
 | computer token | Scoped Computer access where computer tokens are supported. computer tokens do not authenticate public API requests to `api.final.ai`. |
 
 ## Use API keys
@@ -44,24 +44,63 @@ curl "https://api.final.ai/v1/agent-workspaces" \
   -H "Authorization: Bearer ${FINAL_API_KEY}"
 ```
 
+API keys are the only customer credentials accepted as bearer tokens on the public REST API. Do not send Git credentials, WebSocket Gateway tokens, Durable worker tokens, computer tokens, or console session cookies to `api.final.ai`.
+
+## Use delegated credentials
+
+Delegated credentials are short-lived credentials minted from a Final API key. They use the `dc_` ID prefix and include `expiresAt`, `refreshAfter`, and `refreshBefore` lifecycle fields.
+
+| Kind | Use it for |
+| --- | --- |
+| `git` | Git clone, fetch, and push against one repository. |
+| `websocket` | WebSocket Gateway client sessions. |
+| `durable_worker` | Durable Execution worker WebSocket sessions. |
+
+Refresh a delegated credential only during its refresh window. Refresh and revoke requests must use the same API key that created the credential. See [Delegated credentials](/developer-guides/delegated-credentials) and the [Delegated credentials API reference](/api-references/delegated-credentials).
+
 ## Create API keys from the API
 
 You can create organization API keys from automation with [create an API key](/api-references/api-keys/create).
 
-The caller key must be organization-owned and must have the `api_keys:write` permission. A new key cannot request permissions that the caller key does not already have.
+The caller key must be organization-owned and must have the `api_keys:write` permission. A new key cannot request permissions, key kinds, or resource restrictions that exceed the caller key.
 
 ```bash
 curl -X POST "https://api.final.ai/v1/api-keys" \
   -H "Authorization: Bearer ${FINAL_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "CI deploy",
-    "permissions": ["apps:read"],
+    "name": "Git automation",
+    "permissions": ["repositories:read", "repositories:write"],
+    "kind": "repository_automation",
+    "resourceRestrictions": {
+      "audiences": ["git"],
+      "repositories": ["gsr_123"]
+    },
     "expiresAt": "2027-01-01T00:00:00.000Z"
   }'
 ```
 
 The response includes the plaintext `value` once. Store it immediately.
+
+## API key kinds and restrictions
+
+Use API key kinds and resource restrictions to limit what a key can mint.
+
+| Kind | Intended delegated credentials |
+| --- | --- |
+| `general` | Any credential allowed by the key permissions and restrictions. |
+| `repository_automation` | `git` credentials. |
+| `websocket_issuer` | `websocket` credentials. |
+| `durable_worker` | `durable_worker` credentials. |
+
+| Restriction | Applies to | Example |
+| --- | --- | --- |
+| `audiences` | All delegated credentials | `["git"]`, `["websocket-gateway"]`, `["durable-execution"]` |
+| `repositories` | Git credentials | `["gsr_123"]` |
+| `namespaces` | Durable worker credentials | `["billing"]` |
+| `websocketResources` | WebSocket credentials | `["channel:chat", "work:customer-jobs"]` |
+
+Use `*` inside a restriction list to allow every value for that restriction. An empty list denies every value.
 
 ## Use public IDs
 
@@ -87,7 +126,7 @@ See [Agent Workspaces](/developer-guides/agent-workspaces) and the [Agent Worksp
 
 Use a user-owned or team-owned API key to create short-lived WebSocket Gateway session tokens and to publish server-side channel or work queue events. Organization-owned API keys cannot mint or use gateway-scoped resources.
 
-Gateway session tokens are scoped to the API key owner and expire quickly. Do not send your API key to browser or worker clients. Create a session token from your server, then pass the returned token and gateway URL to the client.
+Gateway session tokens are scoped to the API key owner and expire quickly. API-key backed session creation uses the delegated credential lifecycle internally. Do not send your API key to browser or worker clients. Create a session token from your server, then pass the returned token and gateway URL to the client.
 
 See [WebSocket Gateway](/developer-guides/websocket-gateway) and the [WebSocket Gateway API reference](/api-references/websocket-gateway).
 
@@ -117,7 +156,7 @@ See [Agent Disk](/developer-guides/agent-disk) and the [Agent Disk API reference
 
 Use a user-owned or team-owned API key for Durable Execution REST API requests, including sending events, triggering runs, and reading history. Durable Execution scopes work by organization, API key owner, and namespace.
 
-Use a Durable Execution connect key for SDK workers. A connect key is scoped to one durable namespace and is exchanged for short-lived WebSocket worker session tokens by `connect()`. Store connect keys as server-side secrets and do not send them to browsers or untrusted clients.
+Use a user-owned or team-owned API key for SDK workers. `connect()` uses that API key only to call the REST API, then mints and refreshes short-lived `durable_worker` delegated credentials for the worker WebSocket connection. Store the API key as a server-side secret and do not send it to browsers or untrusted clients.
 
 See [TypeScript SDK and workers](/developer-guides/durable-execution/typescript-sdk).
 
@@ -140,8 +179,10 @@ curl "https://api.final.ai/v1/repositories" \
 
 For Git clone, fetch, and push, first mint short-lived Git credentials with [mint Git credentials](/api-references/repositories/mint-git-credentials). Use those credentials with the Git remote URL instead of sending your API key to Git.
 
+For new automation, prefer [creating a `git` delegated credential](/api-references/delegated-credentials/create). It returns the same Git `username` and `password` inside the shared delegated credential lifecycle.
+
 ## Handle auth errors
 
 `401` means the credential is missing, malformed, expired, or invalid.
 
-`403` means the credential is valid but cannot perform the requested action. Check the endpoint's required key owner type, permissions, and team membership. For API key creation through the public API, the caller key must be organization-owned, include `api_keys:write`, and already have every permission requested for the new key.
+`403` means the credential is valid but cannot perform the requested action. Check the endpoint's required key owner type, permissions, key kind, resource restrictions, and team membership. For API key creation through the public API, the caller key must be organization-owned, include `api_keys:write`, and already allow every permission and restriction requested for the new key.

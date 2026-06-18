@@ -8,6 +8,8 @@ Creates a short-lived token for connecting to the hosted WebSocket Gateway.
 
 Requires a user-owned or team-owned API key with `websocket_gateway:connect`.
 
+API-key backed sessions are minted through the delegated credential lifecycle internally, but this endpoint returns the compact gateway session response for compatibility. Use [create a delegated credential](/api-references/delegated-credentials/create) with `kind: "websocket"` when you need the credential `id`, `refreshAfter`, and `refreshBefore` fields.
+
 Set `CHANNEL_NAME` to the channel your application uses. Channel names are owner-local resource names scoped to the API key owner. Send `chat`, `room:123`, or another app-defined name. Do not prefix resource names with `user:` or `team:`.
 
 ```bash
