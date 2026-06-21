@@ -1,0 +1,108 @@
+---
+title: "Manifest reference"
+description: "Define Final Cloud apps with final-cloud.yaml."
+---
+
+`final-cloud.yaml` describes the workloads Final should run for an app. A manifest must include at least one `service`, `job`, or `function`.
+
+## Top-level fields
+
+| Field | Description |
+| --- | --- |
+| `name` | App name. |
+| `build` | Default source build for services and jobs. |
+| `image` | Default container image for services and jobs. |
+| `env` | Plain environment values shared by workloads. |
+| `envFrom` | Environment groups to import. |
+| `secrets` | Secret references exposed as environment variables. |
+| `volumes` | Persistent volumes mounted into services or jobs. |
+| `hooks.preDeploy` | Commands to run before rollout. |
+| `services` | Long-running HTTP services. |
+| `jobs` | Scheduled or manually triggered commands. |
+| `functions` | JavaScript HTTP functions. |
+
+## Service example
+
+```yaml
+name: api
+
+build:
+  method: dockerfile
+  context: .
+  dockerfile: Dockerfile
+
+env:
+  NODE_ENV: production
+
+secrets:
+  DATABASE_URL:
+    ref: prod/database-url
+
+services:
+  - name: web
+    port: 3000
+    command: npm start
+    health:
+      path: /health
+      intervalSeconds: 10
+      timeoutSeconds: 5
+    scaling:
+      min: 1
+      max: 2
+    domains:
+      - api.example.com
+```
+
+Each service needs a `port` and `health.path`. It can inherit the top-level `build` or `image`, or define its own.
+
+## Job example
+
+```yaml
+name: workers
+
+image:
+  repository: ghcr.io/acme/workers
+  tag: latest
+
+jobs:
+  - name: sync
+    command: npm run sync
+    schedule: "*/15 * * * *"
+    retries: 2
+    timeoutSeconds: 1800
+    concurrencyPolicy: forbid
+```
+
+Scheduled jobs use cron syntax. You can also trigger a job through the Final Cloud API.
+
+## Function example
+
+```yaml
+name: callbacks
+
+functions:
+  - name: webhook
+    runtime: workerd
+    entry: src/index.js
+    build:
+      command: npm run build
+      output: dist/index.js
+    moduleEntrypoint: index.js
+    regionSlug: lax2
+    routes:
+      - pathPrefix: /
+        public: true
+    limits:
+      requestTimeoutMs: 30000
+    outboundPolicy:
+      internet: true
+      privateNetwork: false
+```
+
+Functions use the `workerd` runtime and export a `fetch(request, env)` handler. Use [Deploy Cloud Functions](/developer-guides/cloud-functions/deploy) when you want a CLI to generate this function-only manifest for you.
+
+## Source archives
+
+When a deployment includes `sourceArchive`, Final builds from that archive. Archives use `tar.gz` and can be sent inline as `dataB64` or by URL with an optional `sha256` digest.
+
+Use source archives for CI or agent deploys where the caller has a checked-out workspace. Use images when your pipeline already published an immutable container.

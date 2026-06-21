@@ -1,0 +1,98 @@
+---
+title: "Deploy Cloud Functions"
+description: "Deploy a JavaScript function with the provider-neutral Cloud Functions CLI."
+---
+
+Use `final-cloud-functions` to build and deploy a Cloud Function from any CI runner that can execute a command and provide a Final API key.
+
+The CLI deploys through [Final Cloud](/developer-guides/final-cloud). It creates a source archive, generates a function-only `final-cloud.yaml` manifest, submits the deployment to `/v1/final-cloud`, then reads app status for the function hostname.
+
+## Create a test app
+
+Generate a minimal app:
+
+```bash
+final-cloud-functions init --dir ./hello-final --name hello-final
+```
+
+The generated app includes a `final-cloud-functions.json` config, `src/index.js`, and package scripts for deploy and dry run.
+
+## Configure deploys
+
+Add `final-cloud-functions.json` to your repository:
+
+```json
+{
+  "name": "hello-final",
+  "entry": "dist/index.js",
+  "buildCommand": "npm run build",
+  "moduleEntrypoint": "index.js",
+  "regionSlug": "lax2",
+  "public": true,
+  "resourceClass": "standard",
+  "limits": {
+    "requestTimeoutMs": 30000,
+    "maxRequestBodyBytes": 1048576,
+    "maxResponseBodyBytes": 1048576
+  },
+  "outboundPolicy": {
+    "internet": true,
+    "privateNetwork": false
+  }
+}
+```
+
+`name` must be a DNS label: lowercase letters, numbers, and hyphens, with no leading or trailing hyphen.
+
+## Deploy
+
+Run the deploy command with a Final API key:
+
+```bash
+FINAL_CLOUD_API_KEY=... final-cloud-functions deploy --smoke --output json
+```
+
+The command:
+
+1. Packages the current workspace as a `tar.gz` source archive.
+2. Generates a function-only Final Cloud manifest.
+3. Creates or updates the Final Cloud app record.
+4. Submits a deployment through `/v1/final-cloud/deployments`.
+5. Waits for the deployment result and reads app status.
+6. Optionally smoke-tests the public hostname.
+
+Use `--output json --output-file deploy-result.json` when a CI pipeline needs machine-readable deploy metadata.
+
+## Common options
+
+| Option | Description |
+| --- | --- |
+| `--config <path>` | Config file. Defaults to `final-cloud-functions.json` when present. |
+| `--api-key <key>` | Final API key. You can also set `FINAL_CLOUD_API_KEY` or `FINAL_API_KEY`. |
+| `--name <name>` | Cloud Function app name. |
+| `--entry <path>` | Built JavaScript module to upload. |
+| `--build-command <command>` | Command to run before reading `entry`. |
+| `--region <slug>` | Region slug for first create. |
+| `--env KEY=VALUE` | Deployment environment variable. Repeatable. |
+| `--limits-json <json>` | Runtime limits JSON. |
+| `--outbound-policy-json <json>` | Outbound policy JSON. |
+| `--dry-run` | Build and validate without calling the API. |
+| `--smoke` | Invoke the public hostname after deploy. |
+
+## CI contract
+
+The deploy command does not require provider-specific CI APIs. Use the same command in GitHub Actions, Buildkite, Jenkins, Final automation, or a local shell.
+
+```bash
+final-cloud-functions deploy \
+  --config final-cloud-functions.json \
+  --smoke \
+  --output json \
+  --output-file deploy-result.json
+```
+
+## Direct API deploys
+
+If another system already builds the source archive or writes the manifest, call the Final Cloud API directly with `manifestText` and `sourceArchive`.
+
+See the [Final Cloud API reference](/api-references/final-cloud) for app and deployment fields.

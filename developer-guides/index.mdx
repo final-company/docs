@@ -3,7 +3,7 @@ title: "Overview"
 description: "Understand the Final developer API and the products you can build with it."
 ---
 
-The Final developer API gives you the building blocks for agent-native software. You can start agent work, give agents durable files, connect work to version-controlled code, stream progress to users, run long-lived workflows, manage credentials, and operate cloud computers from one API surface.
+The Final developer API gives you the building blocks for agent-native software. You can start agent work, give agents durable files, connect work to version-controlled code, stream progress to users, run long-lived workflows, manage credentials, operate cloud computers, and deploy cloud apps from one API surface.
 
 Use Final when you want agents and automation to do real work inside your product, not only answer questions. A typical integration starts from a user action, creates an agent chat, gives it code or files, streams progress to the UI, stores credentials safely, and publishes reviewed changes through your version control workflow. Git is the default implementation today, not the whole platform story.
 
@@ -27,6 +27,7 @@ https://api.final.ai/v1
 | Stream progress to browsers and connected workers | [WebSockets](/developer-guides/websockets) |
 | Run workflows that retry, wait, and resume | [Durable Execution](/developer-guides/durable-execution) |
 | Run commands on cloud machines | [Computers](/developer-guides/computers) |
+| Deploy services, jobs, and HTTP functions from CI | [Final Cloud](/developer-guides/final-cloud) |
 | Store credentials for trusted automation | [Secrets](/developer-guides/secrets) |
 | Connect code work to version control | [Version control with Git](/developer-guides/git) |
 | Split large code changes into reviewable pieces | [Stacked PRs](/developer-guides/git/stacked-prs) |
@@ -39,6 +40,8 @@ https://api.final.ai/v1
 | [Agent Chats](/developer-guides/agent-chats) | You need to start agent work from your product, send follow-up messages, poll state, and archive completed sessions. |
 | [Agent Disk](/developer-guides/agent-disk) | You need persistent filesystem state with branches, checkpoints, access controls, and share links. |
 | [Computers](/developer-guides/computers) | You need managed cloud machines for command execution, files, SSH, HTTP access, and sandboxed services. |
+| [Final Cloud](/developer-guides/final-cloud) | You need manifest-based deploys for services, jobs, and JavaScript HTTP functions. |
+| [Cloud Functions](/developer-guides/cloud-functions) | You need a managed workerd runtime for JavaScript HTTP handlers. |
 | [Version control with Git](/developer-guides/git) | You need Git-backed repositories, pull requests, checks, and merge queues for reviewed code changes. |
 | [Secrets](/developer-guides/secrets) | You need to store credentials for trusted automation without exposing plaintext values in code, prompts, logs, or configuration files. |
 | [WebSockets](/developer-guides/websockets) | You need realtime progress, product events, or work dispatch for connected clients and workers. |
@@ -49,7 +52,7 @@ https://api.final.ai/v1
 
 1. A user clicks a product action such as **Investigate**, **Fix**, **Review**, or **Generate**.
 2. Your server creates an [Agent Chat](/developer-guides/agent-chats) with the task and stores the returned IDs.
-3. The task uses [Agent Disk](/developer-guides/agent-disk), [Computers](/developer-guides/computers), or [version control with Git](/developer-guides/git) depending on what the agent needs to touch.
+3. The task uses [Agent Disk](/developer-guides/agent-disk), [Computers](/developer-guides/computers), [Final Cloud](/developer-guides/final-cloud), or [version control with Git](/developer-guides/git) depending on what the agent needs to touch.
 4. Your server reads [Secrets](/developer-guides/secrets) only when trusted tooling needs credentials.
 5. The UI receives progress through polling or the [WebSockets](/developer-guides/websockets).
 6. Long-running flows move into [Durable Execution](/developer-guides/durable-execution) when they need retries, waits, callbacks, or run history.

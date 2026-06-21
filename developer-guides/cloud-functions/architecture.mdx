@@ -1,0 +1,38 @@
+---
+title: "Architecture"
+description: "How Cloud Functions handles security, durability, consistency, scalability, and latency."
+---
+
+Cloud Functions run JavaScript handlers on Final-managed compute. Final Cloud owns the app and deployment workflow, while Cloud Functions owns the workerd runtime, function versions, routes, placements, and invocation metrics.
+
+## Security
+
+Deploy and management requests use a Final API key. Final Cloud deploys require `apps:write`; status and event reads require `apps:read`. Computer-scoped tokens cannot manage Cloud Functions.
+
+Function apps are scoped to an organization and can be user-owned or team-owned. Environment variables are stored as deployment-scoped secrets rather than embedded directly in the function record.
+
+Each deployment records an outbound policy and runtime limits. Routes can be public or private, and custom hostnames must be verified before activation.
+
+## Scalability and durability
+
+Each Final Cloud deploy creates an immutable function version with a bundle digest, bundle size, runtime settings, limits, and placement state. The active route points at an active version.
+
+Function bundles can be stored by Final or referenced by an external bundle URL with a digest and size. App metadata, deployments, versions, routes, events, placements, and invocation metrics are stored separately, so history remains available after a new version is promoted.
+
+Pools let the platform place functions by region and resource class. If no active pool is available, deploys fail without creating an ambiguous active version.
+
+## Consistency
+
+Version promotion is explicit. When a new deployment becomes active, older active versions are disabled and older placements are evicted.
+
+Routes point to a specific active version. Hostname and path-prefix uniqueness is enforced for active routes, so two active functions cannot claim the same route.
+
+Deletes are soft lifecycle operations: the app is marked deleted, routes are disabled, versions are deleted, and placements are evicted.
+
+## Latency
+
+Cloud Functions are designed for HTTP handlers that should start from a managed route without provisioning a full Computer per request.
+
+Placements can be cold, warming, or warm. The platform tracks placement and invocation metrics, including request count, errors, CPU time, wall time, egress, and evictions.
+
+Use the deploy CLI's smoke check to verify the public hostname immediately after deploy.

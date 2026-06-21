@@ -1,0 +1,36 @@
+---
+title: "Architecture"
+description: "How Final Cloud handles security, durability, consistency, scalability, and latency."
+---
+
+Final Cloud is a desired-state deployment system. The manifest describes what should run, and each deployment reconciles services, jobs, functions, environment, artifacts, and volumes toward that state.
+
+## Security
+
+Public requests use Final API keys. Reads require `apps:read`; mutations require `apps:write`.
+
+Deployments and job runs require a user-owned or team-owned key. That gives Final a concrete runtime identity for secrets, volumes, source builds, and audit trails.
+
+Environment values and secret references are resolved at deploy time. Secrets stay referenced by name in the manifest instead of being copied into source code or docs.
+
+## Scalability and durability
+
+Apps, manifests, deployments, events, jobs, and runtime state are stored separately. A failed runtime rollout does not erase the manifest or previous healthy deployment record.
+
+Services can scale across replicas. Jobs can be scheduled, retried, and manually triggered. Functions are deployed as immutable bundles with region and resource settings.
+
+Source builds run from uploaded or referenced archives. Image-based workloads can deploy from already-published artifacts.
+
+## Consistency
+
+The manifest is normalized before rollout, so equivalent manifests produce stable workload ordering and deployment records.
+
+Deployments move through explicit phases: parse, store, resolve environment, reconcile volumes, resolve artifacts, run hooks, roll services, deploy functions, store jobs, and mark healthy.
+
+If a rollout fails after entering runtime changes and a previous healthy deployment exists, Final attempts to roll back to the previous healthy state.
+
+## Latency
+
+Reads return app status and events without rebuilding the world. Deploy latency depends on source build time, pre-deploy hooks, health checks, service rollout, and function bundle activation.
+
+Cloud Functions avoid provisioning a full Computer per request. Services optimize for long-running HTTP workloads where process startup and health checks happen during deploy.

@@ -1,0 +1,175 @@
+---
+title: "Cloud Functions"
+description: "API reference for Cloud Function apps, deployments, routes, events, metrics, and lifecycle actions."
+---
+
+Cloud Functions endpoints manage the lower-level function runtime. New deploy tooling uses [Final Cloud](/api-references/final-cloud) to submit manifests and source archives, then Final Cloud materializes Cloud Function versions behind the app deployment.
+
+Cloud Functions endpoints are mounted under:
+
+```text
+https://api.final.ai/v1/cloud-functions
+```
+
+Use a Final API key for these endpoints:
+
+```bash
+Authorization: Bearer <api-key>
+```
+
+Computer-scoped tokens cannot manage Cloud Functions.
+
+Use `/v1/final-cloud` for manifest-based app deploys. Use this API when you need function runtime resources directly, such as routes, events, metrics, or lifecycle actions.
+
+## Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/v1/cloud-functions` | Create a Cloud Function app and initial deployment. |
+| `GET` | `/v1/cloud-functions` | List Cloud Function apps in the organization. |
+| `GET` | `/v1/cloud-functions/{idOrName}` | Get one Cloud Function by `cfapp_...` ID or name. |
+| `POST` | `/v1/cloud-functions/{idOrName}/deployments` | Deploy a new immutable version. |
+| `POST` | `/v1/cloud-functions/{idOrName}/routes` | Add a route for an active version. |
+| `GET` | `/v1/cloud-functions/{idOrName}/events` | List recent app events. |
+| `GET` | `/v1/cloud-functions/{idOrName}/metrics` | List invocation metrics. |
+| `POST` | `/v1/cloud-functions/{idOrName}/actions/{action}` | Enable or disable an app. |
+| `DELETE` | `/v1/cloud-functions/{idOrName}` | Delete an app and evict active placements. |
+
+## Create a Cloud Function
+
+```bash
+curl -X POST "https://api.final.ai/v1/cloud-functions" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "hello-final",
+    "regionSlug": "lax2",
+    "public": true,
+    "bundleSource": {
+      "code": "export default { fetch() { return new Response(\"ok\") } }"
+    },
+    "moduleEntrypoint": "index.js",
+    "resourceClass": "standard",
+    "limits": {
+      "requestTimeoutMs": 30000
+    },
+    "outboundPolicy": {
+      "internet": true,
+      "privateNetwork": false
+    }
+  }'
+```
+
+`name` must be a valid DNS label. Pass `teamId` to create a team-owned app.
+
+You can provide either:
+
+| Bundle field | Description |
+| --- | --- |
+| `bundleSource` | Inline JavaScript source with optional `contentType`. Final stores the bundle and computes the digest. |
+| `bundleUrl`, `bundleDigest`, `bundleSizeBytes` | External bundle location, SHA-256 digest, and size. |
+
+## Deployment fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `moduleEntrypoint` | string | Module name visible to the runtime. Defaults to `index.js`. |
+| `compatibilityDate` | string or null | Optional `YYYY-MM-DD` compatibility date. |
+| `bindingsManifest` | object | Runtime bindings manifest. |
+| `env` | object | String environment variables stored as deployment-scoped secrets. |
+| `resourceClass` | string | Runtime resource class. Defaults to `standard`. |
+| `limits` | object | Runtime limits such as `requestTimeoutMs`, body sizes, CPU, memory, subrequests, logs, and concurrency. |
+| `outboundPolicy` | object | Outbound network policy. Defaults to `{ "internet": true, "privateNetwork": false }`. |
+
+## Deploy a new version
+
+```bash
+curl -X POST "https://api.final.ai/v1/cloud-functions/hello-final/deployments" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "bundleSource": {
+      "code": "export default { fetch() { return new Response(\"v2\") } }"
+    },
+    "moduleEntrypoint": "index.js"
+  }'
+```
+
+Deploying creates a new version and promotes it. Existing active routes are updated to the new version.
+
+## Add a route
+
+```bash
+curl -X POST "https://api.final.ai/v1/cloud-functions/hello-final/routes" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hostname": "hello-final.functions.example.final.ai",
+    "pathPrefix": "/",
+    "public": true
+  }'
+```
+
+Custom hostnames must be verified before activation. Platform function hostnames use the region's function domain.
+
+## Events and metrics
+
+```bash
+curl "https://api.final.ai/v1/cloud-functions/hello-final/events" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+```bash
+curl "https://api.final.ai/v1/cloud-functions/hello-final/metrics?hours=24" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Metrics include request count, error count, CPU time, wall time, egress bytes, and eviction count.
+
+## Actions and delete
+
+Disable an app:
+
+```bash
+curl -X POST "https://api.final.ai/v1/cloud-functions/hello-final/actions/disable" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "incident response" }'
+```
+
+Enable it again with `actions/enable`.
+
+Delete an app:
+
+```bash
+curl -X DELETE "https://api.final.ai/v1/cloud-functions/hello-final" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{ "reason": "cleanup" }'
+```
+
+## Response shapes
+
+Create returns:
+
+```json
+{
+  "cloudFunction": {
+    "id": "cfapp_...",
+    "name": "hello-final",
+    "hostname": "hello-final.functions.example.final.ai",
+    "latestVersionNumber": 1,
+    "latestDeploymentId": "cfdep_..."
+  },
+  "deployment": {
+    "id": "cfdep_...",
+    "versionId": "cfver_...",
+    "versionNumber": 1,
+    "statusName": "ready",
+    "stateName": "active",
+    "runtime": "workerd"
+  }
+}
+```
+
+List returns `{ "cloudFunctions": [...] }`. Get returns `{ "cloudFunction": ... }`. Delete returns `{ "deleted": true }`.

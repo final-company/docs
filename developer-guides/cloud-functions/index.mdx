@@ -1,0 +1,70 @@
+---
+title: "Cloud Functions"
+description: "Deploy JavaScript functions to Final's managed workerd runtime."
+---
+
+Cloud Functions run JavaScript modules on Final-managed compute. Use them for webhooks, lightweight APIs, background callbacks, preview handlers, and other HTTP workloads that should deploy from any CI runner without managing a Computer directly.
+
+Cloud Functions deploy through [Final Cloud](/developer-guides/final-cloud). Your CI runner packages a source archive, submits a function-only `final-cloud.yaml` manifest, and Final builds and publishes the immutable workerd bundle.
+
+<Card title="Deploy Cloud Functions" icon="rocket" href="/developer-guides/cloud-functions/deploy">
+  Configure a function, deploy from CI, and run an optional smoke check.
+</Card>
+
+<Card title="Final Cloud" icon="cloud" href="/developer-guides/final-cloud">
+  Learn the app, deployment, manifest, status, and event model behind Cloud Functions.
+</Card>
+
+<Card title="Architecture" icon="network" href="/developer-guides/cloud-functions/architecture">
+  Understand the security, durability, consistency, and latency model.
+</Card>
+
+<Card title="API reference" icon="book-open" href="/api-references/cloud-functions">
+  Browse Cloud Functions endpoints for apps, deployments, routes, events, metrics, and lifecycle actions.
+</Card>
+
+## What you can build
+
+| Use case | How Cloud Functions helps |
+| --- | --- |
+| Webhooks | Receive provider callbacks without managing a long-running server. |
+| Lightweight APIs | Ship small HTTP handlers behind a Final-managed route. |
+| CI-deployed endpoints | Deploy from GitHub Actions, Buildkite, Jenkins, Final automation, or a local shell with the same command. |
+| Preview handlers | Publish per-service or per-branch handlers that can be smoke-tested after deploy. |
+
+## Runtime model
+
+A Cloud Function app has a stable name, owner scope, region, default hostname, routes, deployments, and immutable versions.
+
+Deploying through Final Cloud creates an app deployment and reconciles the function runtime behind it. The latest active version receives traffic for active routes. Previous active placements are evicted when a new version is promoted.
+
+Functions use a workerd runtime. Your module exports a `fetch(request, env)` handler.
+
+```js
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    return Response.json({
+      ok: true,
+      path: url.pathname,
+      name: env.FINAL_APP_NAME,
+    });
+  },
+};
+```
+
+## Authentication
+
+Use a Final API key for deploy and management requests. Computer-scoped tokens cannot manage Cloud Functions.
+
+```bash
+export FINAL_CLOUD_API_KEY="ak_..."
+```
+
+Cloud Function apps can be user-owned or team-owned. Pass `teamId` when the function should belong to a team.
+
+## Deployment options
+
+Use the Final Cloud API when you already have a `final-cloud.yaml` manifest and source archive. Use the deploy CLI when you want the tool to generate the manifest, package the source, submit the deployment, and optionally smoke-test the public hostname.
+
+Start with [Deploy Cloud Functions](/developer-guides/cloud-functions/deploy).

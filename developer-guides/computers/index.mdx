@@ -31,6 +31,10 @@ You can manage Computers with the public REST API, the `final-computer` CLI, or 
   Configure HTTP ports, public access, custom domains, and sharing.
 </Card>
 
+<Card title="Deploy with Final Cloud" icon="cloud" href="/developer-guides/final-cloud">
+  Deploy services, jobs, and JavaScript HTTP handlers without managing Computers directly.
+</Card>
+
 <Card title="Manage tokens and SSH keys" icon="key-round" href="/developer-guides/computers/access">
   Manage computer tokens, register SSH public keys, and choose the right credential for each workflow.
 </Card>
@@ -48,6 +52,8 @@ You can manage Computers with the public REST API, the `final-computer` CLI, or 
 | Team-owned Computer | A Computer owned by a team. Create one by passing `teamId` as a `team_` ID when you create the Computer. |
 | Image | The container image used to boot the Computer, such as `docker.io/library/ubuntu:24.04` or a private image. |
 | Ephemeral Computer | A Computer that is deleted when it becomes idle instead of being paused. Use this for short-lived jobs and sandboxes. |
+| Final Cloud | A manifest-based deploy system for services, jobs, and Cloud Functions. |
+| Cloud Function | A managed JavaScript HTTP runtime for workloads that do not need direct machine lifecycle control. |
 | Auto resume | A setting that lets retained Computers wake when accessed after being paused or shelved. |
 | computer token | A scoped Computer credential you can create, list, and revoke from the public API. |
 | SSH key | An OpenSSH public key registered to your user for SSH access to Computers in your organization. |

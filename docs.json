@@ -74,6 +74,17 @@
             ]
           },
           {
+            "group": "Final Cloud",
+            "pages": [
+              "developer-guides/final-cloud/index",
+              "developer-guides/final-cloud/manifest",
+              "developer-guides/final-cloud/architecture",
+              "developer-guides/cloud-functions/index",
+              "developer-guides/cloud-functions/architecture",
+              "developer-guides/cloud-functions/deploy"
+            ]
+          },
+          {
             "group": "Version Control",
             "pages": [
               "developer-guides/git/index",
@@ -352,6 +363,13 @@
                   "api-references/computers/regions/list"
                 ]
               }
+            ]
+          },
+          {
+            "group": "Final Cloud",
+            "pages": [
+              "api-references/final-cloud/index",
+              "api-references/cloud-functions/index"
             ]
           },
           {
