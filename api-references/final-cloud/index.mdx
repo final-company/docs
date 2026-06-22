@@ -15,18 +15,41 @@ Use a Final API key:
 Authorization: Bearer <api-key>
 ```
 
-Reads require `apps:read`. Mutations require `apps:write`. Deployment and job-run requests require a user-owned or team-owned API key.
+Reads require `apps:read`. Mutations require `apps:write`. Deployment, redeploy, rollback, and job-run requests require a user-owned or team-owned API key.
 
 ## Endpoints
 
 | Method | Path | Description |
 | --- | --- | --- |
+| `GET` | `/v1/final-cloud/apps` | List apps in the organization. |
 | `POST` | `/v1/final-cloud/apps` | Create or update an app record. |
+| `GET` | `/v1/final-cloud/apps/{appId}` | Get app status. |
 | `GET` | `/v1/final-cloud/apps/{appId}/status` | Get app status, latest deployment, services, jobs, and functions. |
+| `GET` | `/v1/final-cloud/apps/{appId}/config` | Read repository-backed app config. |
+| `PUT` | `/v1/final-cloud/apps/{appId}/config` | Write repository-backed app config. |
+| `GET` | `/v1/final-cloud/apps/{appId}/deployments` | List app deployments. |
+| `GET` | `/v1/final-cloud/apps/{appId}/deployments/{deploymentId}` | Get deployment details, events, logs, metrics, resources, hooks, and diagnostics. |
+| `POST` | `/v1/final-cloud/apps/{appId}/deployments/{deploymentId}/redeploy` | Redeploy from a stored deployment manifest. |
+| `POST` | `/v1/final-cloud/apps/{appId}/deployments/{deploymentId}/rollback` | Roll back to a selected healthy deployment. |
+| `DELETE` | `/v1/final-cloud/apps/{appId}` | Soft-delete an app. |
+| `POST` | `/v1/final-cloud/apps/{appId}/domains/verify` | Compare manifest domains with runtime state. |
+| `POST` | `/v1/final-cloud/apps/{appId}/domains` | Add or remove a domain in a repository-backed manifest. |
 | `GET` | `/v1/final-cloud/apps/{appId}/events` | List deployment and runtime events. |
+| `GET` | `/v1/final-cloud/apps/{appId}/logs` | List unified logs with filters and cursor pagination. |
+| `GET` | `/v1/final-cloud/apps/{appId}/metrics` | Read deployment, service, HTTP, job, and function metrics. |
 | `POST` | `/v1/final-cloud/deployments` | Deploy one app from a manifest. |
 | `POST` | `/v1/final-cloud/workspace/deployments` | Deploy multiple app manifests from one workspace. |
 | `POST` | `/v1/final-cloud/jobs/{jobName}/runs` | Trigger a job immediately. |
+| `POST` | `/v1/final-cloud/repository-pushes` | Process a repository push and deploy matching apps. |
+
+## List apps
+
+```bash
+curl "https://api.final.ai/v1/final-cloud/apps" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Returns `{ "ok": true, "apps": [...] }`.
 
 ## Create an app
 
@@ -37,6 +60,8 @@ curl -X POST "https://api.final.ai/v1/final-cloud/apps" \
   -d '{
     "displayName": "API",
     "manifestPath": "apps/api/final-cloud.yaml",
+    "repositoryId": "repo_...",
+    "branch": "main",
     "metadata": {
       "source": "ci"
     }
@@ -55,6 +80,33 @@ The response includes the stable `appId`:
 ```
 
 If you omit `slug`, Final derives one from `displayName` and `manifestPath`.
+
+Pass `repositoryId`, `branch`, and `manifestPath` when Final Cloud should read and update the app manifest from a repository.
+
+## Read and update app config
+
+Repository-backed apps expose their manifest through the config API:
+
+```bash
+curl "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/config" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+The response includes `manifestText`, parsed `manifest`, `normalizedManifest`, diagnostics, file locator, and `fileSha`.
+
+Write config with either `manifestText` or `manifest`:
+
+```bash
+curl -X PUT "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/config" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "manifestText": "name: api\nimage:\n  repository: ghcr.io/acme/api\n  tag: latest\nservices:\n  - name: web\n    port: 3000\n    health:\n      path: /health\n",
+    "expectedFileSha": "current-file-sha"
+  }'
+```
+
+Use `expectedFileSha` or `expectedHead` to avoid overwriting newer repository changes.
 
 ## Deploy an app
 
@@ -88,6 +140,20 @@ Deployment responses use `ok` for health:
 ```
 
 `status` can be `healthy`, `failed`, or `rolled_back`.
+
+You can also deploy from a repository instead of passing `manifestText`:
+
+```bash
+curl -X POST "https://api.final.ai/v1/final-cloud/deployments" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appId": "00000000-0000-7000-8000-000000000001",
+    "repositoryId": "repo_...",
+    "ref": "main",
+    "manifestPath": "apps/api/final-cloud.yaml"
+  }'
+```
 
 ## Deploy a workspace
 
@@ -125,6 +191,40 @@ curl "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000
 
 Status includes the app, latest deployment, active services, jobs, and functions.
 
+## Deployments
+
+```bash
+curl "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/deployments?limit=50" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Get one deployment:
+
+```bash
+curl "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/deployments/00000000-0000-7000-8000-000000000010" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+The deployment detail response includes source metadata, events, logs, metrics, resources, lifecycle webhook deliveries, and diagnostics.
+
+Redeploy a stored manifest:
+
+```bash
+curl -X POST "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/deployments/00000000-0000-7000-8000-000000000010/redeploy" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Roll back to a healthy deployment:
+
+```bash
+curl -X POST "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/deployments/00000000-0000-7000-8000-000000000010/rollback" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
 ## Read events
 
 ```bash
@@ -133,6 +233,50 @@ curl "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000
 ```
 
 Use `deploymentId` to filter events for one deployment.
+
+## Logs and metrics
+
+```bash
+curl "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/logs?deploymentId=00000000-0000-7000-8000-000000000010&limit=200" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Log filters include `deploymentId`, `source`, `severity`, `resource`, `query`, `startTime`, `endTime`, `cursor`, and `limit`. The response includes `nextCursor` when more logs are available.
+
+```bash
+curl "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/metrics?hours=24" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Metric filters include `deploymentId`, `resource`, `startTime`, `endTime`, and `hours`. Service CPU is reported as vCPU.
+
+## Domains
+
+Verify domains declared in the manifest:
+
+```bash
+curl -X POST "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/domains/verify" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Add a domain to a repository-backed manifest:
+
+```bash
+curl -X POST "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001/domains" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "add",
+    "kind": "service",
+    "resourceName": "web",
+    "hostname": "api.example.com",
+    "expectedFileSha": "current-file-sha"
+  }'
+```
+
+For function domains, use `"kind": "function"` and include `pathPrefix` when needed.
 
 ## Trigger a job
 
@@ -146,3 +290,28 @@ curl -X POST "https://api.final.ai/v1/final-cloud/jobs/sync/runs" \
 ```
 
 The response includes a job run result. `ok` is `true` when the run succeeds.
+
+## Repository push events
+
+```bash
+curl -X POST "https://api.final.ai/v1/final-cloud/repository-pushes" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "github_push",
+    "repositoryId": "repo_...",
+    "branch": "main",
+    "after": "abc123"
+  }'
+```
+
+Final Cloud deploys matching repository-linked apps only when `final-cloud.yaml` allows the pushed branch and trigger.
+
+## Delete an app
+
+```bash
+curl -X DELETE "https://api.final.ai/v1/final-cloud/apps/00000000-0000-7000-8000-000000000001" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+Delete returns `{ "ok": true, "deleted": true }`.

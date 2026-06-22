@@ -10,6 +10,7 @@ description: "Define Final Cloud apps with final-cloud.yaml."
 | Field | Description |
 | --- | --- |
 | `name` | App name. |
+| `deploy` | Branch and trigger rules for repository-driven deploys. |
 | `build` | Default source build for services and jobs. |
 | `image` | Default container image for services and jobs. |
 | `env` | Plain environment values shared by workloads. |
@@ -17,6 +18,8 @@ description: "Define Final Cloud apps with final-cloud.yaml."
 | `secrets` | Secret references exposed as environment variables. |
 | `volumes` | Persistent volumes mounted into services or jobs. |
 | `hooks.preDeploy` | Commands to run before rollout. |
+| `hooks.webhooks` | Lifecycle webhooks for deployment events. |
+| `observability.logs` | Runtime log capture and retention policy. |
 | `services` | Long-running HTTP services. |
 | `jobs` | Scheduled or manually triggered commands. |
 | `functions` | JavaScript HTTP functions. |
@@ -54,6 +57,43 @@ services:
 ```
 
 Each service needs a `port` and `health.path`. It can inherit the top-level `build` or `image`, or define its own.
+
+## Deploy triggers
+
+```yaml
+deploy:
+  branches:
+    - main
+    - release/*
+  triggers:
+    githubPush: true
+    finalGitBranchWrite: true
+```
+
+`branches` defaults to `["main"]`. `finalGitBranchWrite` defaults to `true`; `githubPush` defaults to `false`.
+
+Repository push events deploy only when the branch matches and the trigger is enabled.
+
+## Lifecycle webhooks
+
+```yaml
+hooks:
+  webhooks:
+    - name: deploy-events
+      url: https://hooks.example.com/final-cloud
+      events:
+        - deployment.started
+        - deployment.succeeded
+        - deployment.failed
+      signingSecret:
+        ref: secrets/final-cloud-webhook
+      headers:
+        X-Source: final-cloud
+```
+
+Lifecycle webhooks can subscribe to `deployment.started`, `deployment.succeeded`, `deployment.failed`, and `deployment.rolled_back`.
+
+Use `signingSecret` to sign webhook deliveries with a secret stored in Final. Webhook targets must be public HTTPS endpoints.
 
 ## Job example
 
@@ -106,3 +146,15 @@ Functions use the `workerd` runtime and export a `fetch(request, env)` handler. 
 When a deployment includes `sourceArchive`, Final builds from that archive. Archives use `tar.gz` and can be sent inline as `dataB64` or by URL with an optional `sha256` digest.
 
 Use source archives for CI or agent deploys where the caller has a checked-out workspace. Use images when your pipeline already published an immutable container.
+
+## Observability
+
+```yaml
+observability:
+  logs:
+    stdout: true
+    stderr: true
+    retention: 30d
+```
+
+Log retention can be `7d`, `14d`, `30d`, or `90d`. Runtime logs, deployment events, build logs, job runs, and Cloud Function events are available through the Final Cloud logs API.

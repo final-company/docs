@@ -1,0 +1,64 @@
+---
+title: "Control plane"
+description: "Manage Final Cloud apps, deployments, config, domains, logs, and metrics."
+---
+
+The Final Cloud control plane keeps app configuration, deployment history, runtime status, logs, metrics, and repository-triggered deploys behind one API.
+
+Use this guide when you are building a product UI, CI integration, or agent workflow around Final Cloud apps.
+
+## App records
+
+Create an app once, then deploy it many times. An app can be standalone, or linked to a repository by storing:
+
+- `repositoryId`
+- `branch`
+- `manifestPath`
+
+Repository-linked apps can read and write their `final-cloud.yaml` through the control plane. Writes include optimistic checks with `expectedFileSha` and can create a commit through Final's repository service.
+
+## Config editing
+
+Use `GET /v1/final-cloud/apps/{appId}/config` to read the app manifest from its repository. The response includes the raw `manifestText`, parsed manifest, normalized manifest, diagnostics, file locator, and `fileSha`.
+
+Use `PUT /v1/final-cloud/apps/{appId}/config` to write `manifestText` or a structured `manifest` object back to the repository.
+
+## Deployments
+
+You can deploy in three ways:
+
+1. Submit `manifestText` directly.
+2. Submit `repositoryId`, `ref`, and `manifestPath` so Final reads the manifest from a repository.
+3. Use workspace deployments to deploy several app manifests in sequence.
+
+Each deployment stores source metadata such as trigger, repository, branch, ref, commit SHA, author, and manifest path when provided.
+
+You can redeploy an earlier deployment from its stored manifest, or roll back to a selected healthy deployment.
+
+## Domains
+
+Final Cloud can inspect custom domains declared in service `domains` and function route `hostname` fields.
+
+Use domain verification to compare the YAML against runtime state. Use domain mutation to add or remove a domain in the repository-backed manifest. Domain mutation commits the YAML change, so pass `expectedFileSha` when you want to avoid overwriting a newer edit.
+
+## Logs and metrics
+
+Logs are unified across deployment events, build logs, job runs, service runtime logs, and Cloud Function runtime events. Use filters such as `deploymentId`, `source`, `severity`, `resource`, time range, text query, and cursor pagination.
+
+Metrics include deployment rollups, service CPU and memory, HTTP request/error/latency data, job run counts, and Cloud Function invocation metrics. Service CPU is reported as vCPU for the selected time bucket.
+
+## Repository triggers
+
+The `deploy` section of `final-cloud.yaml` controls push-triggered deploys:
+
+```yaml
+deploy:
+  branches:
+    - main
+    - release/*
+  triggers:
+    githubPush: true
+    finalGitBranchWrite: true
+```
+
+Final deploys a repository-linked app only when the pushed branch matches `deploy.branches` and the matching trigger is enabled.

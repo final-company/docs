@@ -78,6 +78,7 @@
             "pages": [
               "developer-guides/final-cloud/index",
               "developer-guides/final-cloud/manifest",
+              "developer-guides/final-cloud/control-plane",
               "developer-guides/final-cloud/architecture",
               "developer-guides/cloud-functions/index",
               "developer-guides/cloud-functions/architecture",

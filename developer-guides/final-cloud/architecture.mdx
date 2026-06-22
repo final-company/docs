@@ -3,7 +3,7 @@ title: "Architecture"
 description: "How Final Cloud handles security, durability, consistency, scalability, and latency."
 ---
 
-Final Cloud is a desired-state deployment system. The manifest describes what should run, and each deployment reconciles services, jobs, functions, environment, artifacts, and volumes toward that state.
+Final Cloud is a desired-state deployment system. The manifest describes what should run, and each deployment reconciles services, jobs, functions, environment, artifacts, volumes, lifecycle webhooks, and observability toward that state.
 
 ## Security
 
@@ -13,13 +13,15 @@ Deployments and job runs require a user-owned or team-owned key. That gives Fina
 
 Environment values and secret references are resolved at deploy time. Secrets stay referenced by name in the manifest instead of being copied into source code or docs.
 
+Lifecycle webhooks require public targets. Signing secrets are resolved from Final secrets, and sensitive delivery headers are redacted from persisted delivery records.
+
 ## Scalability and durability
 
-Apps, manifests, deployments, events, jobs, and runtime state are stored separately. A failed runtime rollout does not erase the manifest or previous healthy deployment record.
+Apps, manifests, deployments, events, logs, metrics, jobs, webhook deliveries, and runtime state are stored separately. A failed runtime rollout does not erase the manifest or previous healthy deployment record.
 
 Services can scale across replicas. Jobs can be scheduled, retried, and manually triggered. Functions are deployed as immutable bundles with region and resource settings.
 
-Source builds run from uploaded or referenced archives. Image-based workloads can deploy from already-published artifacts.
+Source builds run from uploaded or referenced archives. Image-based workloads can deploy from already-published artifacts. Repository-linked apps can redeploy from stored manifests or from the current repository manifest.
 
 ## Consistency
 
@@ -29,8 +31,10 @@ Deployments move through explicit phases: parse, store, resolve environment, rec
 
 If a rollout fails after entering runtime changes and a previous healthy deployment exists, Final attempts to roll back to the previous healthy state.
 
+Repository triggers are gated by `deploy.branches` and `deploy.triggers`, so a push only deploys apps that explicitly allow that branch and event source.
+
 ## Latency
 
-Reads return app status and events without rebuilding the world. Deploy latency depends on source build time, pre-deploy hooks, health checks, service rollout, and function bundle activation.
+Reads return app status, events, logs, and metrics without rebuilding the world. Deploy latency depends on source build time, pre-deploy hooks, lifecycle webhook delivery, health checks, service rollout, and function bundle activation.
 
 Cloud Functions avoid provisioning a full Computer per request. Services optimize for long-running HTTP workloads where process startup and health checks happen during deploy.

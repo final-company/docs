@@ -5,10 +5,14 @@ description: "Deploy services, jobs, and Cloud Functions from a final-cloud.yaml
 
 Final Cloud deploys app workloads from one manifest. Use it when you want a CI runner or agent to ship a service, scheduled job, one-off job, or Cloud Function without wiring together separate build, rollout, secret, and health-check systems.
 
-A Final Cloud app has a stable app ID and owner scope. Each deployment submits a `final-cloud.yaml` manifest and optional source archive. Final stores the manifest, resolves artifacts and environment, rolls the declared workloads, and marks the deployment `healthy`, `failed`, or `rolled_back`.
+A Final Cloud app has a stable app ID, owner scope, optional repository link, and deployment history. Each deployment submits a `final-cloud.yaml` manifest or resolves one from a repository. Final stores the manifest, resolves artifacts and environment, rolls the declared workloads, and marks the deployment `healthy`, `failed`, or `rolled_back`.
 
 <Card title="Manifest reference" icon="file-code" href="/developer-guides/final-cloud/manifest">
   Define services, jobs, functions, volumes, environment variables, and hooks.
+</Card>
+
+<Card title="Control plane" icon="sliders-horizontal" href="/developer-guides/final-cloud/control-plane">
+  Manage app config, deploys, rollbacks, domains, logs, metrics, and repository triggers.
 </Card>
 
 <Card title="Architecture" icon="network" href="/developer-guides/final-cloud/architecture">
@@ -34,9 +38,10 @@ A Final Cloud app has a stable app ID and owner scope. Each deployment submits a
 ## Deployment model
 
 1. Create or reuse a Final Cloud app.
-2. Submit a manifest through `/v1/final-cloud/deployments`.
-3. Include a source archive when Final should build from source.
-4. Poll app status or read deployment events.
+2. Link the app to a repository, or submit a manifest directly.
+3. Deploy through `/v1/final-cloud/deployments`.
+4. Include a source archive when Final should build from source.
+5. Poll app status, stream logs, read metrics, or inspect deployment events.
 
 The same app can be deployed many times. Each deploy records the manifest and creates a deployment result. If a runtime rollout fails after a previous healthy deployment exists, Final attempts to restore the previous healthy runtime state.
 
@@ -65,3 +70,9 @@ services:
 Use a Final API key with `apps:read` to read app status and events. Use `apps:write` to create apps, submit deployments, and trigger jobs.
 
 Deployment and job-run requests require a user-owned or team-owned API key so Final can attribute runtime actions and resolve scoped secrets.
+
+## Repository deploys
+
+When an app has `repositoryId`, `branch`, and `manifestPath` metadata, Final Cloud can read `final-cloud.yaml` from the repository. Push events deploy only when the manifest `deploy` settings allow that branch and trigger.
+
+Use repository-linked apps when you want the control plane to edit the manifest, verify domains from YAML, and redeploy from a known commit source.
