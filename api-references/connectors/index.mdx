@@ -1,0 +1,20 @@
+---
+title: "Connectors API"
+description: "Reference for the public Connectors REST API."
+---
+
+Use the Connectors API to list your organization's integrated connectors, inspect a connector's tools, and invoke connector tools.
+
+Every request uses bearer authentication with a Final API key:
+
+```http
+Authorization: Bearer final_sk_...
+```
+
+The Connectors API is mounted at:
+
+```text
+https://api.final.ai/v1/connectors
+```
+
+Listing requires the `apps:read` permission. Tool invocation (`/invoke` and `/mcp`) requires a Final API key.

@@ -1,0 +1,75 @@
+---
+title: "Quickstart"
+description: "List connectors, inspect tools, and invoke one."
+---
+
+## List your connectors
+
+```bash
+curl "https://api.final.ai/v1/connectors" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+```json
+{
+  "connectors": [
+    { "id": "app_2x9q...", "name": "GitHub", "type": "website" },
+    { "id": "app_7k2m...", "name": "Slack", "type": "website" }
+  ]
+}
+```
+
+## List a connector's tools
+
+```bash
+curl "https://api.final.ai/v1/connectors/app_2x9q.../tools" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}"
+```
+
+```json
+{
+  "tools": [
+    { "id": "tool_a1b2...", "name": "issues.create", "mcp_tool_name": "github.issues.create", "requires_credential": true },
+    { "id": "tool_c3d4...", "name": "users.get_authenticated", "mcp_tool_name": "github.users.get_authenticated", "requires_credential": true }
+  ]
+}
+```
+
+## Invoke a tool
+
+Pass the tool's `mcp_tool_name` as `toolName` — `name` is just the short display label.
+
+```bash
+curl -X POST "https://api.final.ai/v1/connectors/invoke" \
+  -H "Authorization: Bearer ${FINAL_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "toolName": "github.users.get_authenticated",
+    "args": {},
+    "idempotencyKey": "req-001"
+  }'
+```
+
+```json
+{
+  "ok": true,
+  "status": 200,
+  "body": { "login": "octocat" },
+  "toolId": "tool_c3d4...",
+  "externalAppId": "app_2x9q...",
+  "version": 3
+}
+```
+
+`ok` means the connector dispatched the call; the upstream HTTP status is in `status`.
+
+## Connect an MCP client
+
+To expose your connectors' tools to an MCP client (Claude, Cursor, …), point it at the MCP endpoint with your Final API key:
+
+```text
+https://api.final.ai/v1/connectors/mcp
+Authorization: Bearer final_sk_...
+```
+
+The client's `tools/list` returns every tool across your organization's connectors; `tools/call` runs them.

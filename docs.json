@@ -129,6 +129,13 @@
               "developer-guides/durable-execution/workflows-and-events",
               "developer-guides/durable-execution/runs"
             ]
+          },
+          {
+            "group": "Connectors",
+            "pages": [
+              "developer-guides/connectors/index",
+              "developer-guides/connectors/quickstart"
+            ]
           }
         ]
       },
@@ -497,6 +504,16 @@
                   "api-references/durable-execution/runs/signal"
                 ]
               }
+            ]
+          },
+          {
+            "group": "Connectors",
+            "pages": [
+              "api-references/connectors/index",
+              "api-references/connectors/list",
+              "api-references/connectors/tools",
+              "api-references/connectors/invoke",
+              "api-references/connectors/mcp"
             ]
           }
         ]

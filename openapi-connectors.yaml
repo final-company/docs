@@ -1,0 +1,230 @@
+openapi: 3.0.3
+info:
+  title: Final Connectors API
+  version: "1.0"
+  description: REST API for listing Final connectors and invoking connector tools.
+servers:
+  - url: https://api.final.ai
+security:
+  - bearerAuth: []
+tags:
+  - name: Connectors
+  - name: Tools
+paths:
+  /v1/connectors:
+    get:
+      operationId: listConnectors
+      tags: [Connectors]
+      summary: List connectors
+      description: List the connectors (integrated external apps) installed in the authenticated organization. Requires the `apps:read` permission.
+      responses:
+        "200":
+          description: Connectors were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [connectors]
+                properties:
+                  connectors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Connector"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/connectors/{connectorId}/tools:
+    get:
+      operationId: listConnectorTools
+      tags: [Tools]
+      summary: List connector tools
+      description: List the tools exposed by a connector. Requires the `apps:read` permission.
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          description: Connector ID (an `app_` wire ID).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tools were returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tools]
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tool"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/connectors/invoke:
+    post:
+      operationId: invokeConnectorTool
+      tags: [Tools]
+      summary: Invoke a connector tool
+      description: "Invoke a connector tool by name. The connector backend applies the connector's configured authentication to the upstream call and returns the result. `status` carries the upstream HTTP status code."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvokeRequest"
+      responses:
+        "200":
+          description: The tool was dispatched.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvokeResponse"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/connectors/mcp:
+    post:
+      operationId: connectorsMcp
+      tags: [Connectors]
+      summary: MCP endpoint
+      description: "Model Context Protocol (MCP) Streamable-HTTP endpoint (JSON-RPC 2.0). Point an MCP client (Claude, Cursor, …) at this URL with an `Authorization: Bearer final_sk_…` header to expose the organization's connector tools to the client. Request and response bodies follow MCP JSON-RPC framing rather than a fixed REST schema."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A JSON-RPC 2.0 request (MCP).
+      responses:
+        "200":
+          description: A JSON-RPC 2.0 response (MCP), returned as JSON or an SSE stream.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+      description: Final API key (`final_sk_…`).
+  responses:
+    Unauthorized:
+      description: Bearer token is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The API key lacks the required permission.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidRequest:
+      description: Request body or parameters are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Connector:
+      type: object
+      description: An integrated external application.
+      properties:
+        id:
+          type: string
+          description: Connector ID (`app_` wire ID).
+        name:
+          type: string
+        type:
+          type: string
+          enum: [unknown, website, desktop_app]
+          description: "Connector type."
+        url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Tool:
+      type: object
+      description: A tool exposed by a connector.
+      properties:
+        id:
+          type: string
+          description: Tool ID (`tool_` wire ID).
+        external_app_id:
+          type: string
+          description: Owning connector ID (`app_` wire ID).
+        name:
+          type: string
+          description: Short display name (e.g. `users.get_authenticated`).
+        mcp_tool_name:
+          type: string
+          nullable: true
+          description: >-
+            Namespaced identifier to pass as `toolName` when invoking
+            (e.g. `github.users.get_authenticated`). Null tools are not invokable.
+        description:
+          type: string
+          nullable: true
+        requires_credential:
+          type: boolean
+        mcp_input_schema:
+          type: object
+          additionalProperties: true
+          description: JSON Schema for the tool's arguments.
+    InvokeRequest:
+      type: object
+      required: [toolName]
+      properties:
+        toolName:
+          type: string
+          description: The tool to invoke — the `mcp_tool_name` from the tools listing.
+        args:
+          type: object
+          additionalProperties: true
+          description: Arguments passed to the tool.
+        idempotencyKey:
+          type: string
+    InvokeResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          description: True when the connector dispatched the request. Check `status` for the upstream result.
+        status:
+          type: integer
+          description: Upstream HTTP status code.
+        body:
+          description: Upstream response body.
+        durationMs:
+          type: number
+        toolId:
+          type: string
+          description: Tool ID (`tool_` wire ID).
+        externalAppId:
+          type: string
+          description: Connector ID (`app_` wire ID).
+        version:
+          type: integer
+        targetHost:
+          type: string
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string

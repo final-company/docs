@@ -1,0 +1,35 @@
+---
+title: "Connectors"
+description: "List integrated connectors, inspect their tools, and invoke them."
+---
+
+Connectors are external applications integrated into your Final organization. Use the Connectors API to list the connectors available to your organization, inspect each connector's tools, and invoke those tools — either one call at a time over REST, or by pointing an MCP client at the connector tool surface.
+
+Every request uses bearer authentication with a Final API key:
+
+```http
+Authorization: Bearer final_sk_...
+```
+
+The Connectors API is at:
+
+```text
+https://api.final.ai/v1/connectors
+```
+
+<Card title="Quickstart" icon="rocket" href="/developer-guides/connectors/quickstart">
+  List connectors, inspect tools, and invoke one.
+</Card>
+
+<Card title="API reference" icon="book-open" href="/api-references/connectors">
+  Every Connectors REST endpoint.
+</Card>
+
+## Concepts
+
+| Concept | Description |
+| --- | --- |
+| Connector | An integrated external application. Listed by `GET /v1/connectors`; IDs are `app_` wire IDs. |
+| Tool | An operation a connector exposes. Listed by `GET /v1/connectors/{connectorId}/tools`; IDs are `tool_` wire IDs. |
+| Invocation | A single tool call via `POST /v1/connectors/invoke`. The connector applies its configured upstream auth. |
+| MCP endpoint | `POST /v1/connectors/mcp` — a Model Context Protocol (Streamable HTTP, JSON-RPC) endpoint that exposes your connector tools to an MCP client (Claude, Cursor, …). |
