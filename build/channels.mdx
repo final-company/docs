@@ -1,0 +1,158 @@
+---
+title: "Channels and webhooks"
+sidebarTitle: "Channels"
+description: "Turn webhooks and other HTTP requests into messages for your agent."
+---
+
+A channel gives your agent its own HTTP endpoints. When another system calls one, like your deploy pipeline, GitHub, or a monitoring alert, your route code turns the request into a message for the agent. Use a channel when outside events should wake the agent up. To have the agent call out to another service instead, use a [connection](/build/connections).
+
+## Add a webhook route
+
+Add a file to `agent/channels/`. The file name becomes part of the URL. This route accepts deploy events from your CI system and tells the agent about each one:
+
+```ts agent/channels/deploys.ts
+import { defineChannel, POST } from '@finalai/agents/channels';
+import { z } from 'zod';
+
+const deployEvent = z.object({
+  id: z.string(),
+  service: z.string(),
+  version: z.string(),
+  status: z.enum(['succeeded', 'failed']),
+});
+
+export default defineChannel({
+  routes: [
+    POST('/events', async ({ request, secrets, receive }) => {
+      const token = await secrets.get('deploy-webhook-token');
+      if (!token || request.headers.get('authorization') !== `Bearer ${token}`) {
+        return new Response('unauthorized', { status: 401 });
+      }
+
+      const event = deployEvent.safeParse(await request.json().catch(() => null));
+      if (!event.success) return new Response('invalid payload', { status: 400 });
+
+      const { id, service, version, status } = event.data;
+      await receive({
+        target: { kind: 'bound-conversation' },
+        deliveryId: id,
+        content: [{ type: 'text', text: `Deploy ${status}: ${service} ${version}` }],
+      });
+      return new Response(null, { status: 202 });
+    }),
+  ],
+});
+```
+
+The route checks a shared token, validates the body, and hands the event to the agent with `receive`. `target` says which conversation the message goes to; [connect it to a conversation](#connect-it-to-a-conversation) below. `deliveryId` makes retries safe: if your CI sends the same event twice, the agent sees it once.
+
+Add the token's name to `secrets` in `agent.ts`, and set its value under **Developer** > **Secrets** in the dashboard:
+
+```ts agent/agent.ts
+secrets: ['deploy-webhook-token'],
+```
+
+## Test it locally
+
+`final-agents dev` serves your routes on your machine and reloads when you edit them. Pass local secret values as JSON:
+
+```bash
+AGENT_LOCAL_SECRETS_JSON='{"deploy-webhook-token":"local-test-token"}' \
+  npx final-agents dev ./agent
+```
+
+```text
+serving /Users/you/release-assistant/agent at http://localhost:3000
+  POST http://localhost:3000/deploys/events
+```
+
+In another terminal, send it an event:
+
+```bash
+curl -i http://localhost:3000/deploys/events \
+  -H 'Authorization: Bearer local-test-token' \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"dep_1042","service":"acme-web","version":"1.2.0","status":"succeeded"}'
+```
+
+You get `HTTP/1.1 202 Accepted`, and the dev server logs what the agent would receive:
+
+```text
+receive (deploys): {"target":{"kind":"bound-conversation"},"deliveryId":"dep_1042","content":[{"type":"text","text":"Deploy succeeded: acme-web 1.2.0"}]}
+```
+
+Try a wrong token or an empty body to check that you get `401` and `400`. The dev server only runs your route code. It doesn't start the agent, so test the agent's reply after you publish.
+
+## Publish and get the URL
+
+When you [publish](/operate/publishing), the CLI prints each route's public URL:
+
+```text
+channel deploys (chbind_5Tn2...):
+  POST https://agents.final.ai/acme/release-assistant/deploys/events
+    alias: https://agents.final.ai/b/chbind_5Tn2.../events
+```
+
+Point your sender at that URL with the real token. Both URLs reach the same route.
+
+## Connect it to a conversation
+
+A `bound-conversation` target sends events to the conversation you attach to the channel, such as a team room where people can read the agent's replies. Look up the channel's ID, which the API calls `bindingId`, then attach a [conversation](/client/conversations) that both you and the agent are in:
+
+```ts
+const room = await client.conversations.create({
+  kind: 'group',
+  title: 'Deploys',
+  participants: [{ agent: 'release-assistant' }],
+});
+
+const channels = await client.definitions.channels({ definition: 'release-assistant' });
+const deploys = channels.find((channel) => channel.key === 'deploys');
+if (!deploys) throw new Error('Publish the agent first');
+
+await client.definitions.attachChannel({
+  definition: 'release-assistant',
+  bindingId: deploys.bindingId,
+  conversationId: room.conversation.id,
+});
+```
+
+To send events to the agent owner's direct conversation instead, use `target: { kind: 'owner-direct' }` and skip this step.
+
+## Handle events that arrive mid-turn
+
+If an event arrives while the agent is still working on the previous one, `turnPolicy` decides what happens:
+
+```ts
+export default defineChannel({
+  turnPolicy: 'queue',
+  routes: [/* ... */],
+});
+```
+
+`queue` waits for the current turn to finish. `steer` adds the event to the running turn, so the agent can change course, which suits events like "deploy cancelled."
+
+<Accordion title="Verify a GitHub webhook signature">
+  Providers like GitHub sign the raw request body instead of sending a token. Read the body as text, verify it, then parse it:
+
+  ```ts agent/lib/verify-github.ts
+  const encoder = new TextEncoder();
+
+  export async function isValidGitHubSignature(request: Request, body: string, secret: string | null) {
+    const signature = request.headers.get('x-hub-signature-256')?.replace(/^sha256=/, '');
+    if (!secret || !signature) return false;
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
+    const bytes = Uint8Array.from(signature.match(/../g) ?? [], (hex) => parseInt(hex, 16));
+    return crypto.subtle.verify('HMAC', key, bytes, encoder.encode(body));
+  }
+  ```
+
+  In the route, call `const body = await request.text()`, check `isValidGitHubSignature(request, body, await secrets.get('github-webhook-secret'))`, and only then `JSON.parse(body)`. Use GitHub's `X-GitHub-Delivery` header as the `deliveryId`.
+</Accordion>

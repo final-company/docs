@@ -1,0 +1,139 @@
+---
+title: "Testing and publishing"
+description: "Check your agent locally, try a revision before it goes live, and publish it."
+---
+
+Changing an agent follows the same loop every time: compile it locally to catch mistakes, try the change in a test session, then publish it so new sessions use it. Each publish creates a **revision**, a numbered snapshot you can inspect and compare later.
+
+## Check it locally
+
+`build` compiles the agent and reports anything it can't understand, like a tool without a default export or a schedule with an invalid cron expression:
+
+```bash
+npx final-agents build ./agent
+```
+
+It prints a summary of the tools, connections, schedules, and secrets it found, and writes the compiled output to `agent/.final/compile/`. With `FINAL_API_KEY` set, it also checks that your organization's harness supports everything the agent uses.
+
+`build` doesn't type-check your TypeScript. Add a `tsconfig.json` and run `tsc` for that:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["agent/**/*.ts", "*.ts"]
+}
+```
+
+```bash
+npx tsc
+```
+
+## Publish
+
+```bash
+npx final-agents publish ./agent --agent release-assistant --note 'Add release_status tool'
+```
+
+Publishing does three things:
+
+1. **Uploads your files.** It sends every file Git would commit from the agent directory, including new files you haven't committed yet. Ignored files stay on your machine.
+2. **Compiles them on Final.** If compilation fails, nothing is published.
+3. **Makes the new revision current.** New sessions start on it, and its schedules and channels go live.
+
+```text
+committed 9f3c2a1 to main (2 written, 0 deleted)
+published: revision 4 (arev_9wQe...)
+```
+
+Sessions that are already running keep the revision they started with, so a publish never changes an agent in the middle of a conversation. If nothing changed since the last publish, you'll see `already current` instead of a new revision.
+
+<Warning>
+Publishing makes the agent's repository match your local directory, and deletes remote files that aren't in it. Always publish from a complete checkout of the agent.
+</Warning>
+
+`--note` labels the revision in its history. `--message` sets the commit message.
+
+### Publish from CI
+
+Publish from your CI pipeline to release every change merged to `main`. In GitHub Actions, store your key as a repository secret named `FINAL_API_KEY`:
+
+```yaml .github/workflows/publish-agent.yml
+name: Publish agent
+on:
+  push:
+    branches: [main]
+    paths: ['agent/**']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: npm ci
+      - run: npx final-agents publish ./agent --agent release-assistant --note "${{ github.sha }}"
+        env:
+          FINAL_API_KEY: ${{ secrets.FINAL_API_KEY }}
+```
+
+## Test a revision before publishing
+
+A test revision compiles a branch of the agent's repository without making it current. Start a session on it to try the change while everyone else keeps using the published revision:
+
+```ts
+const revision = await client.definitions.testRevision({
+  definition: 'release-assistant',
+  ref: 'add-release-status',
+});
+
+const { handle, response } = await client.sessions.create({
+  agent: 'release-assistant',
+  revisionId: revision.id,
+  message: 'CI is failing on 1.2.0. Should we ship it?',
+});
+console.log((await response!.result()).text);
+await handle.close();
+```
+
+`ref` is a branch or commit in the agent's repository, not your local files. For an agent backed by GitHub, push a branch. For an agent Final hosts, write your changes to a new branch with `client.definitions.commit({ definition, branch, message, files })`.
+
+Test revisions never activate schedules or channels, but tools and connections run for real, so point them at test data.
+
+Before you publish a change, try a normal request, a request that makes a tool fail, and a follow-up message. If the agent asks for approvals, check that your app shows them and that declining works.
+
+## Agents backed by GitHub
+
+If you created the agent from a connected GitHub repository in the dashboard, Final reads its source from GitHub instead of your upload. Push your changes, then publish a branch, tag, or commit:
+
+```bash
+npx final-agents publish ./agent --agent release-assistant --ref main
+```
+
+The CLI still compiles your local directory to catch errors, but publishes what's on GitHub at `--ref`. Use a commit SHA to publish an exact version.
+
+## Review history and roll back
+
+List an agent's revisions and compare any two:
+
+```ts
+const { revisions } = await client.definitions.revisions({ definition: 'release-assistant' });
+for (const revision of revisions) {
+  console.log(revision.number, revision.note, revision.createdAt);
+}
+
+const diff = await client.definitions.revisionDiff({ definition: 'release-assistant', from: 3 });
+console.log(diff.changes);
+```
+
+`revisionDiff` compares the compiled agents, so it shows changes like an edited instruction or a new tool. Without `to`, it compares against the current revision.
+
+To roll back, restore the earlier files in your checkout, for example with `git revert`, and publish again. The fix becomes a new revision, so the history stays complete.

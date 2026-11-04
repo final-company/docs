@@ -1,0 +1,85 @@
+---
+title: "MCP gateway"
+description: "Add one MCP server to Claude Code, Codex, Cursor, or Claude and reach every account you've connected to Final."
+---
+
+import AgentSetup from '/snippets/agent-setup/mcp-gateway.mdx';
+
+The MCP gateway gives your AI client one server for all of your tools. Instead of installing and signing in to a separate MCP server for GitHub, Linear, Slack, and everything else, you connect those accounts once in Final and add a single server to your client. In Claude Code, that's one command:
+
+```bash
+claude mcp add --transport http final https://api.final.ai/v1/connectors/mcp
+```
+
+From then on, you can ask your agent to work across your services, and it uses your own accounts to do it. Anything that changes data waits for your approval first.
+
+## Let an agent set it up
+
+Paste this prompt into the client you want to connect. It adds the server, signs you in, and makes one read-only request to prove the connection works.
+
+<AgentSetup />
+
+## What you can ask for
+
+Once a service is connected, ask in plain language. Your agent finds the right tool on its own.
+
+<Columns cols={2}>
+  <Card title="Start coding from the ticket" icon="ticket">
+    "Read Linear issue ENG-482 and list its acceptance criteria before you change any code."
+  </Card>
+  <Card title="Catch up on a thread" icon="comments">
+    "Summarize what the team decided in #release-1-2 on Slack this week."
+  </Card>
+  <Card title="Investigate a failure" icon="bug">
+    "Pull the last day of Sentry errors for acme-web and match each one to an open GitHub issue."
+  </Card>
+  <Card title="Close the loop" icon="check">
+    "Comment on ENG-482 with a summary of the fix and move it to In Review." Final asks you to approve before it posts.
+  </Card>
+</Columns>
+
+## How it works
+
+<Steps>
+  <Step title="Connect your accounts in Final">
+    In the Final dashboard, open **Connectors** and sign in to the services you use. The catalog covers GitHub, Linear, Slack, Notion, Google Drive, Sentry, and many more, and you can add any API that has an OpenAPI spec.
+  </Step>
+  <Step title="Add Final to your AI client">
+    Add the gateway as a remote MCP server and sign in with your Final account. Your client now sees a handful of tools for finding and running every tool behind your connections, so its context stays small no matter how many services you add.
+  </Step>
+  <Step title="Ask, then approve changes">
+    Your agent searches for a tool and calls it with your account. If more than one of your accounts could do the job, it asks you which to use. By default, read-only tools run right away, and tools that create, update, or delete something pause until you approve them.
+  </Step>
+</Steps>
+
+The gateway acts as you. It can only reach the accounts you've connected (or that teammates have shared with your projects), and only within the access you granted each service.
+
+## Two server URLs
+
+The **Connect your agent** dialog on the **Connectors** page shows two URLs. Most people only need the first.
+
+| URL | What it's for |
+| --- | --- |
+| **Final MCP URL**<br />`https://api.final.ai/v1/connectors/mcp` | Everyday work. Your agent uses it to find and call tools across all of your connected accounts. |
+| **Catalog MCP URL**<br />`https://api.final.ai/v1/catalog/mcp` | Optional. Add it as a second server if you want your agent to manage connectors for you, such as finding a service in the catalog or sending you a link to connect a new account. |
+
+## Gateway or Agent SDK?
+
+Use the gateway when you want the AI client you already use, like Claude Code or Cursor, to reach your services. If you're building your own agent to run inside your product, use the [Agent SDK](/agent-sdk) instead and give that agent tools with [connections](/build/connections).
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Connect your client" icon="plug" href="/mcp-gateway/quickstart">
+    Add Final to Claude Code, Codex, Cursor, or Claude and run a first request in about five minutes.
+  </Card>
+  <Card title="Accounts and approvals" icon="user-shield" href="/mcp-gateway/accounts-and-approvals">
+    Choose which account your agent uses and decide which actions need your sign-off.
+  </Card>
+  <Card title="Gateway tools" icon="screwdriver-wrench" href="/mcp-gateway/tools">
+    See the tools your client calls behind the scenes and their inputs.
+  </Card>
+  <Card title="Troubleshooting" icon="life-ring" href="/mcp-gateway/troubleshooting">
+    Fix sign-in, missing services, and stuck approvals.
+  </Card>
+</Columns>

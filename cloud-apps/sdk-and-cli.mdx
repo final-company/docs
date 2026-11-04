@@ -1,0 +1,164 @@
+---
+title: "CLI and TypeScript client"
+sidebarTitle: "CLI and client"
+description: "Reference for the final-cloud CLI and the @finalai/cloud TypeScript client."
+---
+
+The `@finalai/cloud` package contains the `final-cloud` CLI and a TypeScript client for the same API. Use the CLI by hand and in CI, and the client when you're building your own deploy tooling. Both need Node.js 26 or later.
+
+```bash
+npm install --save-dev @finalai/cloud
+```
+
+You can also run the CLI without installing it: `npx @finalai/cloud <command>`.
+
+## Authentication
+
+Both read a [Final API key](/api-keys). The CLI reads it from the environment. The client takes it as an option.
+
+| Variable | Purpose |
+| --- | --- |
+| `FINAL_API_KEY` | Required. An API key with `apps:read` to inspect apps, plus `apps:write` to create, deploy, and run jobs. |
+| `FINAL_CLOUD_API_HOST` | Optional. The API origin, `https://api.final.ai` by default. Give an origin only, with no path. |
+
+## CLI commands
+
+`<app>` is an app's slug or ID, and must match exactly.
+
+| Command | What it does |
+| --- | --- |
+| `apps create <name>` | Creates an app and its Git repository, then prints the remote, branch, and next commands. If the app exists, prints the same details. |
+| `apps list` | Lists apps with their slug, ID, status, and URL. |
+| `apps get <app>` | Shows an app's URL, project, Git remote and branch, and current and latest deployments. |
+| `apps delete <app>` | Deletes an app. Asks first. |
+| `validate` | Checks a local `final-cloud.yaml` without deploying it. |
+| `deploy <app>` | Deploys a pushed commit and follows it until it finishes. |
+| `deployments list <app>` | Lists deployments, newest first. |
+| `deployments get <app> <deployment>` | Shows one deployment's status, commit, error, and events. |
+| `rollback <app> <deployment>` | Makes an earlier healthy deployment current again, without rebuilding. |
+| `logs <app>` | Prints logs, oldest first. |
+| `jobs run <app> <job>` | Starts a cron job run now and prints its run ID. `<job>` is the manifest's `name`. |
+| `types <app>` | Writes `final-cloud.d.ts` with types for the app's environment. |
+| `schema` | Prints the JSON Schema for `final-cloud.yaml`. |
+
+### Command options
+
+| Option | Used with | Effect |
+| --- | --- | --- |
+| `--manifest-path <path>` | `apps create` | Where the manifest lives in the repository, relative to its root. Default: `final-cloud.yaml`. |
+| `--project <prj_...>` | `apps create` | The project to create the app in. Default: your API key's project. |
+| `--manifest <path>` | `validate` | The local file to check. Default: `final-cloud.yaml`. |
+| `--ref <branch-or-sha>` | `deploy` | The branch or commit to deploy. Default: the latest commit on the app's branch. |
+| `--detach` | `deploy` | Print the deployment ID as soon as it starts, without following it. |
+| `--limit <n>` | `deployments list`, `logs` | How many rows to return. |
+| `--source <source>` | `logs` | `build`, `deploy`, or `runtime`. Default: all three. |
+| `--deployment <id>` | `logs` | Only logs from one deployment. |
+| `--follow`, `-f` | `logs` | Keep printing new lines until you press Ctrl+C. |
+| `--out <path>` | `types` | Where to write the file. Default: `final-cloud.d.ts`. |
+
+### Global options
+
+| Option | Effect |
+| --- | --- |
+| `--json` | Print exactly one JSON document on standard output. Progress goes to standard error. Can't be combined with `logs --follow`. |
+| `--yes`, `-y` | Answer confirmation prompts with yes: deploys that widen access, and `apps delete`. |
+| `--help`, `-h` | Show usage. |
+
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success. With `deploy --detach`, the deployment started but may not be healthy yet. |
+| `1` | The command or the deployment failed. |
+| `2` | Invalid usage or configuration, such as a missing `FINAL_API_KEY`. |
+| `3` | Confirmation required. Re-run with `--yes` after reviewing. With `--json`, the output includes `"confirmationRequired": true` and the deploy preview. |
+
+The CLI never runs Git for you. It prints the remote, and you push with your own Git setup.
+
+## TypeScript client
+
+Create a client with your API key. The client takes app IDs rather than slugs; `apps.list()` returns both.
+
+```ts list-apps.ts
+import { createCloudClient, orThrow } from '@finalai/cloud';
+
+const cloud = createCloudClient({
+  host: 'https://api.final.ai',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+
+for (const app of orThrow(await cloud.apps.list())) {
+  console.log(app.slug, app.id, app.status);
+}
+```
+
+### Handle results
+
+Methods never throw. Each one returns a result: `{ ok: true, data }` on success, or `{ ok: false, error }` with the error's `status`, `code`, `message`, and, for invalid manifests, `diagnostics`. An error `status` of `0` means no response arrived, either because of a network failure or because the client rejected the input before sending it.
+
+`orThrow(result)` returns `data` or throws, which keeps scripts short. Check `result.ok` yourself when you want to handle a specific error:
+
+```ts
+const result = await cloud.apps.get({ appId });
+if (!result.ok && result.error.status === 404) {
+  console.log('No such app');
+}
+```
+
+### Deploy and wait
+
+`deployments.create` starts a deployment and returns right away. This script previews the latest commit, stops if the deploy would widen access, then polls until the deployment finishes:
+
+```ts deploy.ts
+import { createCloudClient, orThrow, TERMINAL_DEPLOYMENT_STATUSES } from '@finalai/cloud';
+
+const cloud = createCloudClient({
+  host: 'https://api.final.ai',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+const appId = process.env.FINAL_APP_ID!;
+
+const preview = orThrow(await cloud.deployments.preview({ appId }));
+if (preview.diagnostics.some((item) => item.severity === 'error')) {
+  throw new Error('final-cloud.yaml has errors at this commit');
+}
+if (preview.widensAccess) {
+  throw new Error('This deploy widens access. Review it with `final-cloud deploy` first.');
+}
+if (!preview.commitSha) throw new Error('Nothing pushed to deploy');
+
+const { deploymentId } = orThrow(
+  await cloud.deployments.create({ appId, ref: preview.commitSha }),
+);
+
+let status;
+do {
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  ({ status } = orThrow(await cloud.deployments.get({ appId, deploymentId })).deployment);
+} while (!TERMINAL_DEPLOYMENT_STATUSES.has(status));
+
+console.log(`${deploymentId} finished: ${status}`);
+if (status !== 'healthy') process.exit(1);
+```
+
+Deploying the previewed `commitSha`, rather than the branch name, guarantees you ship exactly what you checked, even if someone pushes in between.
+
+### Methods
+
+| Method | Options | Returns |
+| --- | --- | --- |
+| `apps.list()` | | Every app you can see. |
+| `apps.get(options)` | `appId` | The app and its latest deployment. |
+| `apps.ensure(options)` | `displayName`, `manifestPath`, optional `projectId` | `appId` and whether it was `created`. Returns the existing app if there is one. |
+| `apps.delete(options)` | `appId` | Nothing. |
+| `apps.types(options)` | `appId` | The `final-cloud.d.ts` text. |
+| `apps.repository.ensure(options)` | `appId` | The app's Git `remoteUrl` and `branch`, creating the repository the first time. |
+| `apps.repository.get(options)` | `appId` | The same, or an error with code `not_linked` if there's no repository yet. |
+| `deployments.preview(options)` | `appId` and optional `ref`, or `manifestText` | The commit that would deploy, diagnostics, a summary, the public hostname, and `widensAccess`. |
+| `deployments.create(options)` | `appId`, `ref` (a pushed commit SHA) | `deploymentId`. |
+| `deployments.list(options)` | `appId`, optional `limit` | Deployments, newest first. |
+| `deployments.get(options)` | `appId`, `deploymentId` | The deployment, its source commit, events, and diagnostics. |
+| `deployments.rollback(options)` | `appId`, `deploymentId` | The deployment that's now current and the one it replaced. |
+| `logs.list(options)` | `appId`, optional `deploymentId`, `source`, `severity`, `startTime`, `endTime`, `limit`, `cursor` | Log rows, newest first, and a `nextCursor` for the next, older page. |
+| `jobs.run(options)` | `appId`, `jobName` | `jobRunId`. |
+| `manifestSchema.get()` | | The `final-cloud.yaml` JSON Schema. |

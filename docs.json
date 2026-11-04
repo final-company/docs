@@ -11,509 +11,228 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "User Guides",
-        "pages": [
+        "tab": "General",
+        "icon": "house",
+        "groups": [
           {
-            "group": "Overview",
+            "group": "Get started",
             "pages": [
-              "user-guides/index"
+              "index",
+              "api-keys"
             ]
           }
         ]
       },
       {
-        "tab": "Developer Guides",
-        "pages": [
+        "tab": "Final for AI Coding",
+        "icon": "laptop-code",
+        "groups": [
           {
-            "group": "Overview",
+            "group": "Get started",
             "pages": [
-              "developer-guides/index",
-              "developer-guides/quickstart"
+              "ai-coding/overview",
+              "ai-coding/quickstart"
             ]
           },
           {
-            "group": "Platform",
+            "group": "Set up your workspace",
             "pages": [
-              "developer-guides/authentication",
-              "developer-guides/organizations",
-              "developer-guides/delegated-credentials"
+              "ai-coding/projects",
+              "ai-coding/cloud-environments",
+              "ai-coding/agents"
             ]
           },
           {
-            "group": "Agent Chats",
+            "group": "Work on code",
             "pages": [
-              "developer-guides/agent-chats/index",
-              "developer-guides/agent-chats/architecture",
-              "developer-guides/agent-chats/session-lifecycle",
-              "developer-guides/agent-chats/execution-modes",
-              "developer-guides/agent-chats/product-integration"
-            ]
-          },
-          {
-            "group": "Agent Disk",
-            "pages": [
-              "developer-guides/agent-disk/index",
-              "developer-guides/agent-disk/architecture",
-              "developer-guides/agent-disk/create-and-seed-disks",
-              "developer-guides/agent-disk/branches-and-checkpoints",
-              "developer-guides/agent-disk/access-and-sharing",
-              "developer-guides/agent-disk/usage-and-lifecycle"
-            ]
-          },
-          {
-            "group": "Computers",
-            "pages": [
-              "developer-guides/computers/index",
-              "developer-guides/computers/architecture",
-              "developer-guides/computers/rest-api",
-              "developer-guides/computers/quickstart",
-              "developer-guides/computers/sdk",
-              "developer-guides/computers/lifecycle",
-              "developer-guides/computers/networking",
-              "developer-guides/computers/access"
-            ]
-          },
-          {
-            "group": "Final Cloud",
-            "pages": [
-              "developer-guides/final-cloud/index",
-              "developer-guides/final-cloud/manifest",
-              "developer-guides/final-cloud/control-plane",
-              "developer-guides/final-cloud/architecture",
-              "developer-guides/cloud-functions/index",
-              "developer-guides/cloud-functions/architecture",
-              "developer-guides/cloud-functions/deploy"
-            ]
-          },
-          {
-            "group": "Version Control",
-            "pages": [
-              "developer-guides/git/index",
-              "developer-guides/git/architecture",
-              "developer-guides/git/create-repository",
-              "developer-guides/git/clone",
-              "developer-guides/git/pull-requests",
-              "developer-guides/git/stacked-prs",
-              "developer-guides/git/merge-queues",
-              "developer-guides/git/github-sync",
-              "developer-guides/git/manage"
-            ]
-          },
-          {
-            "group": "Secrets",
-            "pages": [
-              "developer-guides/secrets/index",
-              "developer-guides/secrets/architecture",
-              "developer-guides/secrets/store-and-rotate-secrets",
-              "developer-guides/secrets/use-secrets-with-agents"
-            ]
-          },
-          {
-            "group": "WebSockets",
-            "pages": [
-              "developer-guides/websockets/index",
-              "developer-guides/websockets/architecture",
-              "developer-guides/websockets/session-tokens-and-grants",
-              "developer-guides/websockets/channels",
-              "developer-guides/websockets/work-queues"
-            ]
-          },
-          {
-            "group": "Durable Execution",
-            "pages": [
-              "developer-guides/durable-execution/index",
-              "developer-guides/durable-execution/architecture",
-              "developer-guides/durable-execution/quickstart",
-              "developer-guides/durable-execution/how-it-works",
-              "developer-guides/durable-execution/typescript-sdk",
-              "developer-guides/durable-execution/workflows-and-events",
-              "developer-guides/durable-execution/runs"
-            ]
-          },
-          {
-            "group": "Connectors",
-            "pages": [
-              "developer-guides/connectors/index",
-              "developer-guides/connectors/quickstart"
+              "ai-coding/working-with-agents"
             ]
           }
         ]
       },
       {
-        "tab": "API Reference",
-        "pages": [
-          "api-references/index",
+        "tab": "Agent SDK",
+        "icon": "robot",
+        "groups": [
           {
-            "group": "Platform",
+            "group": "Get started",
             "pages": [
-              {
-                "group": "API keys",
-                "pages": [
-                  "api-references/api-keys/list",
-                  "api-references/api-keys/create",
-                  "api-references/api-keys/delete"
-                ]
-              },
-              {
-                "group": "Organizations",
-                "pages": [
-                  "api-references/organizations/index",
-                  {
-                    "group": "Current organization",
-                    "pages": [
-                      "api-references/organizations/current/get",
-                      "api-references/organizations/current/update",
-                      "api-references/organizations/roles/list"
-                    ]
-                  },
-                  {
-                    "group": "Members",
-                    "pages": [
-                      "api-references/organizations/members/list",
-                      "api-references/organizations/members/update-role",
-                      "api-references/organizations/members/remove"
-                    ]
-                  },
-                  {
-                    "group": "Invitations",
-                    "pages": [
-                      "api-references/organizations/invitations/list",
-                      "api-references/organizations/invitations/create",
-                      "api-references/organizations/invitations/resend",
-                      "api-references/organizations/invitations/revoke"
-                    ]
-                  },
-                  {
-                    "group": "Teams",
-                    "pages": [
-                      "api-references/organizations/teams/list",
-                      "api-references/organizations/teams/create",
-                      "api-references/organizations/teams/get",
-                      "api-references/organizations/teams/update",
-                      "api-references/organizations/teams/delete"
-                    ]
-                  },
-                  {
-                    "group": "Team members",
-                    "pages": [
-                      "api-references/organizations/team-members/list",
-                      "api-references/organizations/team-members/add",
-                      "api-references/organizations/team-members/update-role",
-                      "api-references/organizations/team-members/remove"
-                    ]
-                  }
-                ]
-              },
-              {
-                "group": "Delegated credentials",
-                "pages": [
-                  "api-references/delegated-credentials/index",
-                  "api-references/delegated-credentials/create",
-                  "api-references/delegated-credentials/get",
-                  "api-references/delegated-credentials/refresh",
-                  "api-references/delegated-credentials/revoke"
-                ]
-              }
+              "agent-sdk",
+              "quickstart",
+              "concepts"
             ]
           },
           {
-            "group": "Agent Chats",
+            "group": "Examples",
             "pages": [
-              "api-references/agent-chats/index",
-              {
-                "group": "Chats",
-                "pages": [
-                  "api-references/agent-chats/chats/list",
-                  "api-references/agent-chats/chats/create",
-                  "api-references/agent-chats/chats/get",
-                  "api-references/agent-chats/chats/update",
-                  "api-references/agent-chats/chats/archive"
-                ]
-              },
-              {
-                "group": "Sessions",
-                "pages": [
-                  "api-references/agent-chats/sessions/list",
-                  "api-references/agent-chats/sessions/create",
-                  "api-references/agent-chats/sessions/get",
-                  "api-references/agent-chats/sessions/update",
-                  "api-references/agent-chats/sessions/state",
-                  "api-references/agent-chats/sessions/stop",
-                  "api-references/agent-chats/sessions/archive"
-                ]
-              },
-              {
-                "group": "Messages",
-                "pages": [
-                  "api-references/agent-chats/messages/list",
-                  "api-references/agent-chats/messages/send"
-                ]
-              }
+              "examples/index",
+              "examples/docs-assistant",
+              "examples/issue-triage",
+              "examples/pr-digest",
+              "examples/billing-support",
+              "examples/support-chat",
+              "examples/test-runner",
+              "examples/pr-reviewer",
+              "examples/deploy-watcher",
+              "examples/audit-log"
             ]
           },
           {
-            "group": "Agent Disk",
+            "group": "Build an agent",
             "pages": [
-              "api-references/agent-disk/index",
-              {
-                "group": "Disks",
-                "pages": [
-                  "api-references/agent-disk/disks/list",
-                  "api-references/agent-disk/disks/create",
-                  "api-references/agent-disk/disks/get",
-                  "api-references/agent-disk/disks/delete"
-                ]
-              },
-              {
-                "group": "Disk users",
-                "pages": [
-                  "api-references/agent-disk/users/create",
-                  "api-references/agent-disk/users/delete"
-                ]
-              },
-              {
-                "group": "Checkpoints",
-                "pages": [
-                  "api-references/agent-disk/checkpoints/list",
-                  "api-references/agent-disk/checkpoints/create"
-                ]
-              },
-              {
-                "group": "Branches",
-                "pages": [
-                  "api-references/agent-disk/branches/list",
-                  "api-references/agent-disk/branches/create",
-                  "api-references/agent-disk/branches/delete"
-                ]
-              },
-              {
-                "group": "Share links",
-                "pages": [
-                  "api-references/agent-disk/share/create"
-                ]
-              },
-              {
-                "group": "Usage",
-                "pages": [
-                  "api-references/agent-disk/usage/get"
-                ]
-              }
+              "build/project-structure",
+              "build/configuration",
+              "build/instructions-and-skills",
+              "build/tools",
+              "build/connections",
+              "build/sandboxes",
+              "build/schedules",
+              "build/channels",
+              "build/hooks"
             ]
           },
           {
-            "group": "Computers",
+            "group": "Call your agent",
             "pages": [
-              "api-references/computers/index",
-              {
-                "group": "Computers",
-                "pages": [
-                  "api-references/computers/computers/list",
-                  "api-references/computers/computers/create",
-                  "api-references/computers/computers/get",
-                  "api-references/computers/computers/update",
-                  "api-references/computers/computers/update-visibility",
-                  "api-references/computers/computers/action",
-                  "api-references/computers/computers/list-events",
-                  "api-references/computers/computers/delete"
-                ]
-              },
-              {
-                "group": "Execution",
-                "pages": [
-                  "api-references/computers/execution/execute",
-                  "api-references/computers/execution/stream",
-                  "api-references/computers/execution/list-processes",
-                  "api-references/computers/execution/run-cli-command"
-                ]
-              },
-              {
-                "group": "Files",
-                "pages": [
-                  "api-references/computers/files/read",
-                  "api-references/computers/files/write"
-                ]
-              },
-              {
-                "group": "Shares",
-                "pages": [
-                  "api-references/computers/shares/list",
-                  "api-references/computers/shares/create",
-                  "api-references/computers/shares/delete"
-                ]
-              },
-              {
-                "group": "Domains",
-                "pages": [
-                  "api-references/computers/domains/list",
-                  "api-references/computers/domains/add",
-                  "api-references/computers/domains/delete"
-                ]
-              },
-              {
-                "group": "Tokens",
-                "pages": [
-                  "api-references/computers/tokens/list",
-                  "api-references/computers/tokens/create",
-                  "api-references/computers/tokens/delete"
-                ]
-              },
-              {
-                "group": "SSH keys",
-                "pages": [
-                  "api-references/computers/ssh-keys/list",
-                  "api-references/computers/ssh-keys/add",
-                  "api-references/computers/ssh-keys/delete"
-                ]
-              },
-              {
-                "group": "Regions",
-                "pages": [
-                  "api-references/computers/regions/list"
-                ]
-              }
+              "client/sessions",
+              "client/conversations"
             ]
           },
           {
-            "group": "Final Cloud",
+            "group": "Operate",
             "pages": [
-              "api-references/final-cloud/index",
-              "api-references/cloud-functions/index"
+              "operate/authentication",
+              "operate/publishing",
+              "operate/troubleshooting"
             ]
           },
           {
-            "group": "Version Control",
+            "group": "Reference",
             "pages": [
-              {
-                "group": "Repositories",
-                "pages": [
-                  "api-references/repositories/list",
-                  "api-references/repositories/create",
-                  "api-references/repositories/get",
-                  "api-references/repositories/archive",
-                  "api-references/repositories/delete",
-                  "api-references/repositories/mint-git-credentials"
-                ]
-              },
-              {
-                "group": "Pull requests",
-                "pages": [
-                  "api-references/pull-requests/list",
-                  "api-references/pull-requests/create",
-                  "api-references/pull-requests/get",
-                  "api-references/pull-requests/get-diff",
-                  "api-references/pull-requests/update",
-                  "api-references/pull-requests/create-review",
-                  "api-references/pull-requests/set-parent",
-                  "api-references/pull-requests/detach",
-                  "api-references/pull-requests/repair-stack",
-                  "api-references/pull-requests/split-stack",
-                  "api-references/pull-requests/reorder-stack"
-                ]
-              },
-              {
-                "group": "Merge queues",
-                "pages": [
-                  "api-references/merge-queues/list",
-                  "api-references/merge-queues/create-or-update",
-                  "api-references/merge-queues/enqueue",
-                  "api-references/merge-queues/list-entries",
-                  "api-references/merge-queues/list-attempts",
-                  "api-references/merge-queues/list-activity",
-                  "api-references/merge-queues/update-entry",
-                  "api-references/merge-queues/dequeue-entry",
-                  "api-references/merge-queues/reorder-entries"
-                ]
-              },
-              {
-                "group": "Checks",
-                "pages": [
-                  "api-references/checks/create-commit-status",
-                  "api-references/checks/create-check-run"
-                ]
-              }
+              "sdk-reference"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "MCP gateway",
+        "icon": "plug",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "mcp-gateway/overview",
+              "mcp-gateway/quickstart"
             ]
           },
           {
-            "group": "Secrets",
+            "group": "Use the gateway",
             "pages": [
-              "api-references/secrets/list",
-              "api-references/secrets/create",
-              "api-references/secrets/get",
-              "api-references/secrets/update",
-              "api-references/secrets/delete",
-              "api-references/secrets/read-value",
-              "api-references/secrets/write-value"
+              "mcp-gateway/accounts-and-approvals",
+              "mcp-gateway/tools",
+              "mcp-gateway/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Final VMs",
+        "icon": "server",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "vm-platform/overview",
+              "vm-platform/quickstart"
             ]
           },
           {
-            "group": "WebSockets",
+            "group": "Use VMs",
             "pages": [
-              "api-references/websockets/index",
-              "api-references/websockets/meta",
-              {
-                "group": "Sessions",
-                "pages": [
-                  "api-references/websockets/sessions/create"
-                ]
-              },
-              {
-                "group": "Channels",
-                "pages": [
-                  "api-references/websockets/channels/publish"
-                ]
-              },
-              {
-                "group": "Work queues",
-                "pages": [
-                  "api-references/websockets/work-queues/offer"
-                ]
-              }
+              "vm-platform/workloads",
+              "vm-platform/lifecycle-and-snapshots",
+              "vm-platform/images-and-templates",
+              "vm-platform/files-and-volumes",
+              "vm-platform/networking",
+              "vm-platform/desktop"
             ]
           },
           {
-            "group": "Durable Execution",
+            "group": "Reference",
             "pages": [
-              "api-references/durable-execution/index",
-              {
-                "group": "Namespaces",
-                "pages": [
-                  "api-references/durable-execution/namespaces/get-meta"
-                ]
-              },
-              {
-                "group": "Workflows",
-                "pages": [
-                  "api-references/durable-execution/workflows/list",
-                  "api-references/durable-execution/workflows/register"
-                ]
-              },
-              {
-                "group": "Events",
-                "pages": [
-                  "api-references/durable-execution/events/send"
-                ]
-              },
-              {
-                "group": "Runs",
-                "pages": [
-                  "api-references/durable-execution/runs/trigger",
-                  "api-references/durable-execution/runs/get",
-                  "api-references/durable-execution/runs/history",
-                  "api-references/durable-execution/runs/cancel",
-                  "api-references/durable-execution/runs/retry",
-                  "api-references/durable-execution/runs/signal"
-                ]
-              }
+              "vm-platform/api",
+              "vm-platform/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Final CI Runners",
+        "icon": "play",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "ci-runners/overview",
+              "ci-runners/quickstart"
             ]
           },
           {
-            "group": "Connectors",
+            "group": "Run jobs",
             "pages": [
-              "api-references/connectors/index",
-              "api-references/connectors/list",
-              "api-references/connectors/tools",
-              "api-references/connectors/invoke",
-              "api-references/connectors/mcp"
+              "ci-runners/runner-sizes",
+              "ci-runners/migration"
+            ]
+          },
+          {
+            "group": "Caching",
+            "pages": [
+              "ci-runners/dependency-caching",
+              "ci-runners/docker-builds"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "ci-runners/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Final Cloud Apps",
+        "icon": "cloud",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "cloud-apps/overview",
+              "cloud-apps/quickstart",
+              "cloud-apps/workloads"
+            ]
+          },
+          {
+            "group": "App types",
+            "pages": [
+              "cloud-apps/web-apps",
+              "cloud-apps/services",
+              "cloud-apps/cron-jobs",
+              "cloud-apps/functions"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "cloud-apps/environment-and-data",
+              "cloud-apps/deployments"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "cloud-apps/manifest",
+              "cloud-apps/sdk-and-cli",
+              "cloud-apps/troubleshooting"
             ]
           }
         ]
@@ -522,508 +241,96 @@
   },
   "redirects": [
     {
+      "source": "/user-guides",
+      "destination": "/"
+    },
+    {
+      "source": "/user-guides/index",
+      "destination": "/"
+    },
+    {
+      "source": "/developer-guides",
+      "destination": "/"
+    },
+    {
+      "source": "/developer-guides/index",
+      "destination": "/"
+    },
+    {
+      "source": "/developer-guides/quickstart",
+      "destination": "/quickstart"
+    },
+    {
+      "source": "/developer-guides/authentication",
+      "destination": "/operate/authentication"
+    },
+    {
+      "source": "/developer-guides/connectors",
+      "destination": "/build/connections"
+    },
+    {
+      "source": "/developer-guides/connectors/index",
+      "destination": "/build/connections"
+    },
+    {
+      "source": "/developer-guides/connectors/quickstart",
+      "destination": "/build/connections"
+    },
+    {
+      "source": "/developer-guides/agent-chats",
+      "destination": "/client/sessions"
+    },
+    {
+      "source": "/developer-guides/agent-chats/index",
+      "destination": "/client/sessions"
+    },
+    {
+      "source": "/developer-guides/agent-chats/session-lifecycle",
+      "destination": "/client/sessions"
+    },
+    {
+      "source": "/developer-guides/agent-chats/product-integration",
+      "destination": "/client/conversations"
+    },
+    {
+      "source": "/developer-guides/computers/sdk",
+      "destination": "/build/sandboxes"
+    },
+    {
+      "source": "/api-references",
+      "destination": "/sdk-reference"
+    },
+    {
+      "source": "/api-references/index",
+      "destination": "/sdk-reference"
+    },
+    {
       "source": "/api-reference",
-      "destination": "/api-references"
+      "destination": "/sdk-reference"
     },
     {
-      "source": "/api-reference/api-keys/create",
-      "destination": "/api-references/api-keys/create"
+      "source": "/api-reference/index",
+      "destination": "/sdk-reference"
     },
     {
-      "source": "/api-reference/checks/create-check-run",
-      "destination": "/api-references/checks/create-check-run"
+      "source": "/developer-guides/final-cloud",
+      "destination": "/cloud-apps/overview"
     },
     {
-      "source": "/api-reference/checks/create-commit-status",
-      "destination": "/api-references/checks/create-commit-status"
+      "source": "/developer-guides/final-cloud/index",
+      "destination": "/cloud-apps/overview"
     },
     {
-      "source": "/api-reference/durable-execution",
-      "destination": "/api-references/durable-execution"
+      "source": "/developer-guides/final-cloud/manifest",
+      "destination": "/cloud-apps/manifest"
     },
     {
-      "source": "/api-reference/durable-execution/apps/get-meta",
-      "destination": "/api-references/durable-execution/namespaces/get-meta"
+      "source": "/developer-guides/final-cloud/control-plane",
+      "destination": "/cloud-apps/deployments"
     },
     {
-      "source": "/api-references/durable-execution/apps/get-meta",
-      "destination": "/api-references/durable-execution/namespaces/get-meta"
-    },
-    {
-      "source": "/api-reference/durable-execution/namespaces/get-meta",
-      "destination": "/api-references/durable-execution/namespaces/get-meta"
-    },
-    {
-      "source": "/api-reference/durable-execution/events/send",
-      "destination": "/api-references/durable-execution/events/send"
-    },
-    {
-      "source": "/api-reference/durable-execution/runs/cancel",
-      "destination": "/api-references/durable-execution/runs/cancel"
-    },
-    {
-      "source": "/api-reference/durable-execution/runs/get",
-      "destination": "/api-references/durable-execution/runs/get"
-    },
-    {
-      "source": "/api-reference/durable-execution/runs/history",
-      "destination": "/api-references/durable-execution/runs/history"
-    },
-    {
-      "source": "/api-reference/durable-execution/runs/retry",
-      "destination": "/api-references/durable-execution/runs/retry"
-    },
-    {
-      "source": "/api-reference/durable-execution/runs/signal",
-      "destination": "/api-references/durable-execution/runs/signal"
-    },
-    {
-      "source": "/api-reference/durable-execution/runs/trigger",
-      "destination": "/api-references/durable-execution/runs/trigger"
-    },
-    {
-      "source": "/api-reference/durable-execution/workflows/list",
-      "destination": "/api-references/durable-execution/workflows/list"
-    },
-    {
-      "source": "/api-reference/durable-execution/workflows/register",
-      "destination": "/api-references/durable-execution/workflows/register"
-    },
-    {
-      "source": "/api-reference/merge-queues/create-or-update",
-      "destination": "/api-references/merge-queues/create-or-update"
-    },
-    {
-      "source": "/api-reference/merge-queues/dequeue-entry",
-      "destination": "/api-references/merge-queues/dequeue-entry"
-    },
-    {
-      "source": "/api-reference/merge-queues/enqueue",
-      "destination": "/api-references/merge-queues/enqueue"
-    },
-    {
-      "source": "/api-reference/merge-queues/list",
-      "destination": "/api-references/merge-queues/list"
-    },
-    {
-      "source": "/api-reference/merge-queues/list-activity",
-      "destination": "/api-references/merge-queues/list-activity"
-    },
-    {
-      "source": "/api-reference/merge-queues/list-attempts",
-      "destination": "/api-references/merge-queues/list-attempts"
-    },
-    {
-      "source": "/api-reference/merge-queues/list-entries",
-      "destination": "/api-references/merge-queues/list-entries"
-    },
-    {
-      "source": "/api-reference/merge-queues/reorder-entries",
-      "destination": "/api-references/merge-queues/reorder-entries"
-    },
-    {
-      "source": "/api-reference/merge-queues/update-entry",
-      "destination": "/api-references/merge-queues/update-entry"
-    },
-    {
-      "source": "/api-reference/pull-requests/create",
-      "destination": "/api-references/pull-requests/create"
-    },
-    {
-      "source": "/api-reference/pull-requests/create-review",
-      "destination": "/api-references/pull-requests/create-review"
-    },
-    {
-      "source": "/api-reference/pull-requests/detach",
-      "destination": "/api-references/pull-requests/detach"
-    },
-    {
-      "source": "/api-reference/pull-requests/get",
-      "destination": "/api-references/pull-requests/get"
-    },
-    {
-      "source": "/api-reference/pull-requests/get-diff",
-      "destination": "/api-references/pull-requests/get-diff"
-    },
-    {
-      "source": "/api-reference/pull-requests/list",
-      "destination": "/api-references/pull-requests/list"
-    },
-    {
-      "source": "/api-reference/pull-requests/reorder-stack",
-      "destination": "/api-references/pull-requests/reorder-stack"
-    },
-    {
-      "source": "/api-reference/pull-requests/repair-stack",
-      "destination": "/api-references/pull-requests/repair-stack"
-    },
-    {
-      "source": "/api-reference/pull-requests/set-parent",
-      "destination": "/api-references/pull-requests/set-parent"
-    },
-    {
-      "source": "/api-reference/pull-requests/split-stack",
-      "destination": "/api-references/pull-requests/split-stack"
-    },
-    {
-      "source": "/api-reference/pull-requests/update",
-      "destination": "/api-references/pull-requests/update"
-    },
-    {
-      "source": "/api-reference/repositories/archive",
-      "destination": "/api-references/repositories/archive"
-    },
-    {
-      "source": "/api-reference/repositories/create",
-      "destination": "/api-references/repositories/create"
-    },
-    {
-      "source": "/api-reference/repositories/delete",
-      "destination": "/api-references/repositories/delete"
-    },
-    {
-      "source": "/api-reference/repositories/get",
-      "destination": "/api-references/repositories/get"
-    },
-    {
-      "source": "/api-reference/repositories/list",
-      "destination": "/api-references/repositories/list"
-    },
-    {
-      "source": "/api-reference/repositories/mint-git-credentials",
-      "destination": "/api-references/repositories/mint-git-credentials"
-    },
-    {
-      "source": "/api-reference/virtual-machines",
-      "destination": "/api-references/computers"
-    },
-    {
-      "source": "/api-reference/virtual-machines/domains/add",
-      "destination": "/api-references/computers/domains/add"
-    },
-    {
-      "source": "/api-reference/virtual-machines/domains/delete",
-      "destination": "/api-references/computers/domains/delete"
-    },
-    {
-      "source": "/api-reference/virtual-machines/domains/list",
-      "destination": "/api-references/computers/domains/list"
-    },
-    {
-      "source": "/api-reference/virtual-machines/execution/execute",
-      "destination": "/api-references/computers/execution/execute"
-    },
-    {
-      "source": "/api-reference/virtual-machines/execution/list-processes",
-      "destination": "/api-references/computers/execution/list-processes"
-    },
-    {
-      "source": "/api-reference/virtual-machines/execution/run-cli-command",
-      "destination": "/api-references/computers/execution/run-cli-command"
-    },
-    {
-      "source": "/api-reference/virtual-machines/execution/stream",
-      "destination": "/api-references/computers/execution/stream"
-    },
-    {
-      "source": "/api-reference/virtual-machines/files/read",
-      "destination": "/api-references/computers/files/read"
-    },
-    {
-      "source": "/api-reference/virtual-machines/files/write",
-      "destination": "/api-references/computers/files/write"
-    },
-    {
-      "source": "/api-reference/virtual-machines/regions/list",
-      "destination": "/api-references/computers/regions/list"
-    },
-    {
-      "source": "/api-reference/virtual-machines/shares/create",
-      "destination": "/api-references/computers/shares/create"
-    },
-    {
-      "source": "/api-reference/virtual-machines/shares/delete",
-      "destination": "/api-references/computers/shares/delete"
-    },
-    {
-      "source": "/api-reference/virtual-machines/shares/list",
-      "destination": "/api-references/computers/shares/list"
-    },
-    {
-      "source": "/api-reference/virtual-machines/ssh-keys/add",
-      "destination": "/api-references/computers/ssh-keys/add"
-    },
-    {
-      "source": "/api-reference/virtual-machines/ssh-keys/delete",
-      "destination": "/api-references/computers/ssh-keys/delete"
-    },
-    {
-      "source": "/api-reference/virtual-machines/ssh-keys/list",
-      "destination": "/api-references/computers/ssh-keys/list"
-    },
-    {
-      "source": "/api-reference/virtual-machines/tokens/create",
-      "destination": "/api-references/computers/tokens/create"
-    },
-    {
-      "source": "/api-reference/virtual-machines/tokens/delete",
-      "destination": "/api-references/computers/tokens/delete"
-    },
-    {
-      "source": "/api-reference/virtual-machines/tokens/list",
-      "destination": "/api-references/computers/tokens/list"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/action",
-      "destination": "/api-references/computers/computers/action"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/create",
-      "destination": "/api-references/computers/computers/create"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/delete",
-      "destination": "/api-references/computers/computers/delete"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/get",
-      "destination": "/api-references/computers/computers/get"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/list",
-      "destination": "/api-references/computers/computers/list"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/list-events",
-      "destination": "/api-references/computers/computers/list-events"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/update",
-      "destination": "/api-references/computers/computers/update"
-    },
-    {
-      "source": "/api-reference/virtual-machines/vms/update-visibility",
-      "destination": "/api-references/computers/computers/update-visibility"
-    },
-    {
-      "source": "/authentication",
-      "destination": "/developer-guides/authentication"
-    },
-    {
-      "source": "/durable-execution",
-      "destination": "/developer-guides/durable-execution"
-    },
-    {
-      "source": "/durable-execution/quickstart",
-      "destination": "/developer-guides/durable-execution/quickstart"
-    },
-    {
-      "source": "/durable-execution/runs",
-      "destination": "/developer-guides/durable-execution/runs"
-    },
-    {
-      "source": "/durable-execution/workflows-and-events",
-      "destination": "/developer-guides/durable-execution/workflows-and-events"
-    },
-    {
-      "source": "/git",
-      "destination": "/developer-guides/git"
-    },
-    {
-      "source": "/git/clone",
-      "destination": "/developer-guides/git/clone"
-    },
-    {
-      "source": "/git/manage",
-      "destination": "/developer-guides/git/manage"
-    },
-    {
-      "source": "/git/merge-queues",
-      "destination": "/developer-guides/git/merge-queues"
-    },
-    {
-      "source": "/git/pull-requests",
-      "destination": "/developer-guides/git/pull-requests"
-    },
-    {
-      "source": "/git/quickstart",
-      "destination": "/developer-guides/git"
-    },
-    {
-      "source": "/git/reference",
-      "destination": "/developer-guides/git"
-    },
-    {
-      "source": "/quickstart",
-      "destination": "/developer-guides/quickstart"
-    },
-    {
-      "source": "/virtual-machines",
-      "destination": "/developer-guides/computers"
-    },
-    {
-      "source": "/virtual-machines/access",
-      "destination": "/developer-guides/computers/access"
-    },
-    {
-      "source": "/virtual-machines/lifecycle",
-      "destination": "/developer-guides/computers/lifecycle"
-    },
-    {
-      "source": "/virtual-machines/networking",
-      "destination": "/developer-guides/computers/networking"
-    },
-    {
-      "source": "/virtual-machines/quickstart",
-      "destination": "/developer-guides/computers/quickstart"
-    },
-    {
-      "source": "/virtual-machines/rest-api",
-      "destination": "/developer-guides/computers/rest-api"
-    },
-    {
-      "source": "/virtual-machines/sdk",
-      "destination": "/developer-guides/computers/sdk"
-    },
-    {
-      "source": "/api-references/virtual-machines",
-      "destination": "/api-references/computers"
-    },
-    {
-      "source": "/api-references/virtual-machines/domains/add",
-      "destination": "/api-references/computers/domains/add"
-    },
-    {
-      "source": "/api-references/virtual-machines/domains/delete",
-      "destination": "/api-references/computers/domains/delete"
-    },
-    {
-      "source": "/api-references/virtual-machines/domains/list",
-      "destination": "/api-references/computers/domains/list"
-    },
-    {
-      "source": "/api-references/virtual-machines/execution/execute",
-      "destination": "/api-references/computers/execution/execute"
-    },
-    {
-      "source": "/api-references/virtual-machines/execution/list-processes",
-      "destination": "/api-references/computers/execution/list-processes"
-    },
-    {
-      "source": "/api-references/virtual-machines/execution/run-cli-command",
-      "destination": "/api-references/computers/execution/run-cli-command"
-    },
-    {
-      "source": "/api-references/virtual-machines/execution/stream",
-      "destination": "/api-references/computers/execution/stream"
-    },
-    {
-      "source": "/api-references/virtual-machines/files/read",
-      "destination": "/api-references/computers/files/read"
-    },
-    {
-      "source": "/api-references/virtual-machines/files/write",
-      "destination": "/api-references/computers/files/write"
-    },
-    {
-      "source": "/api-references/virtual-machines/regions/list",
-      "destination": "/api-references/computers/regions/list"
-    },
-    {
-      "source": "/api-references/virtual-machines/shares/create",
-      "destination": "/api-references/computers/shares/create"
-    },
-    {
-      "source": "/api-references/virtual-machines/shares/delete",
-      "destination": "/api-references/computers/shares/delete"
-    },
-    {
-      "source": "/api-references/virtual-machines/shares/list",
-      "destination": "/api-references/computers/shares/list"
-    },
-    {
-      "source": "/api-references/virtual-machines/ssh-keys/add",
-      "destination": "/api-references/computers/ssh-keys/add"
-    },
-    {
-      "source": "/api-references/virtual-machines/ssh-keys/delete",
-      "destination": "/api-references/computers/ssh-keys/delete"
-    },
-    {
-      "source": "/api-references/virtual-machines/ssh-keys/list",
-      "destination": "/api-references/computers/ssh-keys/list"
-    },
-    {
-      "source": "/api-references/virtual-machines/tokens/create",
-      "destination": "/api-references/computers/tokens/create"
-    },
-    {
-      "source": "/api-references/virtual-machines/tokens/delete",
-      "destination": "/api-references/computers/tokens/delete"
-    },
-    {
-      "source": "/api-references/virtual-machines/tokens/list",
-      "destination": "/api-references/computers/tokens/list"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/action",
-      "destination": "/api-references/computers/computers/action"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/create",
-      "destination": "/api-references/computers/computers/create"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/delete",
-      "destination": "/api-references/computers/computers/delete"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/get",
-      "destination": "/api-references/computers/computers/get"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/list",
-      "destination": "/api-references/computers/computers/list"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/list-events",
-      "destination": "/api-references/computers/computers/list-events"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/update",
-      "destination": "/api-references/computers/computers/update"
-    },
-    {
-      "source": "/api-references/virtual-machines/vms/update-visibility",
-      "destination": "/api-references/computers/computers/update-visibility"
-    },
-    {
-      "source": "/developer-guides/virtual-machines",
-      "destination": "/developer-guides/computers"
-    },
-    {
-      "source": "/developer-guides/virtual-machines/access",
-      "destination": "/developer-guides/computers/access"
-    },
-    {
-      "source": "/developer-guides/virtual-machines/lifecycle",
-      "destination": "/developer-guides/computers/lifecycle"
-    },
-    {
-      "source": "/developer-guides/virtual-machines/networking",
-      "destination": "/developer-guides/computers/networking"
-    },
-    {
-      "source": "/developer-guides/virtual-machines/quickstart",
-      "destination": "/developer-guides/computers/quickstart"
-    },
-    {
-      "source": "/developer-guides/virtual-machines/rest-api",
-      "destination": "/developer-guides/computers/rest-api"
-    },
-    {
-      "source": "/developer-guides/virtual-machines/sdk",
-      "destination": "/developer-guides/computers/sdk"
+      "source": "/mcp-gateway/access-and-troubleshooting",
+      "destination": "/mcp-gateway/troubleshooting"
     }
   ],
   "logo": {
@@ -1032,12 +339,6 @@
     "href": "https://final.ai/?ref=docs"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:support@final.ai"
-      }
-    ],
     "primary": {
       "type": "button",
       "label": "Dashboard",

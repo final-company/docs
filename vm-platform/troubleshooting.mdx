@@ -1,0 +1,104 @@
+---
+title: "Troubleshooting"
+description: "Fix common problems creating VMs, running workloads, reading files, using volumes, and serving traffic."
+icon: "wrench"
+---
+
+Find the symptom that matches what you see. When you're not sure where to start, read the sandbox (`GET /sandboxes/{id}`) for its state and deadlines, the workload (`GET /sandboxes/{id}/workload`) for its health, and the events (`GET /sandboxes/{id}/events`) or the dashboard's **Activity** tab for what happened when. For every error code, see the [API reference](/vm-platform/api#errors).
+
+## Creating and starting VMs
+
+<AccordionGroup>
+  <Accordion title="Every request returns 401 unauthorized">
+    The API didn't accept your key. Check that `FINAL_API_KEY` is set in the shell you're using (`echo ${FINAL_API_KEY:0:6}` should print the start of it), that the header reads `Authorization: Bearer <key>`, and that the key hasn't been deleted or expired. [Create a new key](/api-keys) if needed.
+  </Accordion>
+  <Accordion title="I get 404 for a VM I can see in the dashboard">
+    Your API key doesn't have access to the VM's project. The dashboard shows everything your account can see, but a key only reaches its own project and any it's been granted, and anything else looks like it doesn't exist. Use a key from the VM's project, or pass `project_id` when you create VMs so they land where you expect.
+  </Accordion>
+  <Accordion title="Creating from a template or snapshot returns invalid_state">
+    The source isn't ready yet. A template must be `ready`, which happens after its build succeeds, and a snapshot must have a `durable_at` time. Check with `GET /templates/{id}` or `GET /snapshots/{id}` and try again once it is.
+  </Accordion>
+  <Accordion title="My image is stuck in failed">
+    Read `error_code` and `error_class` from `GET /images/{id}`. A `user` error class means something about the image or its reference: check the spelling, that it has a `linux/amd64` build, and, for a private registry, that the credential is correct. A `transient` error usually clears if you import the image again.
+  </Accordion>
+  <Accordion title="The VM's state is failed">
+    The VM's machine stopped unexpectedly. Its disk is intact. Call `POST /sandboxes/{id}/start` to boot it again. The workload starts from the beginning.
+  </Accordion>
+</AccordionGroup>
+
+## Workloads and files
+
+<AccordionGroup>
+  <Accordion title="The VM is running but my command didn't do anything">
+    The VM's state only tells you the machine is up, not whether your command worked. Check `GET /sandboxes/{id}/workload` and the **Processes** tab. The most common causes are shell syntax (`&&`, `>`, `$VAR`) without a shell entrypoint like `["/bin/sh", "-c"]`, a program the image doesn't have, and writing to a directory the user can't write to. The default image runs as `user`, which can write to `/home/user` but not to `/`.
+  </Accordion>
+  <Accordion title="My job keeps running over and over">
+    Workloads restart when they exit, unless you set `"restart": false`. Set it for any command that's meant to finish.
+  </Accordion>
+  <Accordion title="My long job paused partway through">
+    Either the idle timeout or the wall-clock limit fired. A VM counts as idle when nothing is talking to it, even if a process inside is busy. For long jobs, set `timers.idle_timeout_s` to `null` and choose a `wall_clock_limit_s` that fits. To give a running VM more time, call `POST /sandboxes/{id}/timeout`. See [what Final does automatically](/vm-platform/lifecycle-and-snapshots#what-final-does-automatically).
+  </Accordion>
+  <Accordion title="The health check says unhealthy">
+    Read `health.error` from `GET /sandboxes/{id}/workload`. Make sure the server listens on the `port` in the check, binds to `0.0.0.0`, and answers `path`. If it's slow to boot, raise `grace_s`.
+  </Accordion>
+  <Accordion title="Reading a file returns file_not_found">
+    Check that the path is absolute and correct; in the default image, relative paths in your command are relative to `/home/user/workspace`. If the path is right, the workload hasn't written the file yet. Wait and read again.
+  </Accordion>
+  <Accordion title="Reading a file returns 409 or 503">
+    The VM changed while you were reading, for example by pausing. A `503` with `Retry-After` clears on its own, so wait and retry. A `409` on a read that passed `generation` means the file view changed; start the read over without the old `generation`.
+  </Accordion>
+  <Accordion title="Reading a file returns file_not_durable">
+    The path is on a temporary file system, like `/tmp` on some images, whose contents aren't saved when a VM pauses or stops. Write results you need to read later under your home or working directory instead.
+  </Accordion>
+</AccordionGroup>
+
+## Lifecycle and snapshots
+
+<AccordionGroup>
+  <Accordion title="Resume reported mode cold and my app isn't running">
+    The VM's memory couldn't be restored, so it booted from its saved disk and ran its workload again. Anything held only in memory is gone. Check the workload's health and restart any programs your workload doesn't start on its own.
+  </Accordion>
+  <Accordion title="Pause, resume, or stop returns invalid_state">
+    The VM is in a state that doesn't allow that action, such as resuming a VM that's `stopped` (use `start`) or acting on one that's still `creating`. Read its state, wait for it to settle, and try the action that matches.
+  </Accordion>
+  <Accordion title="A checkpoint returns name_taken">
+    Snapshot names are unique. If you're retrying a checkpoint whose response you lost, the first attempt worked: find the snapshot with `GET /snapshots`. Otherwise, pick a new name.
+  </Accordion>
+  <Accordion title="My VM disappeared">
+    VMs that stay paused or stopped long enough are deleted, and so are VMs whose `ttl_s` runs out. A deleted VM returns `410 sandbox_deleted`. Watch `deletes_at` and `hard_ttl_at` on VMs you want to keep, and save what matters in a [snapshot](/vm-platform/lifecycle-and-snapshots#save-a-snapshot) or a [volume](/vm-platform/files-and-volumes#keep-data-in-a-volume).
+  </Accordion>
+</AccordionGroup>
+
+## Volumes
+
+<AccordionGroup>
+  <Accordion title="My volume changes disappeared">
+    Changes only reach the volume when you commit them. Detaching without `?commit=true`, or deleting the VM, discards them. Commit, and wait for the commit to reach `committed`, before you detach.
+  </Accordion>
+  <Accordion title="A commit ended in conflict">
+    You sent `if_version`, and another VM committed a newer version first. Nothing changed. Attach the volume to a VM to get the newer version, apply your changes again, and commit with the new `base_version`.
+  </Accordion>
+  <Accordion title="Attaching returns volume_in_use_path or no_free_slot">
+    `volume_in_use_path` means that path, or that volume, is already attached to this VM. `no_free_slot` means the VM already has 8 volumes. Detach one first.
+  </Accordion>
+</AccordionGroup>
+
+## Networking
+
+<AccordionGroup>
+  <Accordion title="Outbound requests from the VM fail">
+    Read `GET /sandboxes/{id}/network`. With `allow_internet` set to `false`, only exact names in `allow_domains` and ranges in `allow_cidrs` are reachable, so a redirect or download host you didn't list will fail. Also check that `applied` is `true`, and remember that IPv6 is blocked.
+  </Accordion>
+  <Accordion title="Updating the network policy returns 409">
+    Someone changed the policy after you read it. Read it again, merge your changes into the current policy, and send the new `revision` as `expected_revision`.
+  </Accordion>
+  <Accordion title="My custom domain doesn't go active">
+    Read `GET /sandboxes/{id}/domains`. A domain stuck in `pending_dns` or `verifying_dns` usually has a missing or wrong `CNAME`; it must point at the `cname_target` from the same response. Changes at your DNS provider can take a while to spread.
+  </Accordion>
+  <Accordion title="My domain was working and now it's offline">
+    Check that the VM isn't stopped, since stopped VMs don't wake for traffic, that the port is still public, and that the service is healthy. Making a port private takes its domains offline.
+  </Accordion>
+  <Accordion title="The desktop or editor won't open">
+    The VM must be `running`. Check `GET /sandboxes/{id}/desktop/status` for an `error`, and allow pop-ups for the dashboard, since the screen and editor open in a new window.
+  </Accordion>
+</AccordionGroup>

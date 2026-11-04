@@ -1,0 +1,221 @@
+---
+title: "Build your first agent"
+sidebarTitle: "Quickstart"
+description: "Create a release assistant, publish it to Final, and send it a message."
+icon: "rocket"
+---
+
+You'll build a release assistant: an agent that answers "is this release ready to ship?" by calling a checklist tool. You'll define it, compile it locally, publish it to Final, and send it a message from a script. It takes about 10 minutes.
+
+<Tip>
+Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let-an-agent-set-it-up).
+</Tip>
+
+**Before you start**, you need:
+
+- Node.js 26 or later and Git. Check with `node --version`.
+- A [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions. You won't need it until step 5.
+
+<Steps>
+  <Step title="Create the project">
+    Create a Node.js project and install the SDK. `@finalai/agents` includes the authoring helpers, the client, and the `final-agents` CLI.
+
+    ```bash
+    mkdir release-assistant && cd release-assistant
+    git init
+    npm init -y
+    npm pkg set type=module
+    npm install @finalai/agents zod
+    npm install --save-dev typescript tsx @types/node
+    mkdir -p agent/tools
+    ```
+
+    Add a `.gitignore`. The CLI uses Git to decide which files to upload, so anything ignored here never leaves your machine.
+
+    ```text .gitignore
+    node_modules/
+    .final/
+    .env*
+    ```
+  </Step>
+  <Step title="Describe the agent">
+    Every agent has an `agent.ts` that names it and picks its **harness**: the agent loop that sends messages to the model, runs the tools the model asks for, and repeats until the answer is ready. `serverlessFinal` is Final's own agent loop. Final hosts it, so there's nothing for you to run.
+
+    ```ts agent/agent.ts
+    import { credentials, defineAgent } from '@finalai/agents';
+    import { serverlessFinal } from '@finalai/agents/harnesses';
+
+    export default defineAgent({
+      name: 'Release Assistant',
+      description: 'Checks whether a release is ready to ship.',
+      harness: serverlessFinal({
+        credentials: credentials.chain({
+          payer: 'organization',
+          tryInOrder: [credentials.platform()],
+        }),
+      }),
+    });
+    ```
+
+    `credentials` decides how model usage is paid for. This setup uses model access that Final provides and bills it to your organization. Because there's no `model` field, the agent uses your organization's default model. [Configuration](/build/configuration) covers both choices.
+
+    Then tell the agent how to behave:
+
+    ```markdown agent/instructions.md
+    You help maintainers decide whether a release is ready to ship.
+    Call release_checklist for the version, then list each check as done or missing.
+    Ask for evidence instead of assuming a check passed.
+    ```
+  </Step>
+  <Step title="Give it a tool">
+    A tool is a function the agent can call. The file name becomes the tool's name, so this one is `release_checklist`. The `description` and `inputSchema` tell the model when to call it and with what arguments.
+
+    ```ts agent/tools/release_checklist.ts
+    import { defineTool } from '@finalai/agents';
+    import { z } from 'zod';
+
+    export default defineTool({
+      description: 'List the checks a release must pass before it ships.',
+      inputSchema: z.object({ version: z.string() }),
+      execute: ({ version }) => ({
+        version,
+        checks: ['CI is green on main', 'CHANGELOG.md has an entry', 'Release owner signed off'],
+      }),
+    });
+    ```
+
+    A real tool would read these checks from your CI or release system. [Tools](/build/tools) shows how.
+  </Step>
+  <Step title="Compile it">
+    Compile the agent locally to catch mistakes before you publish:
+
+    ```bash
+    npx final-agents build ./agent
+    ```
+
+    The build prints a summary of what it found and ends with the folder it wrote to:
+
+    ```text
+    agent: Release Assistant
+    description: Checks whether a release is ready to ship.
+    ...
+    wrote /Users/you/release-assistant/agent/.final/compile
+    ```
+
+    If something is wrong with your files, the build prints a line starting with `error:` and stops. Once `FINAL_API_KEY` is set, the build also checks the agent against your organization's setup.
+  </Step>
+  <Step title="Register the agent" id="register-the-agent">
+    Registering creates the agent in your Final project and reserves its **slug**, the ID you use to call it. You do this once per agent.
+
+    Export your API key, then create a client module that the next scripts share:
+
+    ```bash
+    export FINAL_API_KEY='paste-your-key-here'
+    ```
+
+    ```ts client.ts
+    import { createClient } from '@finalai/agents/client';
+
+    const apiKey = process.env.FINAL_API_KEY;
+    if (!apiKey) throw new Error('Set FINAL_API_KEY first');
+
+    export const client = createClient({
+      host: 'https://agent-session.final.ai/api',
+      auth: { apiKey },
+    });
+    ```
+
+    ```ts register.ts
+    import { client } from './client.js';
+
+    const definition = await client.definitions.create({
+      slug: 'release-assistant',
+      name: 'Release Assistant',
+    });
+    console.log(`Registered ${definition.slug} (${definition.id})`);
+
+    client.close();
+    ```
+
+    ```bash
+    npx tsx register.ts
+    ```
+
+    ```text
+    Registered release-assistant (adef_7Hq2...)
+    ```
+
+    If the slug is already taken, pick another one and use it in the next two steps.
+  </Step>
+  <Step title="Publish it">
+    Publishing uploads the `agent/` folder, compiles it on Final, and makes the result the agent's current revision:
+
+    ```bash
+    npx final-agents publish ./agent --agent release-assistant
+    ```
+
+    The CLI prints the build summary again, then the new revision:
+
+    ```text
+    published: revision 1 (arev_3Ld9...)
+    ```
+  </Step>
+  <Step title="Send it a message">
+    Start a session with a first message and wait for the answer:
+
+    ```ts run.ts
+    import { client } from './client.js';
+
+    const { handle, response } = await client.sessions.create({
+      agent: 'release-assistant',
+      message: 'Is 1.2.0 ready to ship? CI is green and the changelog is updated.',
+    });
+
+    const result = await response!.result();
+    console.log(result.text);
+    console.log(`\nStop reason: ${result.stopReason}`);
+
+    await handle.close();
+    client.close();
+    ```
+
+    ```bash
+    npx tsx run.ts
+    ```
+
+    The agent calls `release_checklist`, compares it with what you told it, and replies with something like:
+
+    ```text
+    Not yet. Two of the three checks are done:
+
+    - CI is green on main: done
+    - CHANGELOG.md has an entry: done
+    - Release owner signed off: missing
+
+    Once the release owner signs off, 1.2.0 is ready to ship.
+
+    Stop reason: end_turn
+    ```
+  </Step>
+</Steps>
+
+<Check>
+You've built, published, and called an agent. To change it, edit the files in `agent/` and run `npx final-agents publish ./agent --agent release-assistant` again. New sessions pick up the new revision.
+</Check>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Stream replies into your app" icon="comments" href="/client/sessions">
+    Show text as it's written and let people approve actions.
+  </Card>
+  <Card title="Call a real API from a tool" icon="code" href="/build/tools">
+    Read release status from your own service with a stored secret.
+  </Card>
+  <Card title="Connect your issue tracker" icon="plug" href="/build/connections">
+    Give the agent tools from an MCP server.
+  </Card>
+  <Card title="How agents work" icon="layer-group" href="/concepts">
+    Learn what revisions, sessions, and turns are.
+  </Card>
+</Columns>

@@ -1,0 +1,188 @@
+---
+title: "Morning pull request digest"
+sidebarTitle: "Pull request digest"
+description: "Post a weekday summary of merged, stuck, and failing pull requests, using GitHub's MCP server."
+icon: "newspaper"
+---
+
+Every weekday at 9 a.m., this agent reads your repository's pull requests and posts a short digest: what merged since the last one, what's been waiting on review, and which ready pull requests have failing checks. Use it to replace the "what happened yesterday?" part of standup, or to keep reviews from going stale.
+
+**What it shows:** a [schedule](/build/schedules) written in Markdown, an MCP [connection](/build/connections) to GitHub limited to read-only tools with an annotation selector, and triggering a schedule from a script with [`runNow`](/build/schedules#run-a-schedule-now).
+
+## Files
+
+<Tree>
+
+- pr-digest/
+  - package.json
+  - .gitignore
+  - run-now.ts
+  - agent/
+    - agent.ts
+    - instructions.md
+    - connections/
+      - github.ts
+    - schedules/
+      - morning-digest.md
+
+</Tree>
+
+```ts agent/agent.ts
+import { credentials, defineAgent } from '@finalai/agents';
+import { serverlessFinal } from '@finalai/agents/harnesses';
+
+export default defineAgent({
+  name: 'PR Digest',
+  description: 'Posts a weekday digest of pull request activity in acme/web.',
+  harness: serverlessFinal({
+    credentials: credentials.chain({
+      payer: 'organization',
+      tryInOrder: [credentials.platform()],
+    }),
+    permissionMode: 'auto',
+  }),
+});
+```
+
+The connection points at GitHub's MCP server. Instead of naming each tool, `allow: [{ readOnlyHint: true }]` exposes every tool the server marks as read-only, so the agent can search and read pull requests but can't comment, merge, or push:
+
+```ts agent/connections/github.ts
+import { defineMcpClientConnection } from '@finalai/agents';
+
+export default defineMcpClientConnection({
+  url: 'https://api.githubcopilot.com/mcp/',
+  description: "GitHub's MCP server, limited to tools that only read.",
+  auth: { secretKey: 'github-token', headerName: null },
+  tools: { allow: [{ readOnlyHint: true }] },
+});
+```
+
+The schedule is a prompt with a timer. It runs at 9:00 a.m. New York time, Monday through Friday, and posts to the agent owner's direct conversation:
+
+```markdown agent/schedules/morning-digest.md
+---
+cron: '0 9 * * 1-5'
+timezone: America/New_York
+---
+
+Write this morning's pull request digest for acme/web.
+```
+
+The instructions say what a good digest looks like, so the schedule's prompt can stay short:
+
+```markdown agent/instructions.md
+You write a short morning digest of pull request activity in the acme/web GitHub repository.
+
+Cover these sections, in this order:
+1. Merged: pull requests merged since the previous weekday at 9:00 a.m. New York time (on Mondays, since Friday). One line each, with the number, title, and author.
+2. Waiting on review: open, non-draft pull requests with no review for more than one business day. Say who's been asked to review.
+3. Failing checks: open, non-draft pull requests whose latest checks failed.
+
+Link every pull request. If a section is empty, write "Nothing today" under it.
+Keep the digest under 25 lines, and don't add a greeting or sign-off.
+```
+
+## Build and publish it
+
+<Steps>
+  <Step title="Set up the project">
+    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+
+    ```bash
+    mkdir pr-digest && cd pr-digest
+    git init
+    npm init -y && npm pkg set type=module
+    npm install @finalai/agents zod
+    npm install --save-dev typescript tsx @types/node
+    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
+    ```
+  </Step>
+  <Step title="Add a GitHub token">
+    Create a fine-grained personal access token in GitHub with read access to the repository's **Pull requests**, **Commit statuses**, and **Contents**. In the Final dashboard, add it under **Developer** > **Secrets** with the name `github-token`.
+  </Step>
+  <Step title="Compile it">
+    ```bash
+    npx final-agents build ./agent
+    ```
+
+    The summary shows the connection and the schedule with its time zone:
+
+    ```text
+    agent: PR Digest
+    description: Posts a weekday digest of pull request activity in acme/web.
+    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
+    mcp servers: github (http)
+    ...
+    schedules: morning-digest (0 9 * * 1-5, America/New_York)
+    secrets: github-token
+    ...
+    wrote /Users/you/pr-digest/agent/.final/compile
+    ```
+  </Step>
+  <Step title="Register and publish it">
+    Register the `pr-digest` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish. The schedule starts running as soon as the agent is published:
+
+    ```bash
+    npx final-agents publish ./agent --agent pr-digest
+    ```
+  </Step>
+</Steps>
+
+## Try it
+
+You don't have to wait for 9 a.m. This script triggers the schedule now, waits for the agent to finish writing, and prints the digest:
+
+```ts run-now.ts
+import { AgentRealtimeKind, ParticipantKind, createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+
+const run = await client.schedules.runNow({ agent: 'pr-digest', key: 'morning-digest' });
+if (!run.conversationId) throw new Error('The schedule did not post to a conversation');
+
+const conversation = client.conversations.get(run.conversationId);
+for await (const event of conversation.events()) {
+  if (
+    event.kind !== AgentRealtimeKind.MessageCreated &&
+    event.kind !== AgentRealtimeKind.MessageUpdated
+  ) {
+    continue;
+  }
+  // The agent's message updates as it writes. `streaming` is null once it's done.
+  const { author, body, streaming } = event.message;
+  if (author.kind === ParticipantKind.Agent && streaming === null && body) {
+    console.log(body);
+    break;
+  }
+}
+
+client.close();
+```
+
+```bash
+npx tsx run-now.ts
+```
+
+After a minute or so, you see something like:
+
+```text
+Merged
+- #1287 Add Apple Pay to checkout (@dana)
+- #1291 Fix timezone offset in order history (@lee)
+
+Waiting on review
+- #1279 Migrate settings page to the new form library (@sam), waiting 3 days on @priya
+
+Failing checks
+- #1293 Bump the payments SDK to 4.2 (@renovate): e2e / checkout failed
+```
+
+The digest also appears in your direct conversation with the agent, where the scheduled runs post each morning.
+
+## Make it yours
+
+- **Post it in a team room.** Add `target: bound-conversation` to the schedule's frontmatter, add a [channel](/build/channels), and [attach it](/build/channels#connect-it-to-a-conversation) to a group conversation, as in the [deploy watcher](/examples/deploy-watcher).
+- **Cover more repositories.** List them in `instructions.md`, and give the token read access to each one.

@@ -1,0 +1,8 @@
+<Prompt description="**Run this project in a Final VM.** Paste this into Claude Code, Codex, or Cursor from the repository you want to run.">
+Set up a Final VM for this repository with the Final VMs HTTP API (https://api.vm.finalwebservices.com/v1), following Final's documentation for exact request fields.
+Read the repository to find its runtime, install steps, and the command that tests or runs it. Use the default image unless the project needs tools it doesn't have.
+Use FINAL_API_KEY from my environment. If it isn't set, walk me through creating a key in the Final dashboard and exporting it in my shell. Never write it to a file tracked by Git.
+Create a sandbox labeled with this project's name. Give it a workload that clones the repository, installs dependencies, and runs the test or start command, writing output and the exit code to files. Use restart false for one-off commands and a wall-clock limit that fits the job.
+Read the output files back through the files API. If it's a web app, add a health check and keep its port private unless I ask you to publish it.
+Finish by telling me the sandbox ID, what ran and whether it passed, and the exact commands to pause, resume, and delete it.
+</Prompt>

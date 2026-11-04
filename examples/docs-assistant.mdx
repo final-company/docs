@@ -1,0 +1,245 @@
+---
+title: "API docs assistant"
+sidebarTitle: "Docs assistant"
+description: "Answer developer questions about your API from a set of skills, with no code beyond agent.ts."
+icon: "book-open"
+---
+
+This agent answers developer questions about an API, the Acme Pay API in this example. Everything it knows lives in skills: one for webhooks, one for error codes, one for API versions. Reach for this pattern when you want a support or docs bot that answers from material you control, and you'd rather edit Markdown than code to improve it.
+
+**What it shows:** [instructions](/build/instructions-and-skills#write-instructions), [skills](/build/instructions-and-skills#package-a-skill) with reference files and a one-file skill, and the harness's [`reasoning`](/build/configuration#choose-a-harness) setting.
+
+## Files
+
+<Tree>
+
+- docs-assistant/
+  - package.json
+  - .gitignore
+  - ask.ts
+  - agent/
+    - agent.ts
+    - instructions.md
+    - skills/
+      - webhooks/
+        - SKILL.md
+        - events.md
+        - verify.md
+      - errors/
+        - SKILL.md
+        - error-codes.md
+      - api-versions.md
+
+</Tree>
+
+`agent.ts` names the agent and picks the harness. `reasoning: 'low'` keeps answers fast, which suits short Q&A.
+
+```ts agent/agent.ts
+import { credentials, defineAgent } from '@finalai/agents';
+import { serverlessFinal } from '@finalai/agents/harnesses';
+
+export default defineAgent({
+  name: 'Docs Assistant',
+  description: 'Answers developer questions about the Acme Pay API.',
+  harness: serverlessFinal({
+    reasoning: 'low',
+    credentials: credentials.chain({
+      payer: 'organization',
+      tryInOrder: [credentials.platform()],
+    }),
+    permissionMode: 'auto',
+  }),
+});
+```
+
+The instructions set the tone and the rules. They stay short because the details live in skills:
+
+```markdown agent/instructions.md
+You answer developer questions about the Acme Pay API.
+
+Answer from your skills. If no skill covers the question, say so and link to https://docs.acme.dev instead of guessing.
+Show code in the language the developer is using, and default to curl.
+Put the answer first, then one example, then a link to the docs page it came from.
+Never ask for an API key. If someone pastes a live key (it starts with sk_live_), tell them to roll it under Developers > API keys before you answer.
+```
+
+### The webhooks skill
+
+A skill's `description` tells the agent when to load it. The steps refer to the files beside `SKILL.md`, which the agent reads only when it needs them:
+
+<CodeGroup>
+
+```markdown agent/skills/webhooks/SKILL.md
+---
+name: webhooks
+description: Answer questions about receiving, verifying, and retrying Acme Pay webhooks.
+---
+
+1. Find the event in events.md. If the developer names an event that isn't listed, say so and suggest the closest one.
+2. For signature errors, ask which language and framework they use, then walk through verify.md step by step.
+3. For missed or duplicate events, explain retries: a delivery fails if the endpoint doesn't return a 2xx status within 10 seconds, and Acme Pay retries it with exponential backoff for up to 3 days. Handlers should be idempotent on the event's id.
+4. Link to https://docs.acme.dev/webhooks.
+```
+
+```markdown agent/skills/webhooks/events.md
+| Event | Sent when |
+| --- | --- |
+| payment.succeeded | A payment is captured. |
+| payment.failed | A payment attempt is declined or errors. |
+| refund.created | A full or partial refund is issued. |
+| payout.paid | A payout reaches the merchant's bank account. |
+| dispute.opened | A cardholder disputes a payment. |
+| dispute.closed | A dispute is won or lost. The outcome is in data.status. |
+```
+
+```markdown agent/skills/webhooks/verify.md
+Every webhook has an Acme-Signature header like `t=1767225600,v1=5f2b...`.
+
+1. Read the raw request body as a string before parsing it. Parsing and re-serializing JSON changes the bytes and breaks the signature. In Express, use express.raw({ type: 'application/json' }) on the webhook route instead of express.json().
+2. Build the signed payload: the t value, a period, then the raw body.
+3. Compute an HMAC-SHA256 of that payload with the endpoint's signing secret (it starts with whsec_), and hex-encode it.
+4. Compare it with the v1 value using a constant-time comparison.
+5. Reject the event if t is more than 5 minutes old, to block replays.
+
+The signing secret is per endpoint. Using the account's API key, or another endpoint's secret, is the most common cause of every signature failing.
+```
+
+</CodeGroup>
+
+### The errors skill
+
+<CodeGroup>
+
+```markdown agent/skills/errors/SKILL.md
+---
+name: errors
+description: Explain an Acme Pay API error code or decline code and how to fix it.
+---
+
+1. Look up the code in error-codes.md. Codes are in the error.code field of the response, and card declines add error.decline_code.
+2. Say whether the developer can fix it in code, or whether their customer has to act.
+3. For 429 rate_limited, show how to retry with backoff using the Retry-After header.
+4. Link to https://docs.acme.dev/errors#<code>.
+```
+
+```markdown agent/skills/errors/error-codes.md
+| Code | Status | Meaning | Who fixes it |
+| --- | --- | --- | --- |
+| invalid_request | 400 | A parameter is missing or malformed. error.param names it. | Developer |
+| authentication_failed | 401 | The API key is missing, revoked, or from the wrong mode (test vs live). | Developer |
+| card_declined | 402 | The bank declined the card. See error.decline_code. | Customer |
+| insufficient_funds | 402 | A decline_code: the card doesn't have enough funds. | Customer |
+| expired_card | 402 | A decline_code: the card has expired. | Customer |
+| idempotency_conflict | 409 | The Idempotency-Key was reused with different parameters. | Developer |
+| rate_limited | 429 | Too many requests. Wait for Retry-After seconds. | Developer |
+```
+
+</CodeGroup>
+
+### A one-file skill
+
+A skill that fits in one file can sit directly in `skills/`:
+
+```markdown agent/skills/api-versions.md
+---
+name: api-versions
+description: Explain Acme Pay API versions and what changes when you upgrade.
+---
+
+Requests pick a version with the Acme-Version header. Without it, the account's default version applies.
+
+Upgrading from 2025-09-01 to 2026-06-01 changes three things:
+- Amounts are integers in the smallest currency unit (cents) everywhere. The old amount_decimal field is gone.
+- payment.failed events include the decline_code at the top level of data.
+- List endpoints return at most 100 items per page, down from 250.
+
+Tell developers to send Acme-Version: 2026-06-01 on a few requests and test them before changing the account default.
+```
+
+## Build and publish it
+
+<Steps>
+  <Step title="Set up the project">
+    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+
+    ```bash
+    mkdir docs-assistant && cd docs-assistant
+    git init
+    npm init -y && npm pkg set type=module
+    npm install @finalai/agents zod
+    npm install --save-dev typescript tsx @types/node
+    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
+    ```
+  </Step>
+  <Step title="Compile it">
+    ```bash
+    npx final-agents build ./agent
+    ```
+
+    The build summary lists the harness and ends with the folder it wrote to:
+
+    ```text
+    agent: Docs Assistant
+    description: Answers developer questions about the Acme Pay API.
+    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
+    ...
+    wrote /Users/you/docs-assistant/agent/.final/compile
+    ```
+  </Step>
+  <Step title="Register and publish it">
+    Register the `docs-assistant` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
+
+    ```bash
+    npx final-agents publish ./agent --agent docs-assistant
+    ```
+  </Step>
+</Steps>
+
+## Try it
+
+Ask a question that one of the skills covers:
+
+```ts ask.ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+
+const { handle, response } = await client.sessions.create({
+  agent: 'docs-assistant',
+  message: 'Every webhook fails signature verification in my Express app. What am I doing wrong?',
+});
+
+console.log((await response!.result()).text);
+
+await handle.close();
+client.close();
+```
+
+```bash
+npx tsx ask.ts
+```
+
+The agent loads the webhooks skill, reads `verify.md`, and replies with something like:
+
+```text
+Most likely, express.json() is parsing the body before you verify it. The signature
+covers the raw bytes, so re-serialized JSON never matches.
+
+Use express.raw() on the webhook route and verify the raw body:
+
+app.post('/webhooks', express.raw({ type: 'application/json' }), (req, res) => {
+  const payload = `${timestamp}.${req.body.toString('utf8')}`;
+  // compute the HMAC-SHA256 with your endpoint's whsec_ secret...
+});
+
+Also check that you're using this endpoint's signing secret, not your API key.
+Docs: https://docs.acme.dev/webhooks
+```
+
+## Make it yours
+
+- **Add a skill per area of your docs.** Copy the `webhooks/` folder, change the `description`, and put the reference material beside `SKILL.md`. The agent sees every skill's description up front, so keep each one specific.
+- **Put it on your docs site.** Stream its answers into a chat widget with the route from the [support chat example](/examples/support-chat).

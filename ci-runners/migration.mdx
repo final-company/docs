@@ -1,0 +1,80 @@
+---
+title: "Migrate a workflow"
+description: "Move existing GitHub Actions jobs to Final CI Runners one at a time."
+---
+
+Moving a job to Final changes where it runs, not what it does. Your triggers, steps, secrets, artifacts, and status checks stay the same. Most jobs move with a one-line change; the rest usually need one setup step for a tool that GitHub's hosted image happened to include.
+
+Move one job first, confirm it passes, then move the rest. This checklist assumes your organization is already enabled; if it isn't, start with the [quickstart](/ci-runners/quickstart).
+
+## Checklist
+
+<Steps>
+  <Step title="Pick a first job">
+    Choose a Linux job that runs often and takes a few minutes, such as your main test suite. You'll see the difference sooner, and a failure is easy to compare with recent runs. Final runners are Linux x64, so leave macOS, Windows, and Arm jobs where they are.
+  </Step>
+  <Step title="Change runs-on">
+    Replace the job's runner label with a Final one. `final-4vcpu-ubuntu-2404` is a good default; see [runner sizes](/ci-runners/runner-sizes) to pick another.
+
+    ```diff .github/workflows/ci.yml
+     jobs:
+       test:
+    -    runs-on: ubuntu-latest
+    +    runs-on: final-4vcpu-ubuntu-2404
+    ```
+
+    For a [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows), change `runs-on` in the called workflow, not the caller. In an OS matrix, change only the Ubuntu entry:
+
+    ```yaml .github/workflows/ci.yml
+    strategy:
+      matrix:
+        os: [final-4vcpu-ubuntu-2404, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    ```
+  </Step>
+  <Step title="Set up your tools">
+    Final's image includes Docker, Git, Python 3, and common build tools, but fewer preinstalled language runtimes than GitHub's hosted image. If a step fails with `command not found`, add the matching setup action before it:
+
+    ```yaml
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    ```
+
+    Setup actions also pin the version, so your build stops depending on whatever the image ships. For system packages, use `sudo apt-get install`. See the [full software list](/ci-runners/runner-sizes#preinstalled-software).
+  </Step>
+  <Step title="Keep your caches">
+    `actions/cache` and the `cache:` option of setup actions keep working on Final runners, so leave them in place for now. Once the job passes, you can switch large caches to a [sticky disk](/ci-runners/dependency-caching), which skips the download and upload entirely.
+
+    If you're coming from another runner provider, remove its cache and Docker builder actions before the first run. Use `actions/cache` in the meantime, or Final's equivalents in [dependency caching](/ci-runners/dependency-caching) and [Docker builds](/ci-runners/docker-builds).
+  </Step>
+  <Step title="Run it and compare">
+    Push the change on a branch and open a pull request. Compare the run with a recent passing run on the old runner. The same tests should pass, and the step timings show you how much time the new size saves.
+
+    Status checks are named after the job, so a required check keeps working. The exception is a matrix job whose name includes the runner label, such as `test (ubuntu-latest)`. Changing the label renames that check, so update your branch protection rule or ruleset to require the new name.
+  </Step>
+  <Step title="Move the rest">
+    Once the first job is green, move the others the same way. Give each job the size it needs: small checks on 2 vCPUs, heavy builds on 8 or 16.
+  </Step>
+</Steps>
+
+## Run on both while you compare
+
+To try Final without giving up your current runner, run the same job twice with a matrix. Both results show up on the pull request, and you can drop the old entry when you're confident:
+
+```yaml .github/workflows/ci.yml
+jobs:
+  test:
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, final-4vcpu-ubuntu-2404]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci && npm test
+```
+
+If a step should only run on Final, such as mounting a [sticky disk](/ci-runners/dependency-caching), guard it with `if: startsWith(runner.name, 'final-')`.

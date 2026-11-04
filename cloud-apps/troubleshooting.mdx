@@ -1,0 +1,116 @@
+---
+title: "Troubleshooting"
+description: "Fix common problems with setup, builds, rollouts, and running apps."
+---
+
+Start with `npx final-cloud apps get <app>`. It shows the app's status, Git remote, and latest deployment. For a failed deployment, `npx final-cloud deployments get <app> <deployment>` shows the error and the events leading up to it.
+
+## Setup and Git
+
+<AccordionGroup>
+  <Accordion title="The CLI says to set FINAL_API_KEY">
+    The CLI couldn't find an API key in your shell. Export one with `apps:read` and `apps:write`:
+
+    ```bash
+    export FINAL_API_KEY='paste-your-key-here'
+    ```
+
+    If the key is set but requests fail with `403`, it's missing a permission, has expired, or belongs to a different project than the app. Check it under **Developer** > **API keys** in the dashboard. See [get an API key](/api-keys).
+  </Accordion>
+
+  <Accordion title="The CLI says no app has that ID or slug">
+    The CLI matches slugs and IDs exactly, not display names. Run `npx final-cloud apps list` and copy the slug from the first column. Also check that your API key belongs to the app's project.
+  </Accordion>
+
+  <Accordion title="git push is rejected">
+    Git authenticates separately from `FINAL_API_KEY`, so a valid API key doesn't help here. Check that you're pushing to the remote that `apps get` shows. If you can't push from your machine, give the push and deploy to your agent in Final, which has access to the app's repository.
+  </Accordion>
+
+  <Accordion title="deploy says it can't find a commit or manifest">
+    Final deploys what's in the app's repository, not your local files. Make sure you've committed and pushed, that `apps get` shows the remote you pushed to, and that `final-cloud.yaml` is at the repository root (or at the `--manifest-path` you gave `apps create`).
+
+    If you deploy with `--ref`, the branch or commit must exist in the app's repository.
+  </Accordion>
+
+  <Accordion title="deploy exits with code 3 in CI">
+    The deploy widens the app's access, for example by adding a secret or database, and there's no one to answer the prompt. Run it once by hand to review the change, or re-run with `--yes` once it's approved. With `--json`, the output includes the preview so you can see what changed. See [review access changes](/cloud-apps/deployments#review-access-changes).
+  </Accordion>
+</AccordionGroup>
+
+## Manifest and build
+
+<AccordionGroup>
+  <Accordion title="validate reports an error">
+    Each error names the field and the problem, such as `error: $["health"]: ...`. Common causes:
+
+    - A web app is missing `port` or `health.path`.
+    - A web app, service, or cron job has neither `build` nor `image`.
+    - A cron job has no `command`.
+    - A field is misspelled or belongs to a different app type. Final rejects fields it doesn't recognize.
+
+    Compare against the [manifest reference](/cloud-apps/manifest), or set up [editor support](/cloud-apps/manifest#editor-support) to catch mistakes as you type.
+  </Accordion>
+
+  <Accordion title="A database binding fails">
+    The database must exist in the app's project and be ready before you deploy. Check its name under **Developer** > **Cloud**; it must match `databases[].name` exactly. If two bindings end up with the same environment variable prefix, set a different `binding` on one of them.
+  </Accordion>
+
+  <Accordion title="The build fails">
+    Read the build log for that deployment:
+
+    ```bash
+    npx final-cloud logs <app> --source build --deployment <deployment-id>
+    ```
+
+    The build only sees files in your pushed commit, so check that the Dockerfile, lockfile, and any generated files are committed and not excluded by `.gitignore`. Paths in `build.context` and `build.dockerfile` are relative to the repository root and the context, respectively.
+  </Accordion>
+
+  <Accordion title="A function fails to deploy or returns 500">
+    Final deploys your `entry` file (or `build.output`) as one module, so `import` statements for npm packages fail unless you bundle them. See [use npm packages](/cloud-apps/functions#use-npm-packages).
+
+    If the response body says `function module does not export fetch`, make sure the file has `export default { fetch(request, env) { ... } }`.
+  </Accordion>
+</AccordionGroup>
+
+## Rollout and runtime
+
+<AccordionGroup>
+  <Accordion title="A web app never becomes healthy">
+    Final waits for `health.path` on your `port` to return a status from 200 to 399. Check, in order:
+
+    1. The server listens on the same port as `port` in the manifest. Final doesn't set a `PORT` variable.
+    2. The server binds to `0.0.0.0`, not `localhost` or `127.0.0.1`.
+    3. The health route returns quickly without redirecting to a login page.
+    4. The app starts within `health.gracePeriodSeconds`. Raise it for slow-starting apps.
+
+    The deploy and runtime logs usually show the cause: `npx final-cloud logs <app> --deployment <deployment-id>`.
+  </Accordion>
+
+  <Accordion title="The health check says no curl or wget is available">
+    The health check runs with `curl` or `wget`, and your image has neither. Use an Alpine-based image, which includes `wget`, or install `curl` in your Dockerfile:
+
+    ```dockerfile
+    RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+    ```
+  </Accordion>
+
+  <Accordion title="My app can't read a secret or variable">
+    Secrets and variables are set when the app deploys. After you add or change one, commit, push, and deploy again. Check that the secret exists in the app's project, and that the name on the right side of `secrets` matches it exactly.
+  </Accordion>
+
+  <Accordion title="A function's fetch call says the outbound host is not allowed">
+    The host isn't in `outboundPolicy.allowedHosts`. Add it, or remove `allowedHosts` to allow any host. If `outboundPolicy.internet` is `false`, the function can't reach the internet at all.
+  </Accordion>
+
+  <Accordion title="rollback says the instances were already replaced">
+    Web apps and services can only roll back while the earlier deployment's instances still exist. Deploy the earlier commit instead with `npx final-cloud deploy <app> --ref <commit-sha>`. See [go back to an earlier version](/cloud-apps/deployments#go-back-to-an-earlier-version).
+  </Accordion>
+
+  <Accordion title="A cron run didn't start">
+    With the default `concurrencyPolicy: forbid`, a run doesn't start while the previous one is still going. Check how long runs take in the runtime logs, and lower `timeoutSeconds` or set `concurrencyPolicy: replace`. Remember that schedules are in UTC.
+  </Accordion>
+
+  <Accordion title="A custom domain stays pending">
+    Open the app in **Developer** > **Cloud**, go to **Settings** > **Domains**, and check the domain's status. It tells you which DNS record to create. After you create it, click **Check status**. DNS changes can take a while to spread, and the app stays reachable at its Final URL in the meantime.
+  </Accordion>
+</AccordionGroup>

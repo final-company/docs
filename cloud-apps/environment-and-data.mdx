@@ -1,0 +1,162 @@
+---
+title: "Environment, secrets, and data"
+sidebarTitle: "Environment and data"
+description: "Give your app configuration, credentials, a SQLite database, and a custom domain."
+---
+
+Everything your app needs at runtime is declared in `final-cloud.yaml`: plain settings, secrets, databases, and domains. You change any of them the same way you change code: edit the manifest, commit, push, and deploy.
+
+Here's an app that uses all four:
+
+```yaml final-cloud.yaml
+name: acme-api
+type: web
+build:
+  method: dockerfile
+port: 3000
+health:
+  path: /health
+env:
+  LOG_LEVEL: info
+secrets:
+  STRIPE_API_KEY: stripe-api-key
+databases:
+  - name: orders
+domains:
+  - api.acme.dev
+```
+
+The first deploy that adds a secret, database, or domain asks you to confirm the new access. See [review access changes](/cloud-apps/deployments#review-access-changes).
+
+## Environment variables
+
+Put settings that aren't sensitive under `env`. Final sets them as environment variables in your container, or passes them on `env` to a [function](/cloud-apps/functions):
+
+```yaml
+env:
+  NODE_ENV: production
+  LOG_LEVEL: info
+  MAX_UPLOAD_MB: 25
+```
+
+Names use uppercase letters, digits, and underscores, and can't start with a digit. Values can be strings, numbers, or booleans, and your code always receives them as strings, so `25` arrives as `"25"`.
+
+## Secrets
+
+Use a secret for anything you'd never commit: API keys, tokens, and passwords. You store the value in Final once, then refer to it by name.
+
+<Steps>
+  <Step title="Create the secret">
+    In the [dashboard](https://console.final.ai), go to **Developer** > **Secrets** and click **New secret**. Give it a name, such as `stripe-api-key`, paste the value, and click **Create**. Create it in the same project as the app.
+  </Step>
+  <Step title="Reference it in the manifest">
+    Map an environment variable name to the secret's name:
+
+    ```yaml
+    secrets:
+      STRIPE_API_KEY: stripe-api-key
+    ```
+
+    Your code reads it like any other variable, such as `process.env.STRIPE_API_KEY` in Node.js or `env.STRIPE_API_KEY` in a function.
+  </Step>
+  <Step title="Deploy">
+    Commit, push, and run `npx final-cloud deploy`. Confirm the access prompt for the new secret.
+  </Step>
+</Steps>
+
+Final reads the secret's value when it deploys. After you change a value in the dashboard, deploy again to pick it up.
+
+## Databases
+
+Final hosts SQLite databases that your apps can share. Create one, bind it to each app that needs it, and query it over HTTP.
+
+### Create and bind a database
+
+In the dashboard, go to **Developer** > **Cloud**, click **New app or database**, and choose **Database**. Enter a name, such as `orders`, and click **Create database**. The database page has a **Query** tab where you can create tables and run SQL by hand.
+
+Then bind it by name in each app's manifest:
+
+```yaml
+databases:
+  - name: orders
+```
+
+The binding gives the app two environment variables, named after the database with `_DB` added:
+
+| Variable | Value |
+| --- | --- |
+| `ORDERS_DB_URL` | The database's endpoint |
+| `ORDERS_DB_TOKEN` | A token that can query only this database |
+
+To pick a different prefix, set `binding`. This app gets `SHOP_DB_URL` and `SHOP_DB_TOKEN`:
+
+```yaml
+databases:
+  - name: orders
+    binding: SHOP_DB
+```
+
+### Query from a container
+
+Web apps, services, and cron jobs send SQL to the database's `/query` endpoint. Pass values as `params` instead of building them into the SQL string:
+
+```js db.mjs
+export async function query(sql, params = []) {
+  const response = await fetch(`${process.env.ORDERS_DB_URL}/query`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${process.env.ORDERS_DB_TOKEN}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ sql, params }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error);
+  return result;
+}
+
+const { columns, rows } = await query('SELECT id, status FROM orders WHERE customer_id = ?', ['cus_381']);
+```
+
+In the response, `columns` names each column once, and `rows` holds each row as an array of values in that order:
+
+```json
+{ "columns": ["id", "status"], "rows": [[1042, "paid"], [1043, "shipped"]] }
+```
+
+Add `"format": "objects"` to the request body to also get write details, such as `changes` (rows affected) and `lastRowId`. To run several statements in one request, `POST` to `/batch` with `{ "statements": [{ "sql": "...", "params": [] }] }`.
+
+### Query from a function
+
+Functions get a database object on `env`, named after the binding, so there's no HTTP code to write:
+
+```js
+const order = await env.ORDERS_DB.prepare('SELECT * FROM orders WHERE id = ?').bind(1042).first();
+```
+
+See [use a database](/cloud-apps/functions#use-a-database) on the functions page.
+
+<Warning>
+Rolling back or redeploying an older commit doesn't undo changes to your data. Make schema changes that the previous version of your app can still run against, such as adding a column before you remove one.
+</Warning>
+
+## Custom domains
+
+Every web app and public function gets a URL from Final. To serve it from your own hostname as well, list the hostname under `domains`, without `https://` or a path:
+
+```yaml
+domains:
+  - api.acme.dev
+```
+
+Deploy, then open the app in **Developer** > **Cloud** and go to **Settings** > **Domains**. Each domain shows its status there. Create the DNS record Final asks for at your DNS provider, then click **Check status**. Final issues the HTTPS certificate once the record resolves. Until then, your app stays reachable at its Final URL.
+
+## Typed environment
+
+Run `types` to generate a `final-cloud.d.ts` file that describes every variable, secret, and database binding in your manifest:
+
+```bash
+npx final-cloud types acme-api
+```
+
+It declares a global `FinalCloudEnv` interface you can use in TypeScript, for example `fetch(request: Request, env: FinalCloudEnv)` in a function. Regenerate it after you change `env`, `secrets`, or `databases`.

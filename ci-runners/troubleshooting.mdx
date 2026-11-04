@@ -1,0 +1,94 @@
+---
+title: "Troubleshoot CI runners"
+sidebarTitle: "Troubleshooting"
+description: "Fix jobs that stay queued, steps that fail on a new runner, and caches that don't stick."
+---
+
+Start from the job in GitHub's **Actions** tab. The **Set up job** step shows which runner picked it up, and each step's log usually points to the cause. Find the symptom below.
+
+## Jobs stay queued
+
+<AccordionGroup>
+  <Accordion title='The job says "Waiting for a runner to pick up this job"'>
+    GitHub couldn't match the job to a runner. The most common cause is the `runs-on` line. It must contain exactly one Final label, optionally with `self-hosted`, `linux`, and `x64`:
+
+    ```yaml
+    runs-on: final-4vcpu-ubuntu-2404                            # works
+    runs-on: [self-hosted, linux, x64, final-4vcpu-ubuntu-2404] # works
+    runs-on: [ubuntu-latest, final-4vcpu-ubuntu-2404]           # stays queued
+    runs-on: final-4vcpu-ubuntu-2204                            # stays queued: not a Final label
+    ```
+
+    Check the label against the [list of sizes](/ci-runners/runner-sizes). If the label is right, the organization may not be set up yet: CI runners must be enabled for it, and an organization owner must approve the Final GitHub App's **Self-hosted runners** permission.
+  </Accordion>
+
+  <Accordion title="Jobs in a public repository never start">
+    GitHub doesn't let public repositories use an organization's self-hosted runners unless you allow it. An organization owner can turn this on in GitHub under **Settings** > **Actions** > **Runner groups**: open the group your Final runners use and select **Allow public repositories**.
+
+    If the runner group only allows selected repositories, add the repository there too.
+  </Accordion>
+
+  <Accordion title="Some jobs wait while others run">
+    Your organization has reached its concurrency limit: the number of Final runners that can run at once. Each job and each matrix entry uses one runner, and queued jobs start as running ones finish.
+  </Accordion>
+</AccordionGroup>
+
+## Jobs fail or behave differently
+
+<AccordionGroup>
+  <Accordion title="The job ran on a different runner">
+    If **Set up job** shows a runner name that doesn't start with `final-ci-`, the job never asked for a Final label. Check that you changed `runs-on` where the job is defined: in the called workflow for a [reusable workflow](https://docs.github.com/en/actions/sharing-automations/reusing-workflows), or in the matrix values when `runs-on` comes from a matrix.
+  </Accordion>
+
+  <Accordion title='A step fails with "command not found"'>
+    Final's image includes fewer language runtimes than GitHub's hosted image. Add the setup action for the tool, such as `actions/setup-node` or `actions/setup-go`, before the step that needs it, or install a system package with `sudo apt-get install -y <package>`. See [what's preinstalled](/ci-runners/runner-sizes#preinstalled-software).
+  </Accordion>
+
+  <Accordion title="The job runs out of memory">
+    Look for `Killed`, exit code 137, or an out-of-memory error in the failing step. Lower the number of parallel workers your build or test tool uses, or move the job to a [larger size](/ci-runners/runner-sizes). Each size up doubles the memory.
+  </Accordion>
+
+  <Accordion title='The job fails with "No space left on device"'>
+    Large checkouts, Docker images, and build output can fill the disk. Delete temporary files you no longer need, prune Docker images between builds with `docker image prune -f`, or move to a larger size, which also comes with a larger disk.
+  </Accordion>
+
+  <Accordion title="Something worked on GitHub-hosted runners but not here">
+    Final runners use Ubuntu 24.04 on x64. If your job ran on an older Ubuntu version or relied on a file GitHub's image preinstalls, install or set it up in the workflow instead. Pinning versions with setup actions also keeps the job stable when either image changes.
+  </Accordion>
+</AccordionGroup>
+
+## Caches and Docker builds
+
+<AccordionGroup>
+  <Accordion title="The cache is empty on every run">
+    Only successful `push`, `schedule`, and `workflow_dispatch` runs on the default branch save a cache. If you've only run the workflow from pull requests, nothing has been saved yet. Merge the change, or run the workflow on the default branch once, and check that the job succeeds.
+
+    Also check that the key is identical in every run. A key that includes the commit SHA or a date creates a new, empty cache each time. Caches that haven't been used for seven days are removed. See [when changes are saved](/ci-runners/dependency-caching#when-changes-are-saved).
+  </Accordion>
+
+  <Accordion title='The log says the disk is "read-only for this run"'>
+    This is expected for pull requests, other branches, and events other than `push`, `schedule`, and `workflow_dispatch`. The job reads the saved cache and can write to its own copy, but those writes are discarded when the job ends.
+  </Accordion>
+
+  <Accordion title="A cache step rejects its key or path">
+    The step fails with `key must be letters, digits, . _ - in /-separated segments`, `path must be an absolute, normalized directory outside system and reserved paths`, or `invalid request`.
+
+    Keys can use letters, digits, `.`, `_`, `-`, and `/` separators, up to 128 characters, and sticky disk keys can't be `buildkit` or start with `buildkit/`. Paths can't be `/` or a system directory such as `/proc`, `/sys`, `/dev`, or `/run`. See the [key format](/ci-runners/dependency-caching#choose-a-key).
+  </Accordion>
+
+  <Accordion title='A cache step fails with "conflicts with a volume already attached to this job"'>
+    Two steps in the same job mount different keys at the same path, or the same key at two paths. Give each cache its own key and its own directory.
+  </Accordion>
+
+  <Accordion title='A cache step fails with "this action runs only on final-* runners"'>
+    The job ran on a runner that isn't a Final runner, so the cache isn't available. Check `runs-on`, or skip the step elsewhere with `if: startsWith(runner.name, 'final-')`.
+  </Accordion>
+
+  <Accordion title="Deleting a cache fails">
+    The step fails with `only push, schedule and workflow_dispatch runs on the default branch may delete volumes`. Deleting a cache counts as a write, so it only works in a `push`, `schedule`, or `workflow_dispatch` run on the default branch. Run the delete step from a `workflow_dispatch` workflow on the default branch, or change the key instead.
+  </Accordion>
+
+  <Accordion title="Docker builds don't reuse layers">
+    Check that the builder step runs before the build and that no later step, such as `docker/setup-buildx-action`, replaces it. `docker buildx ls` should show `final-builder` as the default. Use the same `cache-key` in every run, and remember that pull requests read the cache saved by your default branch. See [Docker builds](/ci-runners/docker-builds#when-layers-are-rebuilt-anyway).
+  </Accordion>
+</AccordionGroup>

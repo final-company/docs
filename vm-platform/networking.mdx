@@ -1,0 +1,163 @@
+---
+title: "Networking and public services"
+sidebarTitle: "Networking"
+description: "Control what a VM can reach on the internet, and share a service running in it on your own domain."
+icon: "globe"
+---
+
+Networking goes two ways. **Outbound** rules decide what a VM can reach, which matters when it runs code you don't fully trust, like code written by an agent. **Inbound** settings decide who can reach a service running in the VM, like a preview of a pull request.
+
+The examples use the `FINAL_API_KEY`, `FINAL_VM_API_URL`, and `SANDBOX_ID` variables from the [quickstart](/vm-platform/quickstart).
+
+## Limit outbound traffic
+
+New VMs can reach the whole internet. To lock one down, turn off `allow_internet` and list what it may reach. This VM can clone from GitHub and install npm packages, and nothing else:
+
+```json locked-down.json
+{
+  "labels": { "name": "agent-task-381" },
+  "allow_internet": false,
+  "allow_domains": ["github.com", "codeload.github.com", "registry.npmjs.org"]
+}
+```
+
+Four fields make up the policy:
+
+| Field | What it does |
+| --- | --- |
+| `allow_internet` | `true` (the default) allows all destinations except `deny_cidrs`. `false` allows only what's listed in `allow_domains` and `allow_cidrs`. |
+| `allow_domains` | Exact domain names, up to 128. `github.com` doesn't include `api.github.com`; list each one you need. |
+| `allow_cidrs` | IPv4 addresses or ranges, such as `10.20.0.0/16`, up to 128. |
+| `deny_cidrs` | IPv4 addresses or ranges that are always blocked, even if another rule allows them. |
+
+Deny rules always win. IPv6 traffic is blocked.
+
+### Change the policy of a running VM
+
+Read the current policy first. The response includes a `revision` number:
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/network" \
+  -H "Authorization: Bearer $FINAL_API_KEY" | jq
+```
+
+```json
+{
+  "policy": {
+    "allow_internet": false,
+    "allow_cidrs": [],
+    "deny_cidrs": [],
+    "allow_domains": ["codeload.github.com", "github.com", "registry.npmjs.org"]
+  },
+  "revision": 1,
+  "applied": true
+}
+```
+
+Send the complete new policy with that revision as `expected_revision`. Here, it adds PyPI:
+
+```bash
+curl -sS -X PUT "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/network" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "expected_revision": 1,
+    "allow_internet": false,
+    "allow_domains": ["github.com", "codeload.github.com", "registry.npmjs.org", "pypi.org", "files.pythonhosted.org"]
+  }' | jq '{revision, applied}'
+```
+
+The new policy replaces the old one, so include everything you want to keep. If someone else changed the policy since you read it, you get `409` and nothing changes; read it again and merge. A VM that has never had a policy change has a `revision` of `null`, which you send as is.
+
+The change takes effect once `applied` is `true`. Read the policy again until it is.
+
+## Publish a port
+
+Services in a VM are private by default. Publishing a port opens it to the internet over HTTPS, which is what lets a [custom domain](#connect-a-custom-domain) route traffic to it:
+
+```bash
+curl -sS -X PUT "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/ports/8000" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"public": true}'
+```
+
+```json
+{ "port": 8000, "public": true }
+```
+
+Make sure the service listens on `0.0.0.0`, not `127.0.0.1`. Send `{"public": false}` to make the port private again, or list port settings with `GET /sandboxes/{id}/ports`. You can also publish at creation time: list the port in both `ports` and `public_ports`.
+
+<Warning>
+Anyone with the URL can reach a public port. If the service shows private data, add authentication in the app itself.
+</Warning>
+
+## Connect a custom domain
+
+Serve a published port on a domain you own, like `pr-142.preview.acme.dev`:
+
+<Steps>
+  <Step title="Publish the port">
+    Publish the port as shown [above](#publish-a-port). Domains only route to public ports.
+  </Step>
+  <Step title="Add the domain">
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/domains" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"domain": "pr-142.preview.acme.dev", "port": 8000}' | jq '{id, domain, status}'
+    ```
+  </Step>
+  <Step title="Point DNS at Final">
+    Get the DNS target:
+
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/domains" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq -r '.cname_target'
+    ```
+
+    At your DNS provider, create a `CNAME` record from your domain to that target.
+  </Step>
+  <Step title="Wait for the certificate">
+    Final checks DNS and issues a TLS certificate. Read the domains list until the status is `active`:
+
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/domains" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq '.domains[] | {domain, status, error}'
+    ```
+
+    The status moves through `pending_dns`, `verifying_dns`, and `issuing_certificate` to `active`. If it's `error`, the `error` field explains why, usually a missing or wrong `CNAME`.
+  </Step>
+</Steps>
+
+When the domain gets traffic while the VM is paused, the VM resumes automatically. A stopped VM stays offline until you start it, and making the port private takes its domains offline. Remove a domain with `DELETE /sandboxes/{id}/domains/{domain_id}`.
+
+A domain can belong to only one VM at a time. Adding one that's already in use returns `409`.
+
+## Share a private preview
+
+To let a teammate see a private port without making it public, create a preview token for that port:
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/preview-tokens" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"port": 8000, "ttl_s": 3600}' | jq '{expires_at}'
+```
+
+`ttl_s` sets how long the token works, from 60 seconds to 7 days (one day by default). In the dashboard, the **Tokens** tab creates five-minute tokens and lists every token for the VM.
+
+<Note>
+Treat preview tokens and links that contain them like passwords. To cut off access, revoke the token on the **Tokens** tab or with `DELETE /sandboxes/{id}/tokens/{token_id}`. New requests are refused within about 30 seconds; connections that are already open aren't closed.
+</Note>
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Health checks" icon="heart-pulse" href="/vm-platform/workloads#run-a-service">
+    Know your service is ready before you share it.
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/vm-platform/troubleshooting#networking">
+    Fix domains that won't activate and blocked requests.
+  </Card>
+</Columns>

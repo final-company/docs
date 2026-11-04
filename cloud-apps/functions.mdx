@@ -1,0 +1,205 @@
+---
+title: "Functions"
+description: "Deploy a JavaScript request handler for webhooks and small APIs, with no container to build."
+---
+
+Use a function when one JavaScript handler can answer your HTTP requests: a webhook receiver, a small JSON API, or a redirect service. You write a `fetch` handler, and Final runs it at a public URL. There's no Dockerfile or server to manage, and a function that sits idle stops until the next request arrives.
+
+Functions run in a lightweight JavaScript runtime with web-standard APIs like `fetch`, `Request`, `Response`, and `crypto.subtle`. Each instance has 128 MB of memory. If you need Node.js-only libraries, native packages, or another language, use a [web app](/cloud-apps/web-apps).
+
+## Write a handler
+
+A function is a JavaScript module whose default export has a `fetch` method:
+
+```js index.js
+export default {
+  async fetch(request, env, ctx) {
+    return Response.json({ path: new URL(request.url).pathname });
+  },
+};
+```
+
+Final calls `fetch` once per request with three arguments:
+
+- `request` is the incoming [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request).
+- `env` holds the app's environment variables and secrets as strings, plus a database object for each [database you bind](#use-a-database).
+- `ctx.waitUntil(promise)` lets work such as logging an analytics event finish after you've sent the response.
+
+Anything you write with `console.log` shows up in the app's runtime logs.
+
+## Deploy a webhook receiver
+
+This function receives order events from another system. It checks each request's HMAC signature against a shared secret, rejects anything unsigned, and logs the event.
+
+<Steps>
+  <Step title="Create the secret">
+    In the [dashboard](https://console.final.ai), go to **Developer** > **Secrets** and click **New secret**. Name it `orders-webhook-secret`, paste a long random value, and click **Create**. Create it in the same project as your API key, which is where the app will live.
+
+    Keep the value handy for testing:
+
+    ```bash
+    export WEBHOOK_SECRET='the-value-you-saved'
+    ```
+  </Step>
+
+  <Step title="Write the handler">
+    ```js index.js
+    const encoder = new TextEncoder();
+    const fromHex = (hex) => new Uint8Array(hex.match(/../g)?.map((byte) => parseInt(byte, 16)) ?? []);
+
+    async function isSigned(request, body, secret) {
+      const signature = request.headers.get('x-signature')?.replace(/^sha256=/, '') ?? '';
+      const key = await crypto.subtle.importKey(
+        'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'],
+      );
+      return crypto.subtle.verify('HMAC', key, fromHex(signature), encoder.encode(body));
+    }
+
+    export default {
+      async fetch(request, env) {
+        const { pathname } = new URL(request.url);
+        if (request.method !== 'POST' || pathname !== '/webhooks/orders') {
+          return new Response('Not found', { status: 404 });
+        }
+
+        const body = await request.text();
+        if (!(await isSigned(request, body, env.WEBHOOK_SECRET))) {
+          return new Response('Invalid signature', { status: 401 });
+        }
+
+        const event = JSON.parse(body);
+        console.log(`order ${event.orderId} is ${event.status}`);
+        return Response.json({ received: true });
+      },
+    };
+    ```
+
+    `crypto.subtle.verify` compares signatures in constant time, so the check doesn't leak timing information.
+  </Step>
+
+  <Step title="Describe the app">
+    ```yaml final-cloud.yaml
+    name: orders-webhook
+    type: function
+    entry: index.js
+    secrets:
+      WEBHOOK_SECRET: orders-webhook-secret
+    ```
+
+    `secrets` maps an environment variable name to a secret name. The value never appears in your repository; Final passes it to the handler as `env.WEBHOOK_SECRET`. Functions are public by default, so there's no need to set `public`.
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    npx final-cloud validate
+    npx final-cloud apps create "Orders webhook"
+    git add . && git commit -m "Add orders webhook"
+    git remote add final https://<your-app-repository>.git   # printed by apps create
+    git push final HEAD:main
+    npx final-cloud deploy orders-webhook
+    ```
+
+    The first deploy asks you to confirm that the app becomes public and can read `orders-webhook-secret`. Type `y`, and the CLI prints the URL when the function is ready.
+  </Step>
+
+  <Step title="Send a signed event">
+    Sign a test payload with the same secret and post it:
+
+    ```bash
+    BODY='{"orderId":"ord_1042","status":"paid"}'
+    SIGNATURE=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -r | cut -d' ' -f1)
+
+    curl -X POST "https://<your-app-url>/webhooks/orders" \
+      -H "content-type: application/json" \
+      -H "x-signature: sha256=$SIGNATURE" \
+      -d "$BODY"
+    ```
+
+    ```json
+    {"received":true}
+    ```
+
+    Change one character in `BODY` without re-signing and you'll get `Invalid signature` instead. The accepted event appears in the logs:
+
+    ```bash
+    npx final-cloud logs orders-webhook --source runtime --limit 20
+    ```
+
+    Look for `order ord_1042 is paid`.
+  </Step>
+</Steps>
+
+## Use a database
+
+Bind a [SQLite database](/cloud-apps/environment-and-data#databases) and the function gets a database object on `env`. It's named after the database, so a database called `orders` becomes `env.ORDERS_DB`:
+
+```yaml final-cloud.yaml
+databases:
+  - name: orders
+```
+
+```js index.js
+export default {
+  async fetch(request, env) {
+    const { results } = await env.ORDERS_DB
+      .prepare('SELECT id, status FROM orders WHERE status = ? ORDER BY id DESC LIMIT 20')
+      .bind('paid')
+      .all();
+    return Response.json(results);
+  },
+};
+```
+
+Statements support `bind`, `all`, `first`, `run`, and `raw`, and `env.ORDERS_DB.batch([...])` runs several statements together. Run `npx final-cloud types <app>` to generate a `final-cloud.d.ts` file with types for `env`, including the database object.
+
+## Use npm packages
+
+Final deploys one JavaScript file as-is. To use npm packages or TypeScript, bundle your code into a single file with `build.command`, and point `build.output` at the result. The command runs in a Node.js environment with your repository checked out.
+
+```yaml final-cloud.yaml
+name: orders-webhook
+type: function
+entry: src/index.ts
+build:
+  command: npm ci && npx esbuild src/index.ts --bundle --format=esm --outfile=dist/index.js
+  output: dist/index.js
+```
+
+Add `esbuild` to your `devDependencies` so `npm ci` installs it. The packages you bundle still need to work without Node.js built-ins such as `fs` or `net`.
+
+## Tune limits and scaling
+
+The defaults suit most webhooks and small APIs. Change them when a handler does heavy work or receives bursts of traffic.
+
+| Field | Default | What it controls |
+| --- | --- | --- |
+| `limits.cpuMs` | `30000` | CPU time a single request may use, in milliseconds. Waiting on `fetch` doesn't count. |
+| `limits.requestTimeoutMs` | none | Wall-clock limit per request. Without it, a request runs as long as the client stays connected. |
+| `limits.subRequests` | `10000` | Outbound `fetch` calls a single request may make. |
+| `limits.maxRequestBodyBytes` | 100 MB | Largest request body the function accepts. |
+| `concurrency` | `64` | Requests one instance handles at the same time. |
+| `scaling.max` | `4` | The most instances to run, up to 16. Final adds one when every instance is busy. |
+| `idleTimeoutSeconds` | `60` | How long an idle instance waits before it stops. The next request starts it again. |
+
+To limit where the function can send requests, list the hosts in `outboundPolicy.allowedHosts`. Each entry also allows its subdomains, and `fetch` calls to any other host throw an error:
+
+```yaml
+outboundPolicy:
+  allowedHosts:
+    - api.stripe.com
+```
+
+Set `outboundPolicy.internet: false` to cut the function off from the internet entirely.
+
+The [manifest reference](/cloud-apps/manifest#functions) lists every function field.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Secrets and environment variables" icon="key" href="/cloud-apps/environment-and-data">
+    Add configuration, credentials, and custom domains.
+  </Card>
+  <Card title="Function fields" icon="file-code" href="/cloud-apps/manifest#functions">
+    Every function field, with types and defaults.
+  </Card>
+</Columns>

@@ -1,0 +1,88 @@
+---
+title: "Final Cloud Apps"
+description: "Deploy websites, APIs, workers, and cron jobs from a Git repository."
+---
+
+import AgentSetup from '/snippets/agent-setup/cloud-apps.mdx';
+
+Final Cloud Apps runs your code from Git. You describe the app in one small file, push your code, and run one command. Final builds it, checks that it's healthy, and gives it a URL, logs, and a history of every deployment.
+
+Here's a complete web app configuration:
+
+```yaml final-cloud.yaml
+name: acme-api
+type: web
+build:
+  method: dockerfile
+port: 3000
+health:
+  path: /health
+```
+
+And here's how you ship it:
+
+```bash
+git push final HEAD:main
+npx final-cloud deploy acme-api
+```
+
+## Let an agent set it up
+
+Paste this prompt into your coding agent from your app's repository. It picks the right app type, writes the configuration, deploys, and checks that the app responds.
+
+<AgentSetup />
+
+## What you can deploy
+
+Each app has one type. [Choose an app type](/cloud-apps/workloads) compares them side by side.
+
+<Columns cols={2}>
+  <Card title="Web apps" icon="globe" href="/cloud-apps/web-apps">
+    Websites and APIs that run their own HTTP server, like Express, Hono, Next.js, or Django.
+  </Card>
+  <Card title="Services" icon="gears" href="/cloud-apps/services">
+    Background workers that run all the time without a public URL, like queue consumers.
+  </Card>
+  <Card title="Cron jobs" icon="clock" href="/cloud-apps/cron-jobs">
+    Commands that run on a schedule or on demand and then exit, like nightly cleanups and reports.
+  </Card>
+  <Card title="Functions" icon="bolt" href="/cloud-apps/functions">
+    A single JavaScript request handler with no container to build, like a webhook receiver.
+  </Card>
+</Columns>
+
+## How a deploy works
+
+When you run `final-cloud deploy`, Final reads `final-cloud.yaml` from the commit you pushed, builds the app, and starts the new version next to the old one. Traffic moves over only after the new version passes its health check. If it doesn't pass, the deployment fails and the version that was already running keeps serving.
+
+Final also asks you to confirm any deploy that opens up access, such as making the app public or giving it a secret or database for the first time. You always see what's changing before it ships.
+
+| Term | What it means |
+| --- | --- |
+| App | One deployable thing with its own URL, logs, settings, and history. Each app has a type. |
+| Manifest | The `final-cloud.yaml` file in your repository that describes the app. See the [manifest reference](/cloud-apps/manifest). |
+| App repository | The Git repository Final creates for each app. You push code to it, and Final deploys from it. |
+| Deployment | One release of one commit. Every deployment has an ID, a status, and its own build and deploy logs. |
+
+## Before you start
+
+You need Node.js 26 or later, Git, and a [Final API key](/api-keys) with the `apps:read` and `apps:write` permissions, exported as `FINAL_API_KEY`. The `final-cloud` CLI comes from the `@finalai/cloud` npm package, so `npx final-cloud` works in any project.
+
+You can also see every app in the [Final dashboard](https://console.final.ai) under **Developer** > **Cloud**, with tabs for its deployments, logs, metrics, and settings.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Deploy your first app" icon="rocket" href="/cloud-apps/quickstart">
+    Ship a small function and get a public URL in about five minutes.
+  </Card>
+  <Card title="Choose an app type" icon="layer-group" href="/cloud-apps/workloads">
+    Match your code to a web app, service, cron job, or function.
+  </Card>
+  <Card title="Add secrets and databases" icon="database" href="/cloud-apps/environment-and-data">
+    Configure environment variables, secrets, SQLite databases, and custom domains.
+  </Card>
+  <Card title="Manifest reference" icon="file-code" href="/cloud-apps/manifest">
+    Every field in `final-cloud.yaml`, with types and defaults.
+  </Card>
+</Columns>

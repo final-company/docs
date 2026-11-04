@@ -1,0 +1,158 @@
+---
+title: "Dependency caching"
+description: "Keep package downloads and build output between jobs with sticky disks."
+---
+
+Every Final runner starts empty, so without a cache each job downloads its dependencies and rebuilds from scratch. A **sticky disk** fixes that: it's a directory that persists between jobs in the same repository. Mount it where your package manager or compiler keeps its files, and the next job starts with everything the last successful run left there.
+
+## Pick a cache
+
+You have two options, and you can use both in the same workflow.
+
+| | `actions/cache` | Sticky disk |
+| --- | --- | --- |
+| Setup | Works on Final runners unchanged | One step that mounts a directory |
+| How it restores | Downloads and unpacks an archive | Mounts the directory directly, with nothing to download |
+| Best for | Small caches, or a job you've recently migrated | Large package stores and compiler output, such as `~/.npm`, a pnpm store, or a Rust `target` directory |
+
+If your workflow already uses `actions/cache` or a setup action's `cache:` option, it keeps working after you [migrate](/ci-runners/migration). Switch to a sticky disk when restoring and saving the cache takes a noticeable share of the job.
+
+## Mount a sticky disk
+
+<Note>
+The sticky disk action isn't published to the GitHub Marketplace yet. Until it is, the examples on this page write its reference as `<sticky-disk-action>`.
+</Note>
+
+Add the step after `actions/checkout` and before the step that installs dependencies. This job keeps npm's download cache between runs:
+
+```yaml .github/workflows/ci.yml highlight={10-14}
+jobs:
+  test:
+    runs-on: final-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache npm downloads
+        uses: <sticky-disk-action>
+        with:
+          key: npm-node22-v1
+          path: ~/.npm
+
+      - run: npm ci
+      - run: npm test
+```
+
+The step's log shows where the disk was mounted and whether this run will [save its changes](#when-changes-are-saved). `npm ci` still checks every package against your lockfile, so a stale cache can't change what gets installed.
+
+<ParamField path="key" type="string" required>
+  The cache's name in this repository. Jobs that use the same key share the same disk. See [choose a key](#choose-a-key).
+</ParamField>
+
+<ParamField path="path" type="string" required>
+  The directory to mount. Relative paths start from the workspace (your checkout), and `~` is the runner's home directory. Mount a dedicated directory such as `~/.npm` or `target`, not your whole checkout or home directory.
+</ParamField>
+
+### Other package managers
+
+<Tabs>
+  <Tab title="pnpm">
+    Ask pnpm where its store is, then mount it there:
+
+    ```yaml
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - name: Find the pnpm store
+      run: echo "PNPM_STORE=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+    - uses: <sticky-disk-action>
+      with:
+        key: pnpm-store-v1
+        path: ${{ env.PNPM_STORE }}
+    - run: pnpm install --frozen-lockfile
+    ```
+  </Tab>
+  <Tab title="pip">
+    ```yaml
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: <sticky-disk-action>
+      with:
+        key: pip-py312-v1
+        path: ~/.cache/pip
+    - run: pip install -r requirements.txt
+    ```
+  </Tab>
+  <Tab title="Rust">
+    Mount Cargo's `target` directory to keep compiled dependencies, so only your own crates rebuild:
+
+    ```yaml
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: <sticky-disk-action>
+      with:
+        key: cargo-target-v1
+        path: target
+    - run: cargo test --locked
+    ```
+
+    Mount it after checkout. A path inside the workspace that's mounted before `actions/checkout` gets cleaned when the checkout runs.
+  </Tab>
+</Tabs>
+
+## When changes are saved
+
+Any job can read a sticky disk, and every job can write to its own copy while it runs. Only some runs save those writes for later jobs:
+
+| Run | Saves changes |
+| --- | --- |
+| A successful `push`, `schedule`, or `workflow_dispatch` run on the default branch | Yes |
+| Pull requests, including from forks | No |
+| Runs on other branches, or triggered by other events | No |
+| Failed, cancelled, or timed-out jobs | No |
+
+This keeps the cache trustworthy. Code in a pull request can't change what your default branch builds with, and a half-finished install from a failed job never becomes the starting point for the next one. When a run won't save, the step's log says the disk is read-only for this run. The job can still write to it; the changes are discarded when the job ends.
+
+In practice, the cache fills from your default branch. After you add a sticky disk, merge the change or run the workflow on the default branch once, and pull requests start from that cache.
+
+<Warning>
+Don't write secrets or credentials into a sticky disk. Every later job in the repository can read it, including pull requests.
+</Warning>
+
+## Choose a key
+
+Use a key that stays the same from commit to commit, so every run finds the same cache. Include the tool or runtime version, and end it with a version suffix you can bump:
+
+- `npm-node22-v1`
+- `pnpm-store-v1`
+- `cargo-target-v1`
+
+Give a cache a new key whenever its contents stop being compatible, for example after a runtime upgrade. Two unrelated jobs that write different files to the same key will keep overwriting each other, so give them separate keys too.
+
+<Accordion title="Key format">
+  Keys can use letters, digits, `.`, `_`, and `-`, with `/` to separate segments, such as `npm/node22-v1`. A key can be up to 128 characters, and `.` or `..` can't be a segment. The key `buildkit` and keys that start with `buildkit/` are reserved for the [Docker builder](/ci-runners/docker-builds).
+</Accordion>
+
+## Reset a cache
+
+The quickest way to start fresh is to change the key, for example from `npm-node22-v1` to `npm-node22-v2`. The old cache is deleted automatically once no job has used it for seven days.
+
+To delete a cache right away, run the delete action with the key:
+
+```yaml
+- uses: <sticky-disk-delete-action>
+  with:
+    key: npm-node22-v1
+```
+
+Like saving, deleting only works in a `push`, `schedule`, or `workflow_dispatch` run on the default branch. A `workflow_dispatch` workflow is a convenient place for it, since you can run it from the **Actions** tab whenever you need to.
+
+## Good to know
+
+- Caches belong to one repository. Two repositories using the same key get separate disks.
+- In one job, each disk mounts at one path, and each path holds one disk.
+- A cache can be empty, for example on its first run or after it expires, so make sure your build still works without one.

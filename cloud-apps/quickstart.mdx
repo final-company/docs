@@ -1,0 +1,184 @@
+---
+title: "Deploy your first app"
+sidebarTitle: "Quickstart"
+description: "Deploy a JavaScript function and get a public URL in about five minutes."
+---
+
+You'll deploy a small JavaScript function that answers HTTP requests, then open it at its public URL. It takes about five minutes and needs no Dockerfile.
+
+<Tip>
+Prefer to hand this off? Give your coding agent the [setup prompt](/cloud-apps/overview#let-an-agent-set-it-up) instead.
+</Tip>
+
+## Before you begin
+
+- Node.js 26 or later, npm, and Git.
+- A [Final API key](/api-keys) with `apps:read` and `apps:write`, exported in your shell:
+
+  ```bash
+  export FINAL_API_KEY='paste-your-key-here'
+  ```
+
+- Git access to the app's repository. Git signs in separately from `FINAL_API_KEY`. If you can't push from your machine, hand the push and deploy to your agent in Final, which already has access.
+
+## Deploy the function
+
+<Steps>
+  <Step title="Create the project">
+    Make a folder, start a Git repository, and install the CLI:
+
+    ```bash
+    mkdir hello-cloud && cd hello-cloud
+    git init -b main
+    npm init -y
+    npm install --save-dev @finalai/cloud
+    ```
+
+    Add a `.gitignore` so dependencies and local env files stay out of Git:
+
+    ```text .gitignore
+    node_modules/
+    .env
+    ```
+  </Step>
+
+  <Step title="Write the function">
+    A function is a JavaScript module whose default export has a `fetch` method. Final calls it with each incoming [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) and sends back the `Response` you return.
+
+    ```js index.js
+    export default {
+      fetch(request) {
+        const { pathname } = new URL(request.url);
+        if (pathname === '/health') return new Response('ok');
+
+        return new Response('Hello from Final Cloud Apps', {
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+        });
+      },
+    };
+    ```
+  </Step>
+
+  <Step title="Describe the app">
+    Create `final-cloud.yaml` in the project root. This tells Final what kind of app this is and where the code lives.
+
+    ```yaml final-cloud.yaml
+    name: hello-cloud
+    type: function
+    entry: index.js
+    public: true
+    ```
+
+    Check it before you deploy:
+
+    ```bash
+    npx final-cloud validate
+    ```
+
+    The last line of the output should be `final-cloud.yaml is valid`. If there's a problem, the CLI names the field and what's wrong with it.
+  </Step>
+
+  <Step title="Create the app">
+    ```bash
+    npx final-cloud apps create "Hello Cloud"
+    ```
+
+    Final creates the app and a Git repository for it, then prints the commands to run next:
+
+    ```text
+    created app hello-cloud
+    remote: https://<your-app-repository>.git
+    branch: main
+
+    next steps:
+    git remote add final https://<your-app-repository>.git
+    git push final HEAD:main
+    final-cloud deploy hello-cloud
+    ```
+
+    `hello-cloud` is the app's **slug**, its short name in every CLI command. Yours may differ, so use the one the CLI printed. The app goes in your API key's project.
+  </Step>
+
+  <Step title="Push your code">
+    Commit the files, then run the two `git` commands from the previous output:
+
+    ```bash
+    git add .
+    git commit -m "Add hello-cloud function"
+    git remote add final https://<your-app-repository>.git
+    git push final HEAD:main
+    ```
+
+    Final always deploys a commit you've pushed, never the files on your disk. Commit and push before every deploy.
+
+    <Tip>
+    If the push is rejected, give this step to your agent in Final. Ask it to push your code to the app's repository and deploy it, for example: "Push this function to the `hello-cloud` app and deploy it."
+    </Tip>
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    npx final-cloud deploy hello-cloud
+    ```
+
+    Because this deploy makes the app public for the first time, the CLI shows the change and asks you to confirm:
+
+    ```text
+    deploying hello-cloud widens its access:
+      public: yes
+    Deploy hello-cloud with this access? [y/N]
+    ```
+
+    Type `y`. The CLI follows the deployment as it builds and starts. When it's done, it prints the commit it deployed and your app's URL:
+
+    ```text
+    deployed hello-cloud at 3f9c1a2b7d4e
+    https://<your-app-url>
+    ```
+  </Step>
+
+  <Step title="Open your app">
+    ```bash
+    curl https://<your-app-url>
+    ```
+
+    ```text
+    Hello from Final Cloud Apps
+    ```
+  </Step>
+</Steps>
+
+<Check>
+Your function is live. Its URL stays the same across deployments, and you can find the app in the [dashboard](https://console.final.ai) under **Developer** > **Cloud**.
+</Check>
+
+## Ship a change
+
+Edit the message in `index.js`, then commit, push, and deploy again:
+
+```bash
+git commit -am "Change greeting"
+git push final HEAD:main
+npx final-cloud deploy hello-cloud
+```
+
+This time there's no prompt, because the app's access didn't change. To see what the function has logged, run `npx final-cloud logs hello-cloud --source runtime`.
+
+When you're done experimenting, delete the app with `npx final-cloud apps delete hello-cloud`. The CLI asks you to confirm first.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Choose an app type" icon="layer-group" href="/cloud-apps/workloads">
+    Deploy a web server, a background worker, or a scheduled job.
+  </Card>
+  <Card title="Build a webhook receiver" icon="bolt" href="/cloud-apps/functions">
+    Verify signed requests with a secret and log each event.
+  </Card>
+  <Card title="Add secrets and databases" icon="database" href="/cloud-apps/environment-and-data">
+    Give your app configuration, credentials, and storage.
+  </Card>
+  <Card title="Deployments and logs" icon="clock-rotate-left" href="/cloud-apps/deployments">
+    Follow rollouts, read logs, and go back to an earlier version.
+  </Card>
+</Columns>

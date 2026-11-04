@@ -1,0 +1,92 @@
+---
+title: "Get an API key"
+description: "Create a key to call Final from the Agent SDK, the VMs API, or the Cloud Apps CLI."
+---
+
+An API key lets your code and CLIs act on behalf of a Final project. You need one for the [Agent SDK](/agent-sdk), [Final VMs](/vm-platform/overview), and [Final Cloud Apps](/cloud-apps/overview).
+
+<Note>
+The [MCP gateway](/mcp-gateway/quickstart) and [Final CI Runners](/ci-runners/quickstart) don't use API keys. Your AI client signs in with your Final account, and CI runners are enabled for your GitHub organization.
+</Note>
+
+## Create a key
+
+<Steps>
+  <Step title="Open API keys">
+    In the [Final dashboard](https://console.final.ai), select your organization and go to **Developer** > **API keys**.
+  </Step>
+  <Step title="Pick a project">
+    Choose the **Project** the key belongs to. You can only create keys for projects you administer. The key can reach that project's agents, VMs, and apps, limited by the permissions you choose next.
+  </Step>
+  <Step title="Name the key and choose permissions">
+    Click **New API key**. Give it a name that says where it's used, like `Local development` or `GitHub Actions deploy`, then select permissions. Pick only what the integration needs; see [choose permissions](#choose-permissions) below.
+
+    Optionally set an **Expiration** date. Keys for short-lived experiments are a good fit for one.
+  </Step>
+  <Step title="Copy the key">
+    Click **Create** and copy the key. The dashboard shows the full key only once, so store it somewhere safe right away.
+  </Step>
+</Steps>
+
+## Choose permissions
+
+| To use | Select |
+| --- | --- |
+| The [agent quickstart](/quickstart) | `agents:read`, `agents:write`, `agents:execute` |
+| [Conversations](/client/conversations) | The agent permissions, plus `conversations:read` and `conversations:write` |
+| [Final Cloud Apps](/cloud-apps/quickstart) | `apps:read` to inspect apps; add `apps:write` to create, deploy, and run jobs |
+| [Final VMs](/vm-platform/quickstart) | The VM permissions for the operations you need |
+
+The dialog lists every permission available to your organization.
+
+## Use the key
+
+Store the key in the `FINAL_API_KEY` environment variable:
+
+```bash
+export FINAL_API_KEY='paste-your-key-here'
+```
+
+The `final-agents` and `final-cloud` CLIs read `FINAL_API_KEY` automatically. SDK clients don't read environment variables on their own, so pass the value in when you create the client:
+
+```ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+```
+
+In CI, save the key as a secret (for example, a GitHub Actions secret named `FINAL_API_KEY`) and expose it to the job as an environment variable.
+
+<Warning>
+Treat an API key like a password. Keep it out of Git, browser code, and chat messages. If a key leaks, delete it in the dashboard right away.
+</Warning>
+
+## Rotate or revoke a key
+
+To rotate a key without downtime:
+
+1. Create a new key with the same permissions.
+2. Update your app or CI secret to use it, and confirm requests succeed.
+3. Delete the old key under **Developer** > **API keys**.
+
+A deleted or expired key stops working immediately.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Build your first agent" icon="robot" href="/quickstart">
+    Define an agent, publish it, and send it a message.
+  </Card>
+  <Card title="Create your first VM" icon="server" href="/vm-platform/quickstart">
+    Start a VM, run a command, and read the output.
+  </Card>
+  <Card title="Deploy your first app" icon="cloud" href="/cloud-apps/quickstart">
+    Deploy a small HTTP function with the Cloud Apps CLI.
+  </Card>
+  <Card title="Connect your AI client" icon="plug" href="/mcp-gateway/quickstart">
+    Use the MCP gateway with your Final account. No key needed.
+  </Card>
+</Columns>

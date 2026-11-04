@@ -1,0 +1,209 @@
+---
+title: "Test runner"
+description: "Run your test suite on a cloud computer, read the failures, and explain what broke."
+icon: "flask"
+---
+
+This agent runs your test suite on a cloud computer, reads the failing tests and the code they cover, and explains what broke. It runs the tests freely through a dedicated tool, but asks before any other shell command or file edit, so you stay in control while you build trust in it. Use it to triage a red build, or to ask "why does this test fail?" without setting up the project yourself.
+
+**What it shows:** a [sandbox](/build/sandboxes) from a saved [setup guide](/build/sandboxes#use-a-saved-setup-guide), the built-in shell and file tools with `permissionMode: 'ask'`, a [tool that uses the sandbox](/build/sandboxes#use-the-sandbox-from-a-tool), and answering [permission](/client/sessions#handle-approvals) requests from a script.
+
+## Files
+
+<Tree>
+
+- test-runner/
+  - package.json
+  - .gitignore
+  - run.ts
+  - agent/
+    - agent.ts
+    - instructions.md
+    - sandbox.ts
+    - tools/
+      - run_tests.ts
+
+</Tree>
+
+`baseTools` gives the agent the built-in shell and file tools, bound to the computer from `sandbox.ts`. `permissionMode: 'ask'` makes it ask before it runs a command or changes a file:
+
+```ts agent/agent.ts
+import { baseTools, credentials, defineAgent } from '@finalai/agents';
+import { serverlessFinal } from '@finalai/agents/harnesses';
+import { computer } from './sandbox.js';
+
+export default defineAgent({
+  name: 'Test Runner',
+  description: 'Runs the acme-web test suite and explains failures.',
+  tools: baseTools({ shell: computer, files: computer }),
+  harness: serverlessFinal({
+    credentials: credentials.chain({
+      payer: 'organization',
+      tryInOrder: [credentials.platform()],
+    }),
+    permissionMode: 'ask',
+  }),
+});
+```
+
+The computer comes from a setup guide named `acme-web-dev`, which checks out the repository and installs its dependencies ahead of time, so each session starts ready to test. `workspace: 'session'` keeps the files for the whole session, so a follow-up question sees the same checkout:
+
+```ts agent/sandbox.ts
+import { computerSetupGuide } from '@finalai/agents/sandboxes';
+
+export const computer = computerSetupGuide({
+  ref: 'acme-web-dev',
+  version: 'latest',
+  workspace: 'session',
+});
+```
+
+`run_tests` runs `npm test` on the same computer and returns only the end of the log, which is where test runners print failures. Your own tools don't ask unless you give them an approval policy, so the agent can run the tests as often as it needs:
+
+```ts agent/tools/run_tests.ts
+import { defineTool } from '@finalai/agents';
+import { z } from 'zod';
+
+export default defineTool({
+  description: 'Run the test suite and report whether it passed.',
+  inputSchema: z.object({ filter: z.string().optional().describe('Only run matching tests') }),
+  label: { start: ({ filter }) => (filter ? `Running ${filter} tests` : 'Running tests') },
+  async execute({ filter }, ctx) {
+    const sandbox = await ctx.getSandbox('computer');
+    const result = await sandbox.run({
+      command: 'npm',
+      args: filter ? ['test', '--', filter] : ['test'],
+      timeoutMs: 10 * 60_000,
+      abortSignal: ctx.abortSignal,
+    });
+    return {
+      passed: result.exitCode === 0,
+      output: result.stdout.slice(-4000) + result.stderr.slice(-2000),
+    };
+  },
+});
+```
+
+```markdown agent/instructions.md
+You keep the acme-web test suite healthy.
+Run tests with run_tests. When something fails, read the failing test and the code it covers before you explain.
+Explain each failure in two or three sentences, then propose the smallest fix as a diff.
+Don't edit files unless someone asks you to.
+```
+
+## Build and publish it
+
+<Steps>
+  <Step title="Set up the project">
+    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+
+    ```bash
+    mkdir test-runner && cd test-runner
+    git init
+    npm init -y && npm pkg set type=module
+    npm install @finalai/agents zod
+    npm install --save-dev typescript tsx @types/node
+    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
+    ```
+  </Step>
+  <Step title="Create the setup guide">
+    In the Final dashboard, open **Developer** > **Computer Setup Guides** and create a guide with the slug `acme-web-dev` that checks out your repository and installs its dependencies with `npm ci`. Wait until it shows **Ready**.
+  </Step>
+  <Step title="Compile it">
+    ```bash
+    npx final-agents build ./agent
+    ```
+
+    The summary shows the computer and the built-in tools bound to it:
+
+    ```text
+    agent: Test Runner
+    description: Runs the acme-web test suite and explains failures.
+    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
+    mcp servers: authored (worker)
+    sandboxes: computer
+    base tools: shell → computer, files → computer
+    ...
+    wrote /Users/you/test-runner/agent/.final/compile
+    ```
+  </Step>
+  <Step title="Register and publish it">
+    Register the `test-runner` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
+
+    ```bash
+    npx final-agents publish ./agent --agent test-runner
+    ```
+  </Step>
+</Steps>
+
+## Try it
+
+When the agent wants to run a shell command, the turn pauses on a **permission** decision. Its options, like allow once or reject, come with the request, so the script lists them and sends back the one you pick:
+
+```ts run.ts
+import { createInterface } from 'node:readline/promises';
+import { DecisionKind, createClient, sessionUpdateOf, textOf } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+const terminal = createInterface({ input: process.stdin, output: process.stdout });
+
+const { handle, response } = await client.sessions.create({
+  agent: 'test-runner',
+  message: 'Run the checkout tests and tell me why they fail.',
+});
+
+const answered = new Set<string>();
+for await (const event of response!.stream()) {
+  const update = sessionUpdateOf(event);
+  if (update?.sessionUpdate === 'agent_message_chunk') process.stdout.write(textOf(update));
+
+  if (event.decisionId && !answered.has(event.decisionId)) {
+    answered.add(event.decisionId);
+    const decision = (await handle.decisions()).find((d) => d.id === event.decisionId);
+    if (decision?.kind !== DecisionKind.Permission) continue;
+
+    const { title, options } = decision.request;
+    console.log(`\n\n${title}`);
+    options.forEach((option, i) => console.log(`  ${i + 1}. ${option.name}`));
+    const picked = Number(await terminal.question('Choose: ')) - 1;
+    await handle.respond({ decisionId: decision.id, optionId: options[picked].optionId });
+  }
+}
+
+terminal.close();
+await handle.close();
+client.close();
+```
+
+```bash
+npx tsx run.ts
+```
+
+The agent runs the tests with `run_tests`, which doesn't ask. Reading the failing files doesn't ask either. When it wants to run another command, you choose, and the session looks something like this:
+
+```text
+Two checkout tests fail, both in src/checkout/total.test.ts.
+
+Run git log -3 --oneline -- src/checkout/total.ts
+  1. Allow once
+  2. Always allow
+  3. Reject
+Choose: 1
+
+Both failures come from the same change: applyDiscount now rounds before it adds
+tax (commit 4f1c2ab), so a $19.99 cart with a 10% discount totals $19.78 instead
+of $19.79. The smallest fix is to round once, after tax:
+
+-  const discounted = Math.round(subtotal * (1 - rate));
+-  return discounted + tax(discounted);
++  const discounted = subtotal * (1 - rate);
++  return Math.round(discounted + tax(discounted));
+```
+
+## Make it yours
+
+- **Let it fix the tests.** Once you trust it, switch to `permissionMode: 'auto'` and keep file edits behind approval with `toolPolicy: { 'files.write': 'ask' }` in `agent.ts`.
+- **Run it on every red build.** Add a [channel](/build/channels) that receives your CI's failure webhooks, and have the route pass the failing job's name as the message.

@@ -1,0 +1,152 @@
+---
+title: "Deployments and logs"
+description: "Ship a commit, follow the rollout, read logs, and go back to an earlier version."
+---
+
+A deployment releases one commit of your app. Final reads `final-cloud.yaml` at that commit, builds the app, starts the new version, and moves traffic to it once it's healthy. This page covers the day-to-day loop: deploying, watching, reading logs, and recovering from a bad release.
+
+Commands take the app's slug or ID. The examples use `acme-api`.
+
+## Deploy a commit
+
+Final deploys what you've pushed to the app's repository, never the files on your disk. Push first, then deploy:
+
+```bash
+git push final HEAD:main
+npx final-cloud deploy acme-api
+```
+
+With no options, `deploy` uses the latest commit on the app's branch. To deploy a different branch or an exact commit, pass `--ref`:
+
+```bash
+npx final-cloud deploy acme-api --ref <commit-sha>
+```
+
+Not sure which remote and branch an app uses? `npx final-cloud apps get acme-api` prints both, along with the app's URL and latest deployment. You can also start a deployment with the **Deploy** button on the app's page in **Developer** > **Cloud**.
+
+## Review access changes
+
+Before anything ships, the CLI previews the deployment. If it gives the app access it didn't have before, the CLI lists what's new and asks you to confirm:
+
+```text
+deploying acme-api widens its access:
+  public: yes
+  secretNames: STRIPE_API_KEY
+  databases: orders
+Deploy acme-api with this access? [y/N]
+```
+
+That happens the first time an app becomes public, or when a deploy adds a secret, database, or custom domain. Deploys that don't change access go straight through. Pass `--yes` to answer the prompt in advance, which is useful in scripts once you've reviewed the change.
+
+## Follow the rollout
+
+`deploy` follows the deployment until it finishes, printing build and rollout events as they happen. On success it prints the app's URL and exits with code `0`. Each deployment moves through these statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `planned` | Final has recorded the deployment and is about to start it. |
+| `applying` | Final is building and starting the new version. |
+| `healthy` | The new version is live. This is the only successful result. |
+| `failed` | Something went wrong, such as a build error or a failing pre-deploy step. The previous version keeps running. |
+| `rolled_back` | The new version didn't become healthy, so Final kept the previous version serving. |
+
+Pressing Ctrl+C stops watching, not the deployment. To start a deployment and return right away, use `--detach`. It prints only the deployment ID, which you can check later:
+
+```bash
+npx final-cloud deploy acme-api --detach
+npx final-cloud deployments get acme-api <deployment-id>
+```
+
+`deployments get` shows the status, the commit and its message, any error, and the rollout's events. `npx final-cloud deployments list acme-api` lists recent deployments, newest first.
+
+## Read logs
+
+Every app has three log sources:
+
+| Source | What's in it |
+| --- | --- |
+| `build` | Installing dependencies and building the image or bundle. Read this when a build fails. |
+| `deploy` | Rollout events, such as instances starting and health checks passing. |
+| `runtime` | What your app writes to standard output and standard error. |
+
+```bash
+# Recent output from the running app
+npx final-cloud logs acme-api --source runtime --limit 100
+
+# Stream new output as it arrives
+npx final-cloud logs acme-api --source runtime --follow
+
+# Everything about one deployment's build
+npx final-cloud logs acme-api --source build --deployment <deployment-id>
+```
+
+Logs print oldest first. Leave out `--source` to see all three together. Logs, metrics, and deployments are also on the app's page in the dashboard.
+
+Final keeps logs for 30 days by default. To change that, set `observability.logs.retention` to `7d`, `14d`, `30d`, or `90d`:
+
+```yaml final-cloud.yaml
+observability:
+  logs:
+    retention: 90d
+```
+
+## Go back to an earlier version
+
+The most reliable way to undo a bad release is to deploy the last good commit again. Find it in the deployment list, then deploy it by SHA:
+
+```bash
+npx final-cloud deployments list acme-api
+npx final-cloud deploy acme-api --ref <good-commit-sha>
+```
+
+This builds that commit fresh and works for every app type. When you've fixed the problem, push the fix and deploy as usual.
+
+`rollback` is faster because it skips the build and restores an earlier healthy deployment directly:
+
+```bash
+npx final-cloud rollback acme-api <healthy-deployment-id>
+```
+
+It works for functions and cron jobs at any time. Web apps and services can only roll back to a deployment whose instances are still around. Once a newer deployment has replaced them, the CLI tells you to redeploy instead.
+
+Neither option reverses changes to your data, like a database migration, or effects outside Final, like emails your app sent.
+
+## Run a step before each release
+
+Use `hooks.preDeploy` for work that must finish before the new version takes traffic, such as a database migration. Each command runs in a one-off container from the freshly built image, with the app's environment variables, secrets, and databases. If a command fails or runs past its `timeoutSeconds` (600 by default), the deployment fails and the current version keeps running.
+
+```yaml final-cloud.yaml
+hooks:
+  preDeploy:
+    - command: node scripts/migrate.mjs
+      timeoutSeconds: 300
+```
+
+Pre-deploy steps run for web apps, services, and cron jobs.
+
+## Get notified about deployments
+
+`hooks.webhooks` sends an HTTP `POST` to your URL when a deployment starts, succeeds, fails, or rolls back. Use it to post to a team chat or trigger end-to-end tests.
+
+```yaml final-cloud.yaml
+hooks:
+  webhooks:
+    - name: deploy-alerts
+      url: https://hooks.acme.dev/final-deploys
+      events: [deployment.succeeded, deployment.failed]
+      signingSecret: deploy-webhook-secret
+```
+
+The body is JSON with the `event`, `appId`, `deploymentId`, and `status`, plus an `error` when a deployment fails. The `x-final-event` header also names the event. When you set `signingSecret` to the name of a [secret](/cloud-apps/environment-and-data#secrets), each request carries an `x-final-signature-sha256: sha256=<hex>` header: the HMAC-SHA256 of the raw body, keyed with the secret's value. Verify it the same way as in the [webhook function example](/cloud-apps/functions#deploy-a-webhook-receiver).
+
+`events` defaults to started, succeeded, and failed. Add `deployment.rolled_back` to hear about rollbacks too.
+
+## Deploy from scripts and CI
+
+Every command takes `--json` and prints exactly one JSON document, with progress on standard error. Combined with exit codes, that makes deploys easy to script:
+
+```bash
+npx final-cloud deploy acme-api --ref "$COMMIT_SHA" --json
+```
+
+An exit code of `3` means the deploy needs confirmation because it widens access. The JSON output includes the preview, so a script can show it to someone before re-running with `--yes`. See the [CLI reference](/cloud-apps/sdk-and-cli#exit-codes) for every exit code, or use the [TypeScript client](/cloud-apps/sdk-and-cli#typescript-client) to build your own deploy tooling.

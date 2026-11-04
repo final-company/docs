@@ -1,0 +1,141 @@
+---
+title: "Connect your AI client"
+description: "Add the MCP gateway to Claude Code, Codex, Cursor, or Claude, sign in, and make your first request."
+---
+
+In about five minutes, you'll connect a service to Final, add Final to your AI client, and ask your agent to read something from that service.
+
+<Tip>
+Prefer to have your agent do the setup? Copy the [setup prompt](/mcp-gateway/overview#let-an-agent-set-it-up) and paste it into your client.
+</Tip>
+
+You need a Final account and an AI client that supports remote MCP servers. Claude Code, Codex, Cursor, Claude, ChatGPT, and VS Code all do. You don't need an API key: your client signs in with your Final account.
+
+<Steps>
+  <Step title="Connect a service in Final">
+    In the [Final dashboard](https://console.final.ai), open **Connectors** and click **+** (**Add a connection**). Pick a service from the catalog, such as GitHub or Linear, click **Install**, and connect your account. Most services open their own sign-in page. Some, like Linear, ask you to paste an API key from that service instead.
+
+    When you return to **Connectors**, the new connection shows **Connected**.
+  </Step>
+  <Step title="Add Final to your client">
+    Every client uses the same server URL. You can also copy it from the **Connect your agent** button (the plug icon) on the **Connectors** page.
+
+    ```text
+    https://api.final.ai/v1/connectors/mcp
+    ```
+
+    <Tabs>
+      <Tab title="Claude Code">
+        Add the server for all of your projects:
+
+        ```bash
+        claude mcp add --transport http --scope user final https://api.final.ai/v1/connectors/mcp
+        ```
+
+        Leave out `--scope user` to add it to the current project only. Then start Claude Code, run `/mcp`, select **final**, and choose to authenticate. Your browser opens to sign in.
+
+        To check the connection from your shell, run `claude mcp list`.
+      </Tab>
+      <Tab title="Codex">
+        Add the server and sign in:
+
+        ```bash
+        codex mcp add final --url https://api.final.ai/v1/connectors/mcp
+        codex mcp login final
+        ```
+
+        `codex mcp login` opens your browser to sign in. If you'd rather edit config by hand, add this to `~/.codex/config.toml` and then run `codex mcp login final`:
+
+        ```toml ~/.codex/config.toml
+        [mcp_servers.final]
+        url = "https://api.final.ai/v1/connectors/mcp"
+        ```
+
+        Run `/mcp` inside Codex to confirm the server is active.
+      </Tab>
+      <Tab title="Cursor">
+        Add Final to `~/.cursor/mcp.json` to use it in every project, or to `.cursor/mcp.json` in a repository to use it there only:
+
+        ```json ~/.cursor/mcp.json
+        {
+          "mcpServers": {
+            "final": {
+              "url": "https://api.final.ai/v1/connectors/mcp"
+            }
+          }
+        }
+        ```
+
+        If the file already has an `mcpServers` object, add the `final` entry to it. Then open Cursor's MCP server list under **Customize**, find **final**, and sign in when Cursor prompts you. Your browser opens to complete it.
+      </Tab>
+      <Tab title="Claude">
+        These steps work in Claude on the web and in Claude Desktop.
+
+        1. Go to **Customize** > **Connectors**.
+        2. Click **+ Add**, then **Add custom connector**.
+        3. Name it `Final`, paste the server URL, and click **Continue** until you can click **Add**.
+        4. Click **Connect** on the new connector and sign in.
+
+        On a Team or Enterprise plan, an owner adds the connector first under **Organization settings** > **Connectors**. Members then find it under **Customize** > **Connectors** and click **Connect**.
+
+        To use it in a chat, click **+** in the message box, open **Connectors**, and turn on **Final**.
+      </Tab>
+      <Tab title="Other clients">
+        Any client that supports remote MCP servers over HTTP (sometimes called Streamable HTTP) with OAuth sign-in can use the gateway. Add a server named `final`, paste the URL, and sign in when the client asks.
+
+        - **ChatGPT:** Turn on developer mode in ChatGPT's settings, add a new app or connector with the server URL, and sign in. Then select Final in a chat. Availability depends on your plan and workspace policy.
+        - **VS Code:** Run **MCP: Add Server** from the Command Palette, choose HTTP, and paste the URL.
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Allow access">
+    When your browser opens, sign in to Final. If you belong to more than one organization, choose the one whose connections you want to use. Then review the request and click **Allow access**.
+
+    Your client stays signed in for up to 90 days. After that, it asks you to sign in again.
+  </Step>
+  <Step title="Make your first request">
+    Ask your agent to read something from the service you connected. For example, with Linear:
+
+    ```text
+    Using Final, list the five most recently updated Linear issues assigned to me,
+    with each issue's ID, title, and status. Don't change anything.
+    ```
+
+    Your client may ask permission the first time it uses a Final tool. Behind the scenes, the agent calls `search_tools` to find a matching tool, then `call_tool` to run it with your Linear account. You should get back a short list, something like:
+
+    ```text
+    1. ENG-482  Add retry to webhook delivery     In Progress
+    2. ENG-477  Fix timezone in usage export      Todo
+    3. ENG-470  Upgrade billing SDK to 1.2.0      In Review
+    ```
+
+    If you have more than one Linear account connected, the agent asks which one to use.
+  </Step>
+</Steps>
+
+<Check>
+Your agent returned real data from your connected account. Connect more services in **Connectors** and they're available in your client right away, with no change to its configuration.
+</Check>
+
+<Accordion title="Optional: add the connector catalog server">
+The **Catalog MCP URL** is a second, separate server that lets your agent manage connectors for you. With it, you can say "connect my Notion account" and get a sign-in link back, or have the agent find a service in the catalog. Changes ask for your confirmation first.
+
+Add it the same way as the main server, under a different name. In Claude Code:
+
+```bash
+claude mcp add --transport http --scope user final-catalog https://api.final.ai/v1/catalog/mcp
+```
+
+Sign in to this server too. Keep using `final` for everyday work: the catalog server can't call your service tools.
+</Accordion>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Accounts and approvals" icon="user-shield" href="/mcp-gateway/accounts-and-approvals">
+    Pick which account your agent uses and approve changes before they run.
+  </Card>
+  <Card title="Troubleshooting" icon="life-ring" href="/mcp-gateway/troubleshooting">
+    Fix sign-in problems, missing services, and stuck approvals.
+  </Card>
+</Columns>

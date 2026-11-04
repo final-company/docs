@@ -1,0 +1,66 @@
+---
+title: "Example agents"
+sidebarTitle: "Overview"
+description: "Complete agents you can copy, build, and publish, each showing a different part of the Agent SDK."
+icon: "code"
+---
+
+Each example is a complete project: every file of the agent, the commands to build and publish it, and a script or request to try it, with the output you should see. They're ordered from simplest to most involved, so if you're new to the SDK, start at the top. Every example builds and publishes the same way as the [quickstart](/quickstart).
+
+<Columns cols={2}>
+  <Card title="API docs assistant" icon="book-open" href="/examples/docs-assistant">
+    Answers developer questions about your API from Markdown you control.
+    **Shows:** instructions, skills with reference files, reasoning level.
+  </Card>
+  <Card title="Issue triage assistant" icon="bug" href="/examples/issue-triage">
+    Files bug reports in Linear with an owner and severity, after checking for duplicates.
+    **Shows:** MCP connection, skill, approval for a connection tool.
+  </Card>
+  <Card title="Morning pull request digest" icon="newspaper" href="/examples/pr-digest">
+    Posts a weekday summary of merged, stuck, and failing pull requests.
+    **Shows:** schedule, GitHub MCP server limited to read-only tools, `runNow`.
+  </Card>
+  <Card title="Billing support agent" icon="credit-card" href="/examples/billing-support">
+    Looks up Stripe customers, issues credits, and cancels subscriptions.
+    **Shows:** tools that call an API, shared `lib/` code, `whenInput` approvals.
+  </Card>
+  <Card title="Support chat in a Next.js app" icon="comments" href="/examples/support-chat">
+    Streams an order-support agent into your site, with Approve and Decline buttons.
+    **Shows:** streaming from a route, forwarding decisions to the browser, follow-ups.
+  </Card>
+  <Card title="Test runner" icon="flask" href="/examples/test-runner">
+    Runs your test suite on a cloud computer and explains what broke.
+    **Shows:** sandbox from a setup guide, shell and file tools, permission prompts.
+  </Card>
+  <Card title="Pull request reviewer" icon="code-pull-request" href="/examples/pr-reviewer">
+    Checks out each new pull request, runs lint and tests, and posts a review.
+    **Shows:** GitHub webhook channel, sandbox with a repository, Git from a tool.
+  </Card>
+  <Card title="Deploy watcher" icon="rocket" href="/examples/deploy-watcher">
+    Posts each deploy to your team's room and summarizes the week on Fridays.
+    **Shows:** webhook channel, schedule, group conversation, local testing.
+  </Card>
+  <Card title="Audit log for agent actions" icon="list-check" href="/examples/audit-log">
+    Records every tool call, approval, and turn to Datadog.
+    **Shows:** lifecycle hooks, posting on failure, the Final connection.
+  </Card>
+</Columns>
+
+## Find an example by feature
+
+| Feature | Examples |
+| --- | --- |
+| [Instructions and skills](/build/instructions-and-skills) | [Docs assistant](/examples/docs-assistant), [issue triage](/examples/issue-triage) |
+| [Tools](/build/tools) | [Billing support](/examples/billing-support), [support chat](/examples/support-chat), [test runner](/examples/test-runner), [pull request reviewer](/examples/pr-reviewer) |
+| [Approvals](/build/tools#ask-before-a-tool-runs) | [Issue triage](/examples/issue-triage), [billing support](/examples/billing-support), [support chat](/examples/support-chat), [test runner](/examples/test-runner) |
+| [Connections](/build/connections) | [Issue triage](/examples/issue-triage), [pull request digest](/examples/pr-digest), [audit log](/examples/audit-log) |
+| [Sandboxes](/build/sandboxes) | [Test runner](/examples/test-runner), [pull request reviewer](/examples/pr-reviewer) |
+| [Schedules](/build/schedules) | [Pull request digest](/examples/pr-digest), [deploy watcher](/examples/deploy-watcher) |
+| [Channels](/build/channels) | [Pull request reviewer](/examples/pr-reviewer), [deploy watcher](/examples/deploy-watcher) |
+| [Hooks](/build/hooks) | [Audit log](/examples/audit-log) |
+| [Sessions and streaming](/client/sessions) | [Support chat](/examples/support-chat), [billing support](/examples/billing-support) |
+| [Conversations](/client/conversations) | [Deploy watcher](/examples/deploy-watcher), [pull request digest](/examples/pr-digest) |
+
+## Before you start
+
+Every example needs Node.js 26 or later, Git, and a [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions, exported as `FINAL_API_KEY`. Examples that call other services, like Linear, GitHub, or Stripe, say which token to store as a [secret](/operate/authentication#use-secrets-in-your-code) and what access it needs.

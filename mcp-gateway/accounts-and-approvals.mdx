@@ -1,0 +1,83 @@
+---
+title: "Accounts and approvals"
+description: "Control which accounts your agent uses through the MCP gateway and which actions need your approval."
+---
+
+The MCP gateway always acts as you. Three things decide what your agent can do through it:
+
+| | What it controls | Where you manage it |
+| --- | --- | --- |
+| **Your Final sign-in** | Which person and organization the client acts for. | The browser sign-in your client opens. |
+| **Connected accounts** | Which services the agent can reach, and as which account. | **Connectors** in the Final dashboard. |
+| **Approvals** | Which actions run right away and which wait for you. | **Code Mode** in the Final dashboard. |
+
+Signing in to Final doesn't connect any services, and connecting a service doesn't approve any actions. Each is a separate step, so you stay in control of each one.
+
+## Connect and manage accounts
+
+Open **Connectors** in the [Final dashboard](https://console.final.ai) to see every service you've connected and its status. To add one, click **+** (**Add a connection**), pick the service, click **Install**, and sign in. If the service you need isn't in the catalog, click **Install from an OpenAPI spec** on the catalog page to add any API that publishes one.
+
+New connections show up in your client right away. You don't need to change your client's configuration or sign in again.
+
+Final's own tools, such as reading your Final Cloud Apps' logs or listing your Git repositories, are always available. They use your Final sign-in, so there's nothing to connect.
+
+## Choose between several accounts
+
+If more than one of your accounts can run a tool, for example a personal and a work GitHub account, the gateway never picks one for you. Your agent asks which to use, or you can say it up front:
+
+```text
+Using my work GitHub account, list open pull requests in acme/acme-web
+that are waiting on my review.
+```
+
+To make the choice automatic, describe each account. On the service's page in **Connectors**, open the **...** menu next to an account, choose **Edit description**, and say when an agent should use it, like `Work account. Use for anything in the acme GitHub organization.` Your agent reads these descriptions when it decides which account fits the request.
+
+## Share an account with your team
+
+You can let teammates use one of your connected accounts, such as a shared bot account. Open the **...** menu next to the account, choose **Share with project**, and pick a project. Members of that project and its subprojects can then use the account through their own gateway connection. It appears to them as **Connected with a shared credential**.
+
+To stop all use of an account, choose **Revoke credential** from the same menu.
+
+## Approve actions
+
+By default, tools that only read data run right away. Tools that create, change, or delete something, like posting a Slack message or closing an issue, pause until you approve that exact call.
+
+How you approve depends on your client:
+
+- **In the chat.** If your client supports MCP approval prompts, it shows the request inline. Confirm it and the call continues.
+- **In the dashboard.** Otherwise, your agent tells you the call is awaiting approval and gives you a link. Open **Code Mode** > **Approvals** in Final, review the tool and its inputs, and click **Approve** or reject it. Then tell your agent to continue. It retries the call with the approval ID it received.
+
+When you approve in the dashboard, you choose how far the approval reaches:
+
+| Option | What it approves |
+| --- | --- |
+| **Allow once** | This call only. |
+| **Allow for session** | Matching calls for the rest of this client session. |
+| **Always allow** | Matching calls from now on. You choose whether that means **This exact tool**, every tool in **This namespace** (for example, all GitHub tools), or the tool **Only for arguments** you pick. |
+
+An approval covers the exact inputs you reviewed. If the agent changes them, for example to post to a different channel, it needs a new approval.
+
+## Set approval policies
+
+Policies change the defaults for a project. Open **Code Mode** > **Policies**, enter a tool **Pattern**, choose an **Effect**, and click **Save policy**.
+
+| Effect | What happens |
+| --- | --- |
+| **Allow** | Matching tools run without asking. |
+| **Ask** | Matching tools wait for approval, even if they only read data. |
+| **Deny** | Matching tools never run. |
+
+Patterns match tool paths and accept `*` as a wildcard. For example, `github.repos.*` matches every GitHub repository tool. When several policies match, the most specific pattern wins. Policies apply to the project you set them in and to its subprojects, and you need editor access to change them.
+
+**Effective policy** on the same tab shows the result for every tool, so you can check a policy before you rely on it.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Gateway tools" icon="screwdriver-wrench" href="/mcp-gateway/tools">
+    See how `list_credentials` and `call_tool` handle accounts and approval IDs.
+  </Card>
+  <Card title="Troubleshooting" icon="life-ring" href="/mcp-gateway/troubleshooting">
+    Fix missing accounts, expired sign-ins, and stuck approvals.
+  </Card>
+</Columns>

@@ -1,0 +1,357 @@
+---
+title: "Manifest reference"
+sidebarTitle: "Manifest"
+description: "Every field in final-cloud.yaml, with types, defaults, and limits."
+---
+
+`final-cloud.yaml` describes one app: what type it is, how to build it, and what it needs at runtime. Final reads it from the root of your repository at the commit you deploy. To keep it somewhere else, pass `--manifest-path` when you [create the app](/cloud-apps/sdk-and-cli#command-options).
+
+## Example
+
+This web app uses most of the common fields. Everything except `name`, `type`, `build`, `port`, and `health` is optional.
+
+```yaml final-cloud.yaml
+name: acme-api                # the app's name
+type: web                     # web, service, cron, or function
+
+build:
+  method: dockerfile          # or buildpacks; or replace build with image
+  context: .
+  dockerfile: Dockerfile
+
+port: 3000                    # where your server listens
+health:
+  path: /health               # must return 200-399 before traffic moves
+  gracePeriodSeconds: 60
+
+size: standard                # small, standard, large, or extra-large
+scaling:
+  min: 2                      # instances to run
+  max: 2
+
+env:                          # plain settings, passed as strings
+  NODE_ENV: production
+  LOG_LEVEL: info
+secrets:                      # environment variable: secret name
+  STRIPE_API_KEY: stripe-api-key
+databases:                    # adds ORDERS_DB_URL and ORDERS_DB_TOKEN
+  - name: orders
+domains:
+  - api.acme.dev
+
+hooks:
+  preDeploy:
+    - command: node scripts/migrate.mjs
+observability:
+  logs:
+    retention: 90d
+```
+
+Final rejects fields it doesn't recognize, so a typo fails validation instead of being silently ignored. Run `npx final-cloud validate` to check a file before you push it.
+
+## Fields for every app
+
+<ParamField path="name" type="string" required>
+  The app's name. It appears in the dashboard, in deploy output, and as the job name for `jobs run`. A function's name must be a valid DNS label: lowercase letters, digits, and hyphens, up to 63 characters, starting and ending with a letter or digit.
+</ParamField>
+
+<ParamField path="type" type="'web' | 'service' | 'cron' | 'function'" required>
+  The kind of app. See [choose an app type](/cloud-apps/workloads). The type decides which other fields apply.
+</ParamField>
+
+<ParamField path="env" type="map of string, number, or boolean" default="{}">
+  Environment variables. Names use uppercase letters, digits, and underscores, and can't start with a digit. Your code receives every value as a string. See [environment variables](/cloud-apps/environment-and-data#environment-variables).
+</ParamField>
+
+<ParamField path="secrets" type="map of string" default="{}">
+  Environment variables whose values come from [secrets](/cloud-apps/environment-and-data#secrets). Each key is the variable name, and each value is the name of a secret in the app's project. `STRIPE_API_KEY: stripe-api-key` and `STRIPE_API_KEY: { name: stripe-api-key }` are equivalent.
+</ParamField>
+
+<ParamField path="databases" type="object[]" default="[]">
+  SQLite databases the app can read and write. See [databases](/cloud-apps/environment-and-data#databases).
+
+  <Expandable title="properties">
+    <ParamField path="name" type="string" required>
+      The database's name, as created in the dashboard.
+    </ParamField>
+    <ParamField path="binding" type="string">
+      The prefix for the database's environment variables. Defaults to the name in uppercase with hyphens turned into underscores, plus `_DB`, so `orders` becomes `ORDERS_DB` and the app gets `ORDERS_DB_URL` and `ORDERS_DB_TOKEN`. Each binding in an app must be unique.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="hooks" type="object">
+  Commands to run before a release, and URLs to notify about deployments. See [run a step before each release](/cloud-apps/deployments#run-a-step-before-each-release).
+
+  <Expandable title="properties">
+    <ParamField path="preDeploy" type="object[]" default="[]">
+      Commands that run in order, in a one-off container from the new build, before the new version takes traffic. If one fails, the deployment fails. Each entry has a `command` (required) and a `timeoutSeconds` from 1 to 3600 (default `600`). Not available for functions.
+    </ParamField>
+    <ParamField path="webhooks" type="object[]" default="[]">
+      URLs that receive a `POST` for deployment events. Each entry has:
+
+      - `name` (required): a label for the webhook.
+      - `url` (required): where to send the request.
+      - `events`: any of `deployment.started`, `deployment.succeeded`, `deployment.failed`, and `deployment.rolled_back`. Defaults to the first three.
+      - `signingSecret`: a secret name. When set, requests carry an `x-final-signature-sha256` header.
+      - `headers`: extra request headers, as a map of strings.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="observability" type="object">
+  Log settings.
+
+  <Expandable title="properties">
+    <ParamField path="logs.stdout" type="boolean" default="true">
+      Capture standard output.
+    </ParamField>
+    <ParamField path="logs.stderr" type="boolean" default="true">
+      Capture standard error.
+    </ParamField>
+    <ParamField path="logs.retention" type="'7d' | '14d' | '30d' | '90d'" default="30d">
+      How long Final keeps the app's logs.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Containers
+
+Web apps, services, and cron jobs run in a container. Give each one a `build` or an `image`.
+
+<ParamField path="build" type="object">
+  Build an image from your repository.
+
+  <Expandable title="properties">
+    <ParamField path="method" type="'dockerfile' | 'buildpacks'" required>
+      `dockerfile` builds your Dockerfile. `buildpacks` detects your language and builds without one.
+    </ParamField>
+    <ParamField path="context" type="string" default=".">
+      The folder to build from, relative to the repository root.
+    </ParamField>
+    <ParamField path="dockerfile" type="string" default="Dockerfile">
+      The Dockerfile's path inside `context`. Only used with `method: dockerfile`.
+    </ParamField>
+    <ParamField path="builder" type="string">
+      The buildpacks builder image to use. Only used with `method: buildpacks`. Leave it out to use Final's default.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="image" type="object">
+  Run an image you've already built, instead of building one.
+
+  <Expandable title="properties">
+    <ParamField path="repository" type="string" required>
+      The image name, such as `ghcr.io/acme/acme-api`.
+    </ParamField>
+    <ParamField path="tag" type="string">
+      The tag to run, such as `1.2.0`. Set `tag`, `digest`, or both.
+    </ParamField>
+    <ParamField path="digest" type="string">
+      An exact image digest, such as `sha256:...`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="command" type="string">
+  The command to run, replacing the image's default. Required for cron jobs.
+</ParamField>
+
+<ParamField path="size" type="'small' | 'standard' | 'large' | 'extra-large'" default="standard">
+  The machine each instance runs on: `small` is 1 vCPU and 512 MB, `standard` is 2 vCPU and 4 GB, `large` is 4 vCPU and 8 GB, and `extra-large` is 8 vCPU and 16 GB.
+</ParamField>
+
+<ParamField path="terminationGraceSeconds" type="integer" default="30">
+  How long a stopping instance gets to shut down cleanly, from 1 to 600 seconds.
+</ParamField>
+
+## Web apps
+
+Fields for `type: web`, in addition to the [container fields](#containers). See [web apps](/cloud-apps/web-apps).
+
+<ParamField path="port" type="integer" required>
+  The port your server listens on, from 1 to 65535. Final sends traffic and health checks here.
+</ParamField>
+
+<ParamField path="health" type="object" required>
+  How Final checks that an instance is ready and still working.
+
+  <Expandable title="properties">
+    <ParamField path="path" type="string" required>
+      The path to request, starting with `/`. A response from 200 to 399 is healthy.
+    </ParamField>
+    <ParamField path="intervalSeconds" type="integer" default="10">
+      Time between checks, from 1 to 300 seconds.
+    </ParamField>
+    <ParamField path="timeoutSeconds" type="integer" default="5">
+      How long one check may take, from 1 to 60 seconds.
+    </ParamField>
+    <ParamField path="gracePeriodSeconds" type="integer" default="60">
+      How long a new instance has to pass its first check, from 0 to 1800 seconds.
+    </ParamField>
+    <ParamField path="onUnhealthy" type="'restart' | 'none'" default="restart">
+      What to do when a running instance fails its checks.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="scaling" type="object">
+  How many instances to run.
+
+  <Expandable title="properties">
+    <ParamField path="min" type="integer" default="1">
+      The number of instances Final runs. At least 1.
+    </ParamField>
+    <ParamField path="max" type="integer" default="1">
+      Must be at least `min`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="domains" type="string[]" default="[]">
+  Custom hostnames, such as `api.acme.dev`, with no scheme or path. See [custom domains](/cloud-apps/environment-and-data#custom-domains).
+</ParamField>
+
+## Services
+
+Fields for `type: service`, in addition to the [container fields](#containers). A service has no port, health check, or domains. See [services](/cloud-apps/services).
+
+<ParamField path="scaling" type="object">
+  How many instances to run. Same as [`scaling` for web apps](#web-apps): `min` sets the count (default `1`), and `max` must be at least `min`.
+</ParamField>
+
+## Cron jobs
+
+Fields for `type: cron`, in addition to the [container fields](#containers). See [cron jobs](/cloud-apps/cron-jobs).
+
+<ParamField path="command" type="string" required>
+  What each run executes, such as `node cleanup.mjs`. The run succeeds when it exits with code `0`.
+</ParamField>
+
+<ParamField path="schedule" type="string">
+  A cron expression, evaluated in UTC, such as `"0 3 * * *"` for 03:00 every day. Leave it out for a job you only start with `jobs run`.
+</ParamField>
+
+<ParamField path="retries" type="integer" default="0">
+  Extra attempts after a failed run, from 0 to 10. Each attempt starts in a fresh container.
+</ParamField>
+
+<ParamField path="timeoutSeconds" type="integer" default="3600">
+  The longest a run may take before Final stops it, from 1 to 86400 seconds.
+</ParamField>
+
+<ParamField path="concurrencyPolicy" type="'forbid' | 'replace' | 'allow'" default="forbid">
+  What happens when a run is due while another is still going. `forbid` skips the new run, `replace` stops the current run and starts the new one, and `allow` runs both.
+</ParamField>
+
+## Functions
+
+Fields for `type: function`. Functions don't use the container fields. See [functions](/cloud-apps/functions).
+
+<ParamField path="entry" type="string" required>
+  The path to your handler's file in the repository, such as `index.js`. Without a build step, this file is what Final deploys, so it must be a single JavaScript module.
+</ParamField>
+
+<ParamField path="build" type="object">
+  Bundle your code before deploying it.
+
+  <Expandable title="properties">
+    <ParamField path="command" type="string">
+      A shell command to run in your repository first, such as `npm ci && npm run build`.
+    </ParamField>
+    <ParamField path="output" type="string">
+      The file the command produces. Final deploys it instead of `entry`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="public" type="boolean" default="true">
+  Whether the function gets a public URL. Set `false` to deploy it with no URL.
+</ParamField>
+
+<ParamField path="domains" type="string[]" default="[]">
+  Custom hostnames for a public function, with no scheme or path.
+</ParamField>
+
+<ParamField path="concurrency" type="integer" default="64">
+  Requests one instance handles at the same time, from 1 to 256.
+</ParamField>
+
+<ParamField path="scaling" type="object">
+  <Expandable title="properties">
+    <ParamField path="min" type="integer" default="1">
+      Minimum instances, 0 or 1.
+    </ParamField>
+    <ParamField path="max" type="integer" default="4">
+      Maximum instances, from 1 to 16. Final adds instances up to this number when every instance is busy.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="idleTimeoutSeconds" type="integer" default="60">
+  How long an instance waits without requests before it stops, from 10 to 86400 seconds. The next request starts it again.
+</ParamField>
+
+<ParamField path="limits" type="object">
+  Per-request limits.
+
+  <Expandable title="properties">
+    <ParamField path="cpuMs" type="integer" default="30000">
+      CPU time one request may use, in milliseconds, from 1 to 300000.
+    </ParamField>
+    <ParamField path="requestTimeoutMs" type="integer">
+      Wall-clock time one request may take, in milliseconds, up to 300000. With no value, a request runs as long as the client stays connected.
+    </ParamField>
+    <ParamField path="subRequests" type="integer" default="10000">
+      Outbound `fetch` calls one request may make, from 1 to 10000.
+    </ParamField>
+    <ParamField path="maxRequestBodyBytes" type="integer" default="104857600">
+      The largest request body accepted, up to 100 MB.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="outboundPolicy" type="object">
+  Where the function may send requests.
+
+  <Expandable title="properties">
+    <ParamField path="internet" type="boolean" default="true">
+      Set `false` to block internet access.
+    </ParamField>
+    <ParamField path="allowedHosts" type="string[]" default="[]">
+      Exact hostnames, such as `api.stripe.com`, that `fetch` may call. Each also allows its subdomains. Empty means any host.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="compatibilityDate" type="string">
+  A date in `YYYY-MM-DD` form that pins the JavaScript runtime's behavior, so later runtime changes don't affect your function.
+</ParamField>
+
+<ParamField path="moduleEntrypoint" type="string" default="index.js">
+  The file name your module is loaded as, ending in `.js` or `.mjs`. You rarely need to change it.
+</ParamField>
+
+A function can have at most 128 environment variables and secrets combined, and each `env` value can be up to 5 KB.
+
+## Editor support
+
+`schema` prints the manifest's JSON Schema. Save it and point your editor at it for autocompletion and inline errors:
+
+```bash
+npx final-cloud schema > final-cloud.schema.json
+```
+
+```yaml final-cloud.yaml
+# yaml-language-server: $schema=./final-cloud.schema.json
+name: acme-api
+type: web
+build:
+  method: dockerfile
+port: 3000
+health:
+  path: /health
+```
+
+The comment works in editors that use the YAML language server, such as VS Code with the YAML extension.

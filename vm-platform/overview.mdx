@@ -1,0 +1,87 @@
+---
+title: "Final VMs"
+description: "Give your code its own Linux machine in the cloud. Create it with one API call, then pause, snapshot, or copy it when you need to."
+icon: "server"
+---
+
+import AgentSetup from '/snippets/agent-setup/vms.mdx';
+
+Final VMs gives your code its own Linux machine in the cloud. Create a VM with one API call, run a script or a server in it, and read the results back. When you're done, pause it to pick up later, save a snapshot to start new VMs from the same point, or delete it.
+
+Each VM is isolated from every other VM, starts from a container image, and keeps its disk until you delete it. In the API a VM is called a **sandbox**, and in the dashboard it's a **computer**. All three names refer to the same thing.
+
+```bash
+curl -sS https://api.vm.finalwebservices.com/v1/sandboxes \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"labels": {"name": "acme-web-tests"}}' \
+  | jq '.sandbox | {id, state, size}'
+```
+
+```json
+{
+  "id": "sbx_7Hq2kV9xR4mT3nLp8sWd1C",
+  "state": "running",
+  "size": { "vcpu": 2, "memory_mb": 2048, "disk_gb": 10 }
+}
+```
+
+## Let an agent set it up
+
+Give this prompt to your coding agent from the repository you want to run. It creates a VM, runs your project's tests or app in it, and tells you how to manage the VM afterward.
+
+<AgentSetup />
+
+## What you can build
+
+<Columns cols={2}>
+  <Card title="Run untrusted or generated code" icon="shield-halved" href="/vm-platform/networking">
+    Give code from an agent or a user its own machine, with outbound traffic limited to the domains it needs.
+  </Card>
+  <Card title="Preview environments" icon="globe" href="/vm-platform/networking#connect-a-custom-domain">
+    Run a dev server for each branch and serve it on your own domain.
+  </Card>
+  <Card title="Batch jobs" icon="list-check" href="/vm-platform/workloads#run-a-one-off-job">
+    Run a script with a hard time limit, then read its result files when it finishes.
+  </Card>
+  <Card title="Parallel experiments" icon="code-branch" href="/vm-platform/lifecycle-and-snapshots#fork-a-vm">
+    Set up one VM, then fork it into as many as 16 copies that start from the same memory and disk.
+  </Card>
+</Columns>
+
+## Key concepts
+
+| Term | What it means |
+| --- | --- |
+| **Sandbox** | A VM. It has its own CPU, memory, disk, and network, and an ID like `sbx_7Hq2...`. |
+| **Workload** | The command the VM runs when it boots, such as a test script or a web server. Final restarts it if it crashes, unless you turn that off. See [workloads](/vm-platform/workloads). |
+| **Image** | The files a VM starts with, taken from a container image like `python:3.13-slim`. If you don't pick one, you get a default Ubuntu image with common developer tools. |
+| **Template** | An image plus a start command that Final boots once and saves, so new VMs start with your service already running. |
+| **Snapshot** | A saved copy of a VM's disk and memory. Start new VMs from it to resume from that exact moment. |
+| **Volume** | A named disk that outlives any one VM. Attach it to share a cache, a dataset, or a workspace between VMs. |
+| **Idle timeout** and **wall-clock limit** | Two timers that pause a VM automatically: one when nothing has talked to it for a while, the other after it has run for a set time. See [lifecycle](/vm-platform/lifecycle-and-snapshots#what-final-does-automatically). |
+
+To choose between an image, a template, and a snapshot, see [choose a starting point](/vm-platform/images-and-templates#choose-a-starting-point).
+
+<Tip>
+Building an agent with the [Agent SDK](/agent-sdk)? Your agent can get file and shell tools from [agent sandboxes](/build/sandboxes) without calling this API directly.
+</Tip>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Create your first VM" icon="rocket" href="/vm-platform/quickstart">
+    Start a VM, run a command, and read its output in about five minutes.
+  </Card>
+  <Card title="Run workloads" icon="terminal" href="/vm-platform/workloads">
+    Run a one-off job or a long-running service, with health checks.
+  </Card>
+  <Card title="Pause, snapshot, and fork" icon="clock-rotate-left" href="/vm-platform/lifecycle-and-snapshots">
+    Keep VMs only while you need them, and reuse their state.
+  </Card>
+  <Card title="API reference" icon="code" href="/vm-platform/api">
+    Every endpoint, request field, and error code.
+  </Card>
+</Columns>
+
+You need a [Final API key](/api-keys) for the project you want to create VMs in.

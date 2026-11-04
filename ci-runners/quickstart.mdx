@@ -1,0 +1,95 @@
+---
+title: "Run your first CI job"
+sidebarTitle: "Quickstart"
+description: "Run a GitHub Actions job on a Final runner in about five minutes."
+---
+
+You'll add a small workflow that runs on a Final runner and prints the machine it got, then point one of your real jobs at Final. Once your organization is enabled, this takes about five minutes.
+
+<Tip>
+Prefer to hand this off? Give your coding agent the [setup prompt](/ci-runners/overview#let-an-agent-set-it-up).
+</Tip>
+
+## Before you start
+
+- A repository in a GitHub **organization** where you can push workflow changes. Personal accounts aren't supported.
+- An owner of that organization, for a one-time approval in step 1.
+
+## Run a job
+
+<Steps>
+  <Step title="Get your organization enabled">
+    Final CI Runners work through the Final GitHub App. When CI runners are turned on for your organization, an organization owner approves the Final GitHub App's request for the **Self-hosted runners** organization permission (read and write). Final uses that permission to register a runner each time one of your jobs asks for one. You only do this once per organization.
+  </Step>
+  <Step title="Add a workflow">
+    Create `.github/workflows/final-hello.yml`:
+
+    ```yaml .github/workflows/final-hello.yml
+    name: Hello from Final
+
+    on:
+      push:
+      workflow_dispatch:
+
+    jobs:
+      hello:
+        runs-on: final-4vcpu-ubuntu-2404
+        steps:
+          - uses: actions/checkout@v4
+          - name: Show the machine
+            run: |
+              lsb_release -ds
+              echo "CPUs: $(nproc)"
+              free -h
+              df -h /
+    ```
+
+    The `runs-on` label is the only Final-specific line. It asks for a runner with 4 vCPUs and 16 GiB of memory.
+  </Step>
+  <Step title="Push and watch it run">
+    Commit the file and push it to any branch:
+
+    ```bash
+    git add .github/workflows/final-hello.yml
+    git commit -m "Try Final CI Runners"
+    git push
+    ```
+
+    In GitHub, open the **Actions** tab and select the **Hello from Final** run. When the job starts, expand **Set up job** to see a runner name that starts with `final-ci-`, then expand **Show the machine**. You should see Ubuntu 24.04, `CPUs: 4`, and about 16 GiB of memory.
+  </Step>
+  <Step title="Move a real job">
+    Open the workflow that runs your tests and change its `runs-on` line:
+
+    ```diff .github/workflows/ci.yml
+     jobs:
+       test:
+    -    runs-on: ubuntu-latest
+    +    runs-on: final-4vcpu-ubuntu-2404
+    ```
+
+    Push the change on a branch and open a pull request. The job runs on Final with the same steps, and its status check keeps the same name. If a step fails because a tool is missing, see [what's preinstalled](/ci-runners/runner-sizes#preinstalled-software).
+  </Step>
+</Steps>
+
+<Check>
+Your tests run on a Final runner and report back to the pull request like before. You can delete `final-hello.yml` now.
+</Check>
+
+If a job sits on **Waiting for a runner to pick up this job**, check the label and your organization's setup in [troubleshooting](/ci-runners/troubleshooting#jobs-stay-queued).
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Choose a runner size" icon="gauge" href="/ci-runners/runner-sizes">
+    Match CPU and memory to each job.
+  </Card>
+  <Card title="Migrate your workflows" icon="arrow-right-arrow-left" href="/ci-runners/migration">
+    Move the rest of your jobs with a short checklist.
+  </Card>
+  <Card title="Cache dependencies" icon="box-archive" href="/ci-runners/dependency-caching">
+    Keep package downloads and build output between runs.
+  </Card>
+  <Card title="Speed up Docker builds" icon="docker" href="/ci-runners/docker-builds">
+    Reuse image layers across jobs.
+  </Card>
+</Columns>

@@ -1,0 +1,61 @@
+---
+title: "Final CI Runners"
+description: "Run GitHub Actions jobs on Final machines sized for each job by changing one line."
+icon: "play"
+---
+
+import AgentSetup from '/snippets/agent-setup/ci-runners.mdx';
+
+Final CI Runners run your GitHub Actions jobs on Final machines. You choose how much CPU and memory each job gets, and your workflows, triggers, logs, and status checks stay in GitHub. Moving a job is a one-line change:
+
+```diff .github/workflows/ci.yml
+ jobs:
+   test:
+-    runs-on: ubuntu-latest
++    runs-on: final-4vcpu-ubuntu-2404
+     steps:
+       - uses: actions/checkout@v4
+       - run: make test
+```
+
+Every job starts on a fresh Ubuntu 24.04 machine and the machine is removed when the job ends, so one run never leaks state into the next. There are no runners for you to install, scale, or patch, and your workflows don't need a Final API key.
+
+## Let an agent set it up
+
+Give this prompt to your coding agent from the repository with your workflows. It picks a good first job, moves it to Final, and checks that the run passes.
+
+<AgentSetup />
+
+## What you can do
+
+- **Speed up slow jobs.** Give a heavy build or test suite 8 or 16 vCPUs, and keep quick checks on a smaller machine. See [runner sizes](/ci-runners/runner-sizes).
+- **Move a workflow without rewriting it.** Your steps, actions, secrets, and required checks keep working. See [migrate a workflow](/ci-runners/migration).
+- **Keep dependencies between runs.** Mount a persistent cache directory so `npm ci`, `pnpm install`, or a compiler reuses the last run's files instead of downloading them again. See [dependency caching](/ci-runners/dependency-caching).
+- **Reuse Docker layers.** Keep BuildKit's layer cache between jobs so unchanged layers aren't rebuilt. See [Docker builds](/ci-runners/docker-builds).
+
+## How it works
+
+| Term | What it means |
+| --- | --- |
+| Runner label | The value you put in `runs-on`, such as `final-4vcpu-ubuntu-2404`. It picks the machine size and operating system. |
+| Runner | The machine that runs one job. Final starts one when GitHub queues a job with a Final label and removes it afterward. |
+| Sticky disk | A cache directory that persists between jobs in the same repository. Successful runs on your default branch save it; pull requests read it. |
+
+Once CI runners are enabled for your GitHub organization, a job in any of its repositories can use a Final runner by its label.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Run your first job" icon="rocket" href="/ci-runners/quickstart">
+    Add a small workflow and watch it run on a Final runner.
+  </Card>
+  <Card title="Migrate a workflow" icon="arrow-right-arrow-left" href="/ci-runners/migration">
+    Move an existing job and check that nothing changed but the speed.
+  </Card>
+  <Card title="Choose a runner size" icon="gauge" href="/ci-runners/runner-sizes">
+    Compare CPU, memory, and disk, and see what's preinstalled.
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/ci-runners/troubleshooting">
+    Fix queued jobs, missing tools, and cache surprises.
+  </Card>
+</Columns>

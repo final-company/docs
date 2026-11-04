@@ -1,0 +1,86 @@
+---
+title: "Project structure"
+description: "Where each agent file goes and how the compiler finds it."
+---
+
+An agent is one directory. The compiler looks at where each file sits to decide what it is: a file in `tools/` is a tool, a file in `schedules/` is a schedule, and so on. You never register files by hand, so adding a capability means adding a file.
+
+Here's a release assistant that uses every kind of file:
+
+<Tree>
+
+- release-assistant/
+  - package.json
+  - .gitignore
+  - agent/
+    - agent.ts
+    - instructions.md
+    - instructions/
+      - release-policy.md
+    - tools/
+      - release_checklist.ts
+    - connections/
+      - issues.ts
+    - skills/
+      - triage/
+        - SKILL.md
+        - checklist.md
+    - sandbox.ts
+    - schedules/
+      - daily-digest.md
+    - channels/
+      - deploys.ts
+    - hooks/
+      - audit.ts
+    - lib/
+      - verify-signature.ts
+
+</Tree>
+
+Only `agent.ts` is required. You pass the agent directory to the CLI: `npx final-agents build ./agent` and `npx final-agents publish ./agent`.
+
+## What goes where
+
+| Path | What it defines | Guide |
+| --- | --- | --- |
+| `agent.ts` | The agent's name, harness, model credentials, and built-in tools. Default-export `defineAgent(...)`. | [Configuration](/build/configuration) |
+| `instructions.md` | Standing guidance the agent always follows. | [Instructions](/build/instructions-and-skills) |
+| `instructions/*.md`, `instructions/*.ts` | More instruction fragments, loaded after `instructions.md` in filename order. | [Instructions](/build/instructions-and-skills) |
+| `skills/<name>/SKILL.md` | A procedure the agent loads when it needs it, plus any files beside it. `skills/<name>.md` works for a one-file skill. | [Skills](/build/instructions-and-skills#package-a-skill) |
+| `tools/*.ts` | One tool per file, named after the file. | [Tools](/build/tools) |
+| `connections/*.ts` | One MCP server per file. | [Connections](/build/connections) |
+| `sandbox.ts` | The computer the agent's shell and file tools run on. You can use `sandbox/index.ts` instead, but not both. | [Sandboxes](/build/sandboxes) |
+| `schedules/*.md`, `schedules/*.ts` | One scheduled prompt per file, named after the file. | [Schedules](/build/schedules) |
+| `channels/*.ts` | HTTP routes that turn requests into messages for the agent. | [Channels](/build/channels) |
+| `hooks/**/*.ts` | Code that runs on session events. Subfolders are allowed. | [Hooks](/build/hooks) |
+
+Each TypeScript file in these folders default-exports its definition. Apart from `hooks/` and skill folders, the compiler only reads files directly inside each folder. Put shared helpers in a folder it doesn't scan, like `agent/lib/`, and import them. Keep them inside the agent directory, because that's all `publish` uploads.
+
+<Note>
+`memory/`, `subagents/`, and `extensions/` aren't supported yet, and the compiler rejects them. Use [instructions and skills](/build/instructions-and-skills) for knowledge, [sandbox files](/build/sandboxes) for working state, and ordinary modules for shared code.
+</Note>
+
+## Code that runs on Final
+
+Tools, hooks, channel routes, and other callbacks run on Final, not on your machine. They have Web-standard APIs like `fetch`, `Request`, `Response`, and `crypto`, but not Node.js APIs such as `fs` or `process.env`. Read stored values with [`ctx.secrets`](/operate/authentication#use-secrets-in-your-code), and reach files and commands through the [sandbox](/build/sandboxes#use-the-sandbox-from-a-tool).
+
+## Source control
+
+Commit `agent/`, `package.json`, and your lockfile. Ignore dependencies, local environment files, and `.final/`, where `build` writes its output:
+
+```text .gitignore
+node_modules/
+.final/
+.env*
+```
+
+`final-agents publish` uploads every file Git would commit from the agent directory, including new files you haven't committed yet. Files that Git ignores stay on your machine.
+
+## Several agents in one repository
+
+Put each agent in its own directory, such as `agents/release-assistant/` and `agents/triage-bot/`, and register and publish each one separately:
+
+```bash
+npx final-agents publish ./agents/release-assistant --agent release-assistant
+npx final-agents publish ./agents/triage-bot --agent triage-bot
+```

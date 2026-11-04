@@ -1,0 +1,104 @@
+---
+title: "Docker builds"
+description: "Build Docker images on Final runners and reuse layers between jobs."
+---
+
+Docker and Docker Buildx are installed on every Final runner, so the Docker steps you already have work as they are. Because each job starts on a fresh machine, though, every build begins with an empty layer cache. The Final Docker builder keeps that cache on a persistent disk, so layers that haven't changed since the last run aren't rebuilt.
+
+## Build an image
+
+No setup is needed to build an image:
+
+```yaml .github/workflows/docker.yml
+jobs:
+  build:
+    runs-on: final-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t acme-web:ci .
+```
+
+`docker/build-push-action` and other Docker actions work too. Image builds are usually CPU-heavy, so they're a good fit for an 8 vCPU runner.
+
+## Keep layers between jobs
+
+<Note>
+The Docker builder action isn't published to the GitHub Marketplace yet. Until it is, the examples on this page write its reference as `<docker-builder-action>`.
+</Note>
+
+Add the builder step after checkout and before you build. It starts a BuildKit builder whose state lives on a sticky disk, and makes it the default builder for the rest of the job:
+
+```yaml .github/workflows/docker.yml highlight={6-7}
+jobs:
+  build:
+    runs-on: final-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up the Final Docker builder
+        uses: <docker-builder-action>
+      - name: Build the image
+        run: docker buildx build --load -t acme-web:ci .
+      - name: Check the image
+        run: docker image inspect acme-web:ci
+```
+
+The builder step's log ends with whether this run will save the cache. On the next run, unchanged layers show as `CACHED` in the build output.
+
+`--load` copies the finished image into Docker on the runner, so later steps in the job can run or inspect it. To publish the image instead, sign in to your registry and use `--push`:
+
+```yaml .github/workflows/docker.yml
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: final-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: <docker-builder-action>
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker buildx build --push -t ghcr.io/acme/acme-web:${{ github.sha }} .
+```
+
+<ParamField path="cache-key" type="string" default="default">
+  The builder cache's name in this repository. If you build several unrelated images, give each Dockerfile its own key, such as its path (`services/web/Dockerfile`), so the builds don't evict each other's layers. Keys follow the same [format](/ci-runners/dependency-caching#choose-a-key) as sticky disk keys.
+</ParamField>
+
+<ResponseField name="name" type="string">
+  The name of the builder the step set up, `final-builder`. Pass it to tools that take an explicit builder, such as the `builder` input of `docker/build-push-action`.
+</ResponseField>
+
+## Cache package downloads in a Dockerfile
+
+Layer caching skips a step only when nothing it depends on changed. When your lockfile changes, the install step runs again. A cache mount keeps the package manager's downloads even then, and the Final builder saves cache mounts along with layers:
+
+```dockerfile Dockerfile
+# syntax=docker/dockerfile:1
+FROM node:22-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY . .
+RUN npm run build
+```
+
+Copy the lockfile before the rest of the source, as above, so that editing application code doesn't invalidate the install layer. Add `node_modules`, `.git`, and build output to `.dockerignore` to keep them out of the build context.
+
+## When the cache is saved
+
+The builder follows the same rules as [sticky disks](/ci-runners/dependency-caching#when-changes-are-saved). Successful `push`, `schedule`, and `workflow_dispatch` runs on the default branch save the cache, and every other run, including pull requests, reads it without saving. If the image builds but a later step in the job fails, that job's cache changes are discarded.
+
+Saving the cache doesn't push an image anywhere. Use `--push` or your registry's action for that.
+
+To start over with an empty cache, change `cache-key`.
+
+## When layers are rebuilt anyway
+
+- **Another step replaced the builder.** `docker/setup-buildx-action` creates its own builder and makes it the default. Remove it, since the Final builder step already sets up Buildx. Run `docker buildx ls` to check: `final-builder` should be marked with `*`.
+- **The cache hasn't been saved yet.** Pull requests read the cache from your default branch, so it's empty until a default-branch run succeeds once.
+- **An early layer changed.** A change to a file copied early in the Dockerfile invalidates every layer after it. Copy dependency manifests first and the rest of the source later.

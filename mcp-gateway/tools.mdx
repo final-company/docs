@@ -1,0 +1,173 @@
+---
+title: "Gateway tools"
+description: "The tools your AI client uses to find and run tools through the MCP gateway, with their inputs and outputs."
+---
+
+When your client connects to the **Final MCP URL**, it doesn't load a tool for every operation in every service you've connected. It sees five tools that let it search for the right one, read its inputs, and run it. That keeps your client's context small even when you've connected dozens of services.
+
+You rarely call these tools by name. Ask for what you want and your agent uses them for you. This page is for when you want to understand what's happening, debug a call, or write instructions for your agent in a file like `AGENTS.md` or `CLAUDE.md`.
+
+| Tool | What it does |
+| --- | --- |
+| `search_tools` | Finds tools for a task and shows which of your accounts can run each one. |
+| `describe_tools` | Returns the exact input schema for one or more tools. |
+| `list_credentials` | Lists the accounts you can act with. |
+| `call_tool` | Runs a tool with the account you choose. |
+| `get_tool_guide` | Returns Final's current guidance on discovery, accounts, and approvals. |
+
+Your client may show these with a prefix. In Claude Code, for example, `search_tools` appears as `mcp__final__search_tools`.
+
+## How a request flows
+
+Here's what happens when you ask, "List the open pull requests in acme/acme-web."
+
+<Steps>
+  <Step title="Search for a tool">
+    The agent describes the task to `search_tools`:
+
+    ```json
+    {
+      "query": "list open pull requests in a repository",
+      "connector": "github",
+      "limit": 5
+    }
+    ```
+
+    Each result has a `path` that identifies the tool, a short summary of its inputs, whether it only reads data, and the accounts that can run it:
+
+    ```json
+    {
+      "results": [
+        {
+          "path": "github.pulls.list",
+          "app": "GitHub",
+          "description": "List pull requests",
+          "argSummary": "{ owner, repo, state, head, base, sort, direction, per_page, ... ; required: owner, repo }",
+          "readOnly": true,
+          "destructive": false,
+          "credentials": [
+            {
+              "id": "cred_7Hk2pQ",
+              "identity": "maya-acme",
+              "source": "own",
+              "description": "Work account. Use for anything in the acme GitHub organization."
+            }
+          ]
+        }
+      ],
+      "nextCursor": null
+    }
+    ```
+
+    If no account can run a tool, the result includes `needsAuthorization` with the service and scopes to connect instead.
+  </Step>
+  <Step title="Read the exact inputs">
+    The agent passes the path to `describe_tools` to get the full input schema, so it doesn't have to guess field names:
+
+    ```json
+    { "paths": ["github.pulls.list"] }
+    ```
+  </Step>
+  <Step title="Run it">
+    The agent calls `call_tool` with the path, inputs that match the schema, and the account to use:
+
+    ```json
+    {
+      "path": "github.pulls.list",
+      "args": { "owner": "acme", "repo": "acme-web", "state": "open" },
+      "credential": "cred_7Hk2pQ"
+    }
+    ```
+
+    The response includes the service's HTTP `status`, its `result`, and the account that ran the call.
+  </Step>
+</Steps>
+
+The paths and IDs above show the shape of a real exchange. Your agent should always copy paths, field names, and credential IDs from the responses it gets, not from examples.
+
+## Resume a call after approval
+
+If a tool needs approval and your client can't show an approval prompt, `call_tool` returns an error that says the call is awaiting approval, with an approval ID and a link to **Code Mode** > **Approvals**. After you approve it, the agent resumes the call with only the ID:
+
+```json
+{ "approvalId": "4f6b1c2e-8a3d-4e5f-9b7a-1c2d3e4f5a6b" }
+```
+
+Final runs the exact call you approved. See [approve actions](/mcp-gateway/accounts-and-approvals#approve-actions) for the options.
+
+## Tool reference
+
+<AccordionGroup>
+  <Accordion title="search_tools">
+    <ParamField body="query" type="string" required>
+      The task in plain words, like `"create a Linear issue"`. Up to 200 characters.
+    </ParamField>
+    <ParamField body="connector" type="string">
+      Limit results to one connector, such as `github`. Use `final` for Final's own tools.
+    </ParamField>
+    <ParamField body="issuer" type="string">
+      Limit results to tools that use one sign-in provider.
+    </ParamField>
+    <ParamField body="limit" type="number" default="10">
+      Results per page, from 1 to 20.
+    </ParamField>
+    <ParamField body="cursor" type="string">
+      The `nextCursor` from a previous response, to fetch the next page.
+    </ParamField>
+  </Accordion>
+  <Accordion title="describe_tools">
+    <ParamField body="paths" type="string[]" required>
+      Tool paths from `search_tools`. Up to 50 at once. Paths that don't match a tool come back in `missing`.
+    </ParamField>
+    <ParamField body="includeOutputSchema" type="boolean" default="false">
+      Also return each tool's output schema.
+    </ParamField>
+  </Accordion>
+  <Accordion title="list_credentials">
+    Each credential in the response has an `id`, the `identity` it acts as, whether it's your own or `shared` with you, its description, the connectors it `reach`es, and its `status`.
+
+    <ParamField body="issuer" type="string">
+      Only list credentials for one sign-in provider.
+    </ParamField>
+    <ParamField body="limit" type="number" default="20">
+      Credentials per page, from 1 to 50.
+    </ParamField>
+    <ParamField body="cursor" type="string">
+      The `nextCursor` from a previous response.
+    </ParamField>
+  </Accordion>
+  <Accordion title="call_tool">
+    <ParamField body="path" type="string">
+      The tool to run, from `search_tools`. Required unless you're resuming with `approvalId`.
+    </ParamField>
+    <ParamField body="args" type="object" default="{}">
+      Inputs that match the tool's schema from `describe_tools`.
+    </ParamField>
+    <ParamField body="credential" type="string">
+      The account to use: a credential `id` (like `cred_7Hk2pQ`), identity, or description from `list_credentials`. Required when more than one of your accounts can run the tool. Leave it out for Final's own tools, which use your Final sign-in.
+    </ParamField>
+    <ParamField body="dryRun" type="boolean" default="false">
+      Check the call without running the tool.
+    </ParamField>
+    <ParamField body="approvalId" type="string">
+      Resume a call you've approved. Final reuses the approved path, inputs, and account.
+    </ParamField>
+  </Accordion>
+  <Accordion title="get_tool_guide">
+    Takes no inputs. Returns Final's current guidance for this connection: how to discover tools, choose accounts, and handle approvals. Agents can call it when they're unsure how to proceed.
+  </Accordion>
+</AccordionGroup>
+
+## Catalog server tools
+
+The optional **Catalog MCP URL** is a separate server for managing connectors rather than using them. Add it when you want to set up services from your chat instead of the dashboard.
+
+| Tool | What it does |
+| --- | --- |
+| `search_catalog` | Searches the connector catalog and your custom connectors, and shows whether you already have an account connected. |
+| `request_authorization` | Returns a link where you connect an account in Final. Your agent never sees the password or key. |
+| `add_connector` | Adds a connector from an OpenAPI or GraphQL spec to a project. |
+| `annotate_credential` | Sets the description that tells agents when to use an account. |
+| `share_credential` | Shares one of your accounts with a project. |
+
+Tools that change something ask you to confirm first.

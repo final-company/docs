@@ -1,0 +1,100 @@
+---
+title: "Agent SDK"
+sidebarTitle: "Overview"
+description: "Define an agent in TypeScript, publish it to Final, and call it from your app."
+icon: "robot"
+---
+
+import AgentSetup from '/snippets/agent-setup/agent-sdk.mdx';
+
+The Agent SDK lets you build an agent as a folder of files: instructions in Markdown, tools in TypeScript. Final runs it for you, including the model calls, tool calls, working files, and chat history, and your app talks to it through a typed client.
+
+Here's a complete agent and the code that calls it:
+
+<CodeGroup>
+
+
+```ts agent/tools/release_checklist.ts
+import { defineTool } from '@finalai/agents';
+import { z } from 'zod';
+
+export default defineTool({
+  description: 'List the checks a release must pass before it ships.',
+  inputSchema: z.object({ version: z.string() }),
+  execute: ({ version }) => ({
+    version,
+    checks: ['CI is green on main', 'CHANGELOG.md has an entry', 'Release owner signed off'],
+  }),
+});
+```
+
+```markdown agent/instructions.md wrap
+You help maintainers decide whether a release is ready to ship.
+Call release_checklist for the version, then list each check as done or missing.
+```
+
+```ts ask.ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+
+const { response } = await client.sessions.create({
+  agent: 'release-assistant',
+  message: 'Is 1.2.0 ready to ship?',
+});
+
+console.log((await response!.result()).text);
+```
+
+</CodeGroup>
+
+The [quickstart](/quickstart) adds the remaining file, `agent.ts`, and walks you through publishing.
+
+## Let an agent set it up
+
+Give this prompt to your coding agent. It creates the agent files, compiles them, publishes the agent, and sends it a first message.
+
+<AgentSetup />
+
+## What you can build
+
+<Columns cols={2}>
+  <Card title="A chat assistant in your product" icon="comments" href="/client/sessions">
+    Stream replies into your UI and let people approve actions before they run.
+  </Card>
+  <Card title="A coding agent that runs your tests" icon="terminal" href="/build/sandboxes">
+    Give the agent a cloud computer with a shell, files, and your repository.
+  </Card>
+  <Card title="An assistant for your team's tools" icon="plug" href="/build/connections">
+    Connect MCP servers such as your issue tracker, and choose which tools need approval.
+  </Card>
+  <Card title="A scheduled or event-driven worker" icon="clock-rotate-left" href="/build/schedules">
+    Send the agent a prompt every morning, or wake it up with a webhook.
+  </Card>
+</Columns>
+
+See [example agents](/examples) for complete projects that combine these.
+
+## How it works
+
+1. **You write the agent as files.** `agent.ts` picks the model and runtime. Markdown files hold instructions and skills. TypeScript files in `tools/`, `connections/`, `schedules/`, and other folders add capabilities. The folder name decides what each file is.
+2. **You publish it.** `npx final-agents publish` uploads the folder and creates a **revision**, an immutable snapshot of the agent. New sessions use the latest revision.
+3. **Your app starts sessions.** A **session** is one ongoing thread with the agent. Each message you send starts a **turn**: Final runs the model, calls tools, and streams the output back until the turn ends.
+
+[How agents work](/concepts) explains these ideas in more depth.
+
+You'll need a [Final API key](/api-keys) to publish and run agents. If you want to use Claude Code or another existing AI client with your connected accounts instead of building an agent, use the [MCP gateway](/mcp-gateway/overview).
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Build your first agent" icon="rocket" href="/quickstart">
+    Create a release assistant, publish it, and send it a message in about 10 minutes.
+  </Card>
+  <Card title="How agents work" icon="layer-group" href="/concepts">
+    Learn how files, revisions, sessions, and turns fit together.
+  </Card>
+</Columns>

@@ -1,0 +1,89 @@
+---
+title: "Runner sizes and software"
+sidebarTitle: "Runner sizes"
+description: "Pick the CPU, memory, and disk for each job, and see what's installed on every runner."
+---
+
+The label in `runs-on` decides which machine a job gets. Every size runs Ubuntu 24.04 on x64, has the same software, and gives each job a machine of its own. Bigger sizes only change the CPU, memory, and disk.
+
+| Label | vCPU | Memory | Disk | Good for |
+| --- | --- | --- | --- | --- |
+| `final-2vcpu-ubuntu-2404` | 2 | 8 GiB | 80 GB | Linting, formatting, type checks, small test suites |
+| `final-4vcpu-ubuntu-2404` | 4 | 16 GiB | 120 GB | Most builds and test suites. Start here. |
+| `final-8vcpu-ubuntu-2404` | 8 | 32 GiB | 160 GB | Large compiles, parallel test runs, Docker image builds |
+| `final-16vcpu-ubuntu-2404` | 16 | 64 GiB | 250 GB | Monorepo builds, Rust or C++ compiles, big integration suites |
+
+## Pick a size
+
+Start every job on `final-4vcpu-ubuntu-2404`, then adjust based on what you see. If a job runs out of memory or its build and test steps are clearly CPU-bound, move it up a size. If a short check finishes in the same time on 2 vCPUs, move it down.
+
+More cores only help if your tools use them. Many build tools and test runners size themselves to the machine, but some need a flag:
+
+```bash
+make -j"$(nproc)"             # Make
+pytest -n auto                # pytest, with pytest-xdist installed
+npx jest --maxWorkers=100%    # Jest
+```
+
+When you compare sizes, look at the build and test steps rather than the whole job. Time spent downloading dependencies doesn't shrink with more CPUs; [caching](/ci-runners/dependency-caching) is the fix for that.
+
+## Mix sizes in one workflow
+
+Each job picks its own size, so you can keep fast checks small and give the expensive job more room:
+
+```yaml .github/workflows/ci.yml
+jobs:
+  lint:
+    runs-on: final-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    runs-on: final-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+```
+
+Every job, and every entry in a matrix, gets its own runner. They all run at the same time up to your organization's concurrency limit, and any extra jobs wait in the queue until a runner frees up.
+
+## Write the `runs-on` line
+
+Use exactly one Final label. You can also include GitHub's standard self-hosted labels, which match every Final runner:
+
+```yaml
+runs-on: final-4vcpu-ubuntu-2404
+# or, equivalently:
+runs-on: [self-hosted, linux, x64, final-4vcpu-ubuntu-2404]
+```
+
+Labels aren't case-sensitive. Any other label in the list, such as `ubuntu-latest` or a second Final size, means no runner matches and the job stays queued.
+
+## Preinstalled software
+
+Every runner starts from the same Ubuntu 24.04 image. It's leaner than GitHub's hosted image, so set up language runtimes in the workflow with the usual setup actions, such as `actions/setup-node`, `actions/setup-python`, `actions/setup-go`, or `actions/setup-java`.
+
+| Category | Included |
+| --- | --- |
+| Containers | Docker and Docker Buildx |
+| Source control | Git, Git LFS, GitHub CLI (`gh`) |
+| Build tools | `build-essential` (GCC, Make), Clang, CMake, `pkg-config` |
+| Languages | Python 3 with `pip` and `venv` |
+| Browsers | Google Chrome |
+| Utilities | `curl`, `jq`, `rsync`, `zip`, `unzip`, `xz`, `zstd`, `openssh-client` |
+
+Jobs run as a user named `runner` with passwordless `sudo`, so you can install anything else with `apt-get`:
+
+```yaml
+- name: Install system packages
+  run: sudo apt-get update && sudo apt-get install -y postgresql-client
+```

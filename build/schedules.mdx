@@ -1,0 +1,74 @@
+---
+title: "Schedules"
+description: "Send your agent a prompt on a cron schedule, like a daily digest."
+---
+
+A schedule sends your agent the same prompt on a timer, so it can do recurring work without anyone asking: a morning summary of yesterday's releases, a weekly report, an hourly check. The agent's reply is posted to a conversation where you can read it.
+
+## Add a schedule
+
+Add a Markdown file to `agent/schedules/`. The frontmatter sets when it runs, and the body is the prompt:
+
+```markdown agent/schedules/daily-digest.md
+---
+cron: '0 9 * * 1-5'
+timezone: America/Los_Angeles
+---
+
+Summarize the releases that shipped in the last 24 hours.
+List anything blocking the next release, with an owner for each item.
+```
+
+This runs at 9:00 a.m. Los Angeles time, Monday through Friday. The file name is the schedule's key, `daily-digest`, which you use to find or trigger it later.
+
+Schedules start running when you [publish](/operate/publishing). Local builds and test revisions never trigger them.
+
+## Schedule options
+
+<ParamField path="cron" type="string" required>
+  A five-field cron expression: minute, hour, day of month, month, day of week. `0 9 * * 1-5` means 9:00 on weekdays.
+</ParamField>
+
+<ParamField path="timezone" type="string" default="UTC">
+  An IANA time zone such as `America/Los_Angeles` or `Europe/Berlin`. Set it explicitly so "9 a.m." means what you expect.
+</ParamField>
+
+<ParamField path="target" type="'owner-direct' | 'bound-conversation'" default="'owner-direct'">
+  Where the prompt and reply go. `owner-direct` uses the agent owner's direct conversation with the agent. `bound-conversation` uses the conversation you've attached to the agent's [channel](/build/channels#connect-it-to-a-conversation), such as a team room.
+</ParamField>
+
+If you'd rather write schedules in TypeScript, default-export `defineSchedule(...)` from `agent/schedules/daily-digest.ts` with the same fields and the prompt in `markdown`. Use one file or the other for each schedule, not both:
+
+```ts agent/schedules/daily-digest.ts
+import { defineSchedule } from '@finalai/agents';
+
+export default defineSchedule({
+  cron: '0 9 * * 1-5',
+  timezone: 'America/Los_Angeles',
+  markdown: 'Summarize the releases that shipped in the last 24 hours.',
+});
+```
+
+## Run a schedule now
+
+`runNow` triggers a published schedule immediately, which is handy for testing a new prompt. It returns as soon as the run starts, with the conversation the reply goes to:
+
+```ts
+const run = await client.schedules.runNow({ agent: 'release-assistant', key: 'daily-digest' });
+console.log(run.conversationId);
+```
+
+Read the reply from that [conversation](/client/conversations#load-history-and-mark-it-read) once the agent finishes.
+
+## Pause or change a schedule
+
+List an agent's schedules to see when each one runs next, then update it by ID:
+
+```ts
+const [digest] = await client.schedules.list({ agent: 'release-assistant' });
+console.log(digest.key, digest.nextRunAt);
+
+await client.schedules.update({ scheduleId: digest.id, enabled: false });
+```
+
+`update` also accepts `cron`, `timezone`, and `prompt`, which is useful for adjusting a schedule without a new release.

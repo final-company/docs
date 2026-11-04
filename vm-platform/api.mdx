@@ -1,0 +1,426 @@
+---
+title: "Final VMs API reference"
+sidebarTitle: "API reference"
+description: "Every Final VMs endpoint, the create-sandbox request and sandbox object field by field, and error codes."
+icon: "code"
+---
+
+The Final VMs API is a JSON HTTP API. Every request goes to this base URL:
+
+```text
+https://api.vm.finalwebservices.com/v1
+```
+
+Authenticate with a [Final API key](/api-keys) in the `Authorization` header, and send JSON bodies with a `Content-Type` header:
+
+```bash
+curl -sS https://api.vm.finalwebservices.com/v1/sandboxes \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"labels": {"name": "acme-web-tests"}}'
+```
+
+A key reaches the VMs and other resources in its project. Reading needs view access, and every change needs edit access.
+
+## Conventions
+
+- **IDs** have a prefix that tells you what they refer to: `sbx_` for sandboxes, `img_` images, `tpl_` templates, `snp_` snapshots, `vol_` volumes, `vcm_` volume commits, `rcd_` registry credentials, `vse_` events, and `vtk_` tokens. Use them exactly as returned.
+- **Times** are Unix timestamps in milliseconds, such as `1793817600000`.
+- **Durations** in request fields are in seconds and end in `_s`, such as `ttl_s`.
+- **Request bodies** can be up to 1 MiB.
+- **Lifecycle actions** (create, pause, resume, stop, start, delete, timeout) return `{ "sandbox": {...}, "resumed": {...} }`. `resumed` describes how a resume or start brought the VM back and is `null` otherwise.
+
+<Warning>
+Responses to create, pause, resume, start, and fork can include a `connect` object with short-lived credentials for the VM. Don't log full responses or store them where others can read them.
+</Warning>
+
+## Endpoints
+
+### Sandboxes
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `POST` | `/sandboxes` | [Create a sandbox](#create-a-sandbox). |
+| `GET` | `/sandboxes` | [List sandboxes](#list-sandboxes) you can see. |
+| `GET` | `/sandboxes/{id}` | Get a [sandbox](#the-sandbox-object). |
+| `DELETE` | `/sandboxes/{id}` | Delete the sandbox and its disk. |
+| `PATCH` | `/sandboxes/{id}/labels` | Merge `{"labels": {...}}` into its labels without restarting. Up to 64 labels in total. |
+| `POST` | `/sandboxes/{id}/pause` | Pause, keeping memory and disk. |
+| `POST` | `/sandboxes/{id}/resume` | Resume a paused sandbox. |
+| `POST` | `/sandboxes/{id}/stop` | Stop, keeping only the disk. |
+| `POST` | `/sandboxes/{id}/start` | Start a stopped or failed sandbox. |
+| `POST` | `/sandboxes/{id}/timeout` | Set a new `wall_clock_limit_s`, counted from now. |
+| `POST` | `/sandboxes/{id}/checkpoint` | Save a snapshot. Body: optional `name` (1-128 characters, unique). Returns `snapshot_id`. |
+| `POST` | `/sandboxes/{id}/fork` | Create `count` (1-16) running copies. Returns `snapshot_id` and `children`. |
+| `GET` | `/sandboxes/{id}/events` | State changes, newest first, kept for 30 days. Query: `limit` (1-200, default 50), `before` (an event ID). |
+
+See [lifecycle and snapshots](/vm-platform/lifecycle-and-snapshots) for what each action keeps.
+
+### Workloads and files
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/sandboxes/{id}/workload` | The workload and its `health`: `healthy`, `error`, and `checked_at`. |
+| `PUT` | `/sandboxes/{id}/workload` | Replace the workload with `{"workload": {...}}`. Restarts the VM. Returns `202` with `"pending": true` while the restart is in progress. |
+| `GET` | `/sandboxes/{id}/files` | Read a file, list a directory, or stat a path. See [file queries](#file-queries). |
+
+### Networking
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/sandboxes/{id}/network` | Outbound `policy`, its `revision`, and whether it's `applied`. |
+| `PUT` | `/sandboxes/{id}/network` | Replace the outbound policy. Send `expected_revision` from the last read; a stale value returns `409`. |
+| `GET` | `/sandboxes/{id}/ports` | Ports with explicit visibility settings. |
+| `PUT` | `/sandboxes/{id}/ports/{port}` | Set `{"public": true}` or `{"public": false}`. |
+| `POST` | `/sandboxes/{id}/preview-tokens` | Create a preview token for `port`, valid for `ttl_s` (60 to 604800, default 86400). |
+| `GET` | `/sandboxes/{id}/tokens` | Credentials for this VM, newest first, without their secrets. Query: `limit`, `before`. |
+| `DELETE` | `/sandboxes/{id}/tokens/{token_id}` | Revoke a credential. |
+| `GET` | `/sandboxes/{id}/domains` | Custom domains, their `status`, and the `cname_target` to point DNS at. |
+| `POST` | `/sandboxes/{id}/domains` | Add `{"domain": "...", "port": 8000}`. The port must be public. |
+| `DELETE` | `/sandboxes/{id}/domains/{domain_id}` | Remove a domain. |
+
+See [networking](/vm-platform/networking) for the policy rules and the custom domain flow.
+
+### Desktop
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/sandboxes/{id}/desktop/status` | Desktop `state` and `error`. |
+| `POST` | `/sandboxes/{id}/desktop/start` | Start the desktop. |
+| `POST` | `/sandboxes/{id}/desktop/stop` | Stop the desktop. The workload keeps running. |
+
+### Images, templates, and snapshots
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `POST` | `/images` | Import an image. Body: `reference`, optional `registry_credential_id` and `project_id`. |
+| `GET` | `/images` | List images, including the platform's own. |
+| `GET`, `DELETE` | `/images/{id}` | Get or delete an image. States: `pending`, `converting`, `ready`, `failed`. |
+| `POST` | `/registry-credentials` | Save registry credentials. Body: `name`, `registry_host`, `kind` (`basic`, `ghcr`, or `gcp_sa`), `secret`. |
+| `GET` | `/registry-credentials` | List saved credentials, without their secrets. |
+| `GET`, `DELETE` | `/registry-credentials/{id}` | Get or delete a credential. |
+| `POST` | `/templates` | Create a template. See [prepare a template](/vm-platform/images-and-templates#prepare-a-template) for the fields. |
+| `GET` | `/templates` | List templates. |
+| `GET`, `DELETE` | `/templates/{id}` | Get or delete a template. States: `pending`, `building`, `ready`, `failed`. |
+| `POST` | `/templates/{id}/build` | Build the template. Returns a build with state `queued`, `building`, `succeeded`, `failed`, or `canceled`. |
+| `GET` | `/snapshots` | List named snapshots. |
+| `GET`, `DELETE` | `/snapshots/{id}` | Get or delete a snapshot. A snapshot is usable once `durable_at` is set. |
+
+Lists of images, credentials, templates, snapshots, and volumes accept an optional `project_id` query parameter, which limits results to that project and the projects below it.
+
+### Volumes
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `POST` | `/volumes` | Create a volume. Body: `name`, `size_gb` (1-2048), optional `expires_after_unused_s` and `project_id`. |
+| `GET` | `/volumes` | List volumes. |
+| `GET` | `/volumes/{id}` | Get a volume, including its current `version`. |
+| `PATCH` | `/volumes/{id}` | Grow `size_gb` or change `expires_after_unused_s` (`null` clears it). |
+| `DELETE` | `/volumes/{id}` | Delete a volume. Returns `204`. |
+| `POST` | `/sandboxes/{id}/volumes` | Attach a volume. Body: `volume_id`, `path`, optional `allow_commit` (default `true`). |
+| `POST` | `/sandboxes/{id}/volumes/{volume_id}/commit` | Commit the VM's changes. Optional `if_version`. Returns `202` with `commit_id`. |
+| `DELETE` | `/sandboxes/{id}/volumes/{volume_id}` | Detach. Add `?commit=true` to commit first. |
+| `GET` | `/volumes/{id}/commits/{commit_id}` | A commit's `state`: `pending`, `committed`, `conflict`, or `failed`. |
+
+See [files and volumes](/vm-platform/files-and-volumes) for how commits and versions work.
+
+## Create a sandbox
+
+`POST /sandboxes`. Every field is optional; an empty body `{}` creates a VM from the default image with default size and timers.
+
+<ParamField body="source" type="object">
+  What the VM starts from. Leave it out to use the default image.
+
+  <Expandable title="properties">
+    <ParamField body="kind" type="string" required>
+      `image`, `template`, or `snapshot`.
+    </ParamField>
+    <ParamField body="image_id" type="string">
+      Required when `kind` is `image`. The image must be `ready`.
+    </ParamField>
+    <ParamField body="template_id" type="string">
+      Required when `kind` is `template`. The template must be `ready`.
+    </ParamField>
+    <ParamField body="snapshot_id" type="string">
+      Required when `kind` is `snapshot`. The snapshot must have a `durable_at`.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="size" type="object">
+  CPU, memory, and disk. VMs created from a template, or from a snapshot without a `workload`, use the source's vCPU and memory, and the disk can only be larger than the source's.
+
+  <Expandable title="properties">
+    <ParamField body="vcpu" type="integer" default="2">
+      Virtual CPUs, 1 to 64.
+    </ParamField>
+    <ParamField body="memory_mb" type="integer" default="2048">
+      Memory in MiB, 256 to 262144.
+    </ParamField>
+    <ParamField body="disk_gb" type="integer" default="10">
+      Disk in GB, 1 to 2048.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="workload" type="object">
+  The command to run at boot. Without one, the VM runs the image's own entrypoint and command, or the snapshot's workload. See [workloads](/vm-platform/workloads).
+
+  <Expandable title="properties">
+    <ParamField body="entrypoint" type="string[]">
+      Program and leading arguments, up to 256 items. Use `["/bin/sh", "-c"]` for shell syntax.
+    </ParamField>
+    <ParamField body="cmd" type="string[]">
+      Arguments after `entrypoint`, up to 256 items.
+    </ParamField>
+    <ParamField body="workdir" type="string">
+      Absolute working directory.
+    </ParamField>
+    <ParamField body="user" type="string">
+      User to run as: a name, a UID, or `user:group`.
+    </ParamField>
+    <ParamField body="restart" type="boolean" default="true">
+      Restart the command when it exits. Set to `false` for jobs.
+    </ParamField>
+    <ParamField body="termination_grace_s" type="integer" default="30">
+      Seconds between asking the process to stop and killing it, 0 to 600.
+    </ParamField>
+    <ParamField body="health_check" type="object">
+      HTTP health check. `port`, `path` (starts with `/`), `interval_s` (1-3600), `timeout_s` (1-60), and `grace_s` (0-3600) are all required.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="env" type="object">
+  Environment variables for the workload, as string values. Names must match `[A-Za-z_][A-Za-z0-9_]*`. Up to 256 variables and 64 KiB in total. Stored encrypted.
+</ParamField>
+
+<ParamField body="labels" type="object">
+  Your own key-value strings, up to 64. Keys are 1-128 characters and values up to 1024. The dashboard shows `name` as the VM's name. Filter lists by labels.
+</ParamField>
+
+<ParamField body="timers" type="object">
+  Automatic pauses. Unset timers use your organization's defaults.
+
+  <Expandable title="properties">
+    <ParamField body="idle_timeout_s" type="integer | null">
+      Pause after this many seconds with no file reads, port requests, or dashboard sessions. `null` turns it off.
+    </ParamField>
+    <ParamField body="wall_clock_limit_s" type="integer">
+      Pause after the VM has run this many seconds since it was created, resumed, or started. Capped by your plan.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="ttl_s" type="integer">
+  Delete the VM this many seconds after creation, whatever its state.
+</ParamField>
+
+<ParamField body="ephemeral" type="boolean" default="false">
+  Delete the VM, instead of pausing it, when the idle timeout fires.
+</ParamField>
+
+<ParamField body="auto_resume" type="boolean" default="true">
+  Resume a paused VM when a request reaches one of its public ports or custom domains.
+</ParamField>
+
+<ParamField body="ports" type="integer[]">
+  Ports your workload listens on, up to 32.
+</ParamField>
+
+<ParamField body="public_ports" type="integer[]">
+  Ports to publish right away. Each must also be in `ports`.
+</ParamField>
+
+<ParamField body="allow_internet" type="boolean" default="true">
+  Allow outbound traffic to any destination not in `deny_cidrs`. When `false`, only `allow_domains` and `allow_cidrs` are reachable.
+</ParamField>
+
+<ParamField body="allow_domains" type="string[]">
+  Exact domain names the VM may reach, up to 128.
+</ParamField>
+
+<ParamField body="allow_cidrs" type="string[]">
+  IPv4 addresses or CIDR ranges the VM may reach, up to 128.
+</ParamField>
+
+<ParamField body="deny_cidrs" type="string[]">
+  IPv4 addresses or CIDR ranges that are always blocked, up to 128.
+</ParamField>
+
+<ParamField body="volumes" type="object[]">
+  Volumes to mount before the workload starts, up to 8. Each item has `volume_id`, `path`, and optional `allow_commit` (default `true`).
+</ParamField>
+
+<ParamField body="tools" type="string[]">
+  Platform tools to run in the VM. Currently `docker`.
+</ParamField>
+
+<ParamField body="project_id" type="string">
+  Project to create the VM in. Defaults to the API key's project.
+</ParamField>
+
+## The sandbox object
+
+`GET /sandboxes/{id}` returns a sandbox, and lifecycle actions return one as `sandbox`.
+
+<ResponseField name="id" type="string">
+  The sandbox ID, like `sbx_7Hq2kV9xR4mT3nLp8sWd1C`.
+</ResponseField>
+<ResponseField name="state" type="string">
+  `creating`, `running`, `pausing`, `paused`, `resuming`, `stopping`, `stopped`, `starting`, `deleting`, `deleted`, or `failed`.
+</ResponseField>
+<ResponseField name="project_id" type="string">
+  The project the VM belongs to.
+</ResponseField>
+<ResponseField name="size" type="object">
+  `vcpu`, `memory_mb`, and `disk_gb`.
+</ResponseField>
+<ResponseField name="image_id" type="string">
+  The image the VM's disk came from.
+</ResponseField>
+<ResponseField name="template_id" type="string | null">
+  The template it was created from, if any.
+</ResponseField>
+<ResponseField name="labels" type="object">
+  Your labels.
+</ResponseField>
+<ResponseField name="health_healthy" type="boolean | null">
+  The workload's latest health check result while running, or `null` before the first check.
+</ResponseField>
+<ResponseField name="health_last_error" type="string | null">
+  Why the last health check failed.
+</ResponseField>
+<ResponseField name="ports" type="integer[]">
+  Ports declared at creation.
+</ResponseField>
+<ResponseField name="allow_internet" type="boolean">
+  Whether outbound traffic is open by default. Read `GET /sandboxes/{id}/network` for the full policy.
+</ResponseField>
+<ResponseField name="timers" type="object">
+  The `idle_timeout_s` and `wall_clock_limit_s` you set, or `null` for defaults.
+</ResponseField>
+<ResponseField name="volumes" type="object[]">
+  Attached volumes, each with `id`, `volume_id`, `path`, `allow_commit`, `base_version`, and `state` (`attaching`, `attached`, `detaching`, or `detached`).
+</ResponseField>
+<ResponseField name="tools" type="object[]">
+  Enabled tools, each with `tool`, `version`, and `ready`.
+</ResponseField>
+<ResponseField name="ephemeral" type="boolean">
+  Whether the VM is deleted when idle.
+</ResponseField>
+<ResponseField name="auto_resume" type="boolean">
+  Whether requests wake it from a pause.
+</ResponseField>
+<ResponseField name="created_at" type="integer">
+  When the VM was created.
+</ResponseField>
+<ResponseField name="wall_clock_deadline_at" type="integer | null">
+  When a running VM will be paused by its wall-clock limit.
+</ResponseField>
+<ResponseField name="paused_until" type="integer | null">
+  When a paused VM will be stopped.
+</ResponseField>
+<ResponseField name="deletes_at" type="integer | null">
+  When the VM will be deleted for staying paused or stopped.
+</ResponseField>
+<ResponseField name="warn_at" type="integer | null">
+  When the deletion warning starts.
+</ResponseField>
+<ResponseField name="hard_ttl_at" type="integer | null">
+  When `ttl_s` runs out.
+</ResponseField>
+<ResponseField name="next_deadline_at" type="integer | null">
+  The soonest of the scheduled times above.
+</ResponseField>
+<ResponseField name="recovery" type="object | null">
+  Set when Final had to move the VM after a machine failure. `recovery_point` says which saved state it came back from, and `memory_kept` says whether memory came with it.
+</ResponseField>
+
+## List sandboxes
+
+`GET /sandboxes` returns `{ "sandboxes": [...] }`, one page at a time.
+
+<ParamField query="state" type="string">
+  Comma-separated states, such as `running,paused`.
+</ParamField>
+<ParamField query="labels" type="string">
+  A JSON object of labels. Matches sandboxes that carry every pair, such as `{"name":"acme-web-tests"}`.
+</ParamField>
+<ParamField query="limit" type="integer" default="50">
+  Page size, 1 to 200.
+</ParamField>
+<ParamField query="after" type="string">
+  The last sandbox ID from the previous page. Stop when a page comes back empty.
+</ParamField>
+<ParamField query="project_id" type="string">
+  Limit results to this project and the projects below it.
+</ParamField>
+
+```bash
+curl -sS --get "$FINAL_VM_API_URL/sandboxes" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  --data-urlencode 'state=running,paused' \
+  --data-urlencode 'labels={"branch":"main"}' \
+  | jq '.sandboxes[] | {id, state, name: .labels.name}'
+```
+
+## File queries
+
+`GET /sandboxes/{id}/files` works on running, paused, and stopped VMs.
+
+<ParamField query="path" type="string" required>
+  Absolute path.
+</ParamField>
+<ParamField query="op" type="string" default="read">
+  `read` returns contents in `result.data_b64`. `list` returns `result.entries` and `result.next_b64`. `stat` returns `result.entry`.
+</ParamField>
+<ParamField query="offset" type="integer" default="0">
+  For `read`: the byte to start at.
+</ParamField>
+<ParamField query="length" type="integer" default="1048576">
+  For `read`: bytes to return, up to 1 MiB.
+</ParamField>
+<ParamField query="limit" type="integer" default="256">
+  For `list`: entries per page, up to 256.
+</ParamField>
+<ParamField query="cursor" type="string">
+  For `list`: `result.next_b64` from the previous page.
+</ParamField>
+<ParamField query="generation" type="integer">
+  The `generation` from an earlier response. The request fails with `409` if the VM changed since, so multi-part reads stay consistent. Send `snapshot_id` with it when the earlier response had one.
+</ParamField>
+
+## Errors
+
+Errors come back as JSON with an HTTP status and a machine-readable `error` code, plus a `message` or a list of validation `issues` when there's more to say:
+
+```json
+{ "error": "invalid_state", "message": "template is not ready" }
+```
+
+| Status | Codes | What to do |
+| --- | --- | --- |
+| `400` | `invalid_request`, `invalid_json`, `invalid_id`, `invalid_port`, `reserved_domain`, `label_limit` | Fix the request. `issues` lists what's wrong. |
+| `401` | `unauthorized` | Check that the API key is set, valid, and not expired. |
+| `403` | `forbidden`, `commit_not_allowed`, `volume_project_mismatch` | The key's project can see the resource but not change it, or the volume belongs to another project. |
+| `404` | `not_found`, `file_not_found`, `volume_not_found` | Check the ID or path. Resources in projects your key can't see also return `404`. |
+| `409` | `invalid_state`, `conflict`, `name_taken`, `volume_name_taken`, `volume_in_use_path`, `no_free_slot`, `snapshot_in_use`, `image_in_use` | The resource isn't in a state that allows this, or something changed it first. Read it again, then decide. |
+| `410` | `sandbox_deleted`, `volume_deleted` | The resource was deleted. |
+| `413` | `body_too_large` | Keep the body under 1 MiB. |
+| `422` | `file_not_durable`, `volume_shrink`, `template_with_volumes`, `unknown_tool` | The request is valid but can't be applied. `message` explains why. |
+| `502`, `503` | `unavailable`, `pending`, `host_rejected` | A temporary problem. Retry after the `Retry-After` header. |
+
+## Retry safely
+
+A `503` with `pending` means Final has started the operation and doesn't know the outcome yet. Sending the same request again continues it rather than starting a second one. Wait for the number of seconds in `Retry-After`, then retry with a limit on attempts.
+
+`pause`, `resume`, `stop`, `start`, and `delete` are safe to repeat: if the VM is already in the target state, you get it back unchanged. Create and fork aren't, so if a response is lost, look for what you created before trying again. Give each VM a unique label, such as a job ID, and list by it:
+
+```bash
+curl -sS --get "$FINAL_VM_API_URL/sandboxes" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  --data-urlencode 'labels={"job":"build-8812"}' | jq '.sandboxes | length'
+```
+
+For checkpoints, set a `name`: a repeated request returns `name_taken` instead of a second snapshot. For more fixes, see [troubleshooting](/vm-platform/troubleshooting).
