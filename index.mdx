@@ -1,34 +1,48 @@
 ---
-title: "Final documentation"
-description: "Product documentation for Final."
+title: "Welcome to Final"
+sidebarTitle: "Introduction"
+description: "Build agents, connect your AI tools, and give your code a place to run."
 ---
 
-Final documentation is organized by product.
+import AgentSetup from '/snippets/agent-setup/general.mdx';
 
-<Card title="Authentication" icon="key-round" href="/developer-guides/authentication">
-  Authenticate API requests with bearer credentials.
-</Card>
+Final is a cloud platform for building with AI agents. Use one product or combine several: build your own agent, let the coding agent you already use work in a real cloud environment, or move your builds and deploys onto Final.
 
-<Card title="Computers" icon="server" href="/developer-guides/computers">
-  Cloud machines for sandboxes, services, and command execution.
-</Card>
+## Pick a starting point
 
-<Card title="Agent Disk" icon="hard-drive" href="/developer-guides/agent-disk">
-  Persistent storage for agent file state, checkpoints, branches, and shares.
-</Card>
+<Columns cols={2}>
+  <Card title="Final for AI Coding" icon="laptop-code" href="/ai-coding/overview">
+    Give Claude Code, Codex, or a Final agent a cloud workspace where it can run your app and tests.
+  </Card>
+  <Card title="Agent SDK" icon="robot" href="/agent-sdk">
+    Define an agent in TypeScript, give it tools, and call it from your product.
+  </Card>
+  <Card title="MCP gateway" icon="plug" href="/mcp-gateway/overview">
+    Add one MCP server to your AI client and reach all of your connected accounts through it.
+  </Card>
+  <Card title="Final VMs" icon="server" href="/vm-platform/overview">
+    Run code in a cloud VM, then pause, snapshot, or copy it when you need to.
+  </Card>
+  <Card title="Final CI Runners" icon="play" href="/ci-runners/overview">
+    Run GitHub Actions jobs on Final machines with persistent caches by changing one line.
+  </Card>
+  <Card title="Final Cloud Apps" icon="cloud" href="/cloud-apps/overview">
+    Deploy websites, APIs, workers, and cron jobs from a Git repository.
+  </Card>
+</Columns>
 
-<Card title="Agent Chats" icon="folder-code" href="/developer-guides/agent-chats">
-  Start agent work, send messages, and poll session state from the API.
-</Card>
+## Let an agent set it up
 
-<Card title="Version Control" icon="git-branch" href="/developer-guides/git">
-  Git-compatible repositories, pull requests, checks, and merge queues.
-</Card>
+Not sure where to start? Give this prompt to your coding agent. It looks at your project, asks what you want to do, and walks you through the right quickstart.
 
-<Card title="WebSockets" icon="radio" href="/developer-guides/websockets">
-  Create scoped realtime sessions, publish channel events, and dispatch work.
-</Card>
+<AgentSetup />
 
-<Card title="Durable Execution" icon="workflow" href="/developer-guides/durable-execution">
-  Event-driven workflows with durable steps, waits, retries, and run history.
-</Card>
+## Connect to Final
+
+How you authenticate depends on the product.
+
+| Product | How you connect |
+| --- | --- |
+| Agent SDK, Final VMs, Final Cloud Apps | An [API key](/api-keys) from the Final dashboard. |
+| MCP gateway | [Sign in from your AI client](/mcp-gateway/quickstart). No API key needed. |
+| Final CI Runners | [Enable your GitHub organization](/ci-runners/quickstart). Workflows don't need a key. |

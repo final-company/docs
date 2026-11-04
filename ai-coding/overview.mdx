@@ -1,0 +1,65 @@
+---
+title: "Final for AI Coding"
+sidebarTitle: "Overview"
+description: "Give Claude Code, Codex, or a Final agent a cloud computer where it can run your app and tests."
+icon: "laptop-code"
+---
+
+import AgentSetup from '/snippets/agent-setup/ai-coding.mdx';
+
+Final for AI Coding gives your coding agent its own cloud computer: a checkout of your repository with the tools, services, and test data it needs to run your app. Because the agent can run the code it writes, it hands you changes it has already tested. You can also run several tasks at once without tying up your laptop.
+
+Bring the agent you already use. Run stock Claude Code or Codex on a Final computer with your own settings and login, or create a Final agent that your team chats with and that starts on a ready-made computer every time.
+
+## Let an agent set it up
+
+Want to skip the reading? Paste this prompt into your coding agent from your repository. It works out how your app is built, writes a setup script, and walks you through the dashboard steps.
+
+<AgentSetup />
+
+## How it fits together
+
+You set up three things once, then hand the agent tasks.
+
+| Piece | What it is |
+| --- | --- |
+| [Project](/ai-coding/projects) | Where the work lives in Final. It holds your repositories, computers, agents, and the people who can use them. |
+| [Cloud environment](/ai-coding/cloud-environments) | A Final computer with your code checked out and your app able to run. A setup script makes every new computer identical. |
+| [Agent](/ai-coding/agents) | Claude Code, Codex, or a Final agent, working in that computer's shell and files. |
+
+Your repository stays the source of truth. The agent edits a normal Git checkout, and you review its branch and open a pull request the way you do today.
+
+## Choose how your agent runs
+
+| Option | Pick it when | How you work with it |
+| --- | --- | --- |
+| **Claude Code or Codex on a Final computer** | You want the exact CLI you use today, with your own settings, instructions, and subscription. | Open the computer's editor and run `claude` or `codex` in its terminal. |
+| **A Final agent** | Your team wants a shared coding agent that anyone can message, with the environment prepared for it. | Chat with it in Final. It runs on Claude or Codex and can use your Claude or ChatGPT subscription. |
+
+You can use both. A common path is to start with the CLI on a computer, then turn the same setup into a Final agent once it works. See [choose your agent](/ai-coding/agents) for the details of each.
+
+## What you can do
+
+- **Fix a bug with proof.** The agent reproduces the bug, adds a regression test, and shows you the passing run.
+- **Build UI and look at it.** The agent starts your dev server on the computer, and you open the page in the computer's browser.
+- **Work in parallel.** Give each task its own computer so agents never share a checkout or a database.
+- **Hand off long tasks.** A Final agent keeps working on its computer after you close the tab. Come back to a branch and a test report.
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/ai-coding/quickstart">
+    Go from an empty project to a reviewed change in about 20 minutes.
+  </Card>
+  <Card title="Make the environment reproducible" icon="box" href="/ai-coding/cloud-environments">
+    Write a setup script and a setup guide so every computer starts ready.
+  </Card>
+  <Card title="Choose your agent" icon="robot" href="/ai-coding/agents">
+    Set up Claude Code, Codex, or a Final agent, with exact commands.
+  </Card>
+  <Card title="Work with agents" icon="list-check" href="/ai-coding/working-with-agents">
+    Write tasks with a clear finish line and review what comes back.
+  </Card>
+</Columns>
+
+Final for AI Coding works with the rest of Final. Connect your issue tracker and other tools through the [MCP gateway](/mcp-gateway/overview), run your checks on [Final CI Runners](/ci-runners/overview), and ship with [Final Cloud Apps](/cloud-apps/overview).

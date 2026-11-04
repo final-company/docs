@@ -1,0 +1,8 @@
+<Prompt description="**Connect this AI client to the MCP gateway.** Paste this into Claude Code, Codex, or Cursor.">
+Connect this AI client to Final's MCP gateway, following Final's MCP gateway docs.
+Check my MCP configuration first and reuse a server named final if one exists. Otherwise add a remote HTTP server named final with the URL https://api.final.ai/v1/connectors/mcp, using this client's own command or config file.
+Walk me through signing in to Final in the browser. If my client needs a restart or a /mcp step, tell me exactly what to do.
+Ask which service I want to try, such as GitHub, Linear, or Slack. If it isn't connected yet, send me to Connectors in the Final dashboard to connect it.
+Then make one read-only request through the gateway, like listing my open issues. If I have several accounts for that service, ask me which one to use. Don't create or change anything.
+Show me the result and suggest two prompts I could try next.
+</Prompt>

@@ -1,0 +1,147 @@
+---
+title: "Create your first VM"
+sidebarTitle: "Quickstart"
+description: "Start a VM, run a command in it, and read the result back."
+icon: "rocket"
+---
+
+In this guide you create a VM, have it run a short command, read the file it writes, and delete the VM. It takes about five minutes and only needs `curl` and `jq`.
+
+<Tip>
+Want your coding agent to do this for your own project? Copy the [agent setup prompt](/vm-platform/overview#let-an-agent-set-it-up).
+</Tip>
+
+## Prerequisites
+
+- A [Final API key](/api-keys), exported as `FINAL_API_KEY`.
+- `curl` and `jq`. On macOS, install `jq` with `brew install jq`. On Debian or Ubuntu, use `sudo apt install jq`.
+
+<Steps>
+  <Step title="Point your shell at the API">
+    Save the API URL in a variable so the commands below stay short, then list your VMs to check that your key works:
+
+    ```bash
+    export FINAL_VM_API_URL="https://api.vm.finalwebservices.com/v1"
+
+    curl -sS "$FINAL_VM_API_URL/sandboxes?limit=5" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq
+    ```
+
+    You should see a list, which is empty if this project has no VMs yet:
+
+    ```json
+    { "sandboxes": [] }
+    ```
+
+    If you see `{"error": "unauthorized"}` instead, check that `FINAL_API_KEY` is set in this shell and that the key hasn't expired.
+  </Step>
+
+  <Step title="Describe the VM">
+    Save this request body as `first-vm.json`:
+
+    ```bash
+    cat > first-vm.json <<'EOF'
+    {
+      "labels": { "name": "first-vm" },
+      "timers": { "wall_clock_limit_s": 900 },
+      "workload": {
+        "entrypoint": ["/bin/sh", "-c"],
+        "cmd": ["echo \"Hello from Final VMs on $(uname -sm)\" > result.txt"],
+        "restart": false
+      }
+    }
+    EOF
+    ```
+
+    Here's what each part does:
+
+    - `labels.name` is a name you'll see in the dashboard. Labels are free-form key-value pairs you can also filter by.
+    - `timers.wall_clock_limit_s` caps how long the VM runs before Final pauses it: 15 minutes here, so a forgotten VM doesn't keep running.
+    - `workload` is the command the VM runs when it boots. This one writes a line of text to `result.txt` and exits. `restart: false` tells Final not to run it again after it exits.
+
+    The request doesn't name an image or a size, so you get the defaults: an Ubuntu image with Git, Python, and Node.js, and 2 vCPUs, 2 GiB of memory, and a 10 GB disk. Commands run as `user` in `/home/user/workspace`.
+  </Step>
+
+  <Step title="Create the VM">
+    Send the request and keep the new VM's ID:
+
+    ```bash
+    export SANDBOX_ID=$(curl -sS "$FINAL_VM_API_URL/sandboxes" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d @first-vm.json | jq -r '.sandbox.id')
+
+    echo "$SANDBOX_ID"
+    ```
+
+    You'll see an ID that starts with `sbx_`:
+
+    ```text
+    sbx_7Hq2kV9xR4mT3nLp8sWd1C
+    ```
+
+    If it prints `null`, the request failed. Run the `curl` command again without `| jq -r '.sandbox.id'` to see the error message.
+  </Step>
+
+  <Step title="Check that it's running">
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq '{id, state}'
+    ```
+
+    ```json
+    { "id": "sbx_7Hq2kV9xR4mT3nLp8sWd1C", "state": "running" }
+    ```
+
+    If the state is `creating`, wait a few seconds and run it again.
+  </Step>
+
+  <Step title="Read the result">
+    Ask the files API for `result.txt` and decode it:
+
+    ```bash
+    curl -sS --get "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/files" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      --data-urlencode "path=/home/user/workspace/result.txt" \
+      | jq -r '.result.data_b64 // error(.error)' | base64 --decode
+    ```
+
+    ```text
+    Hello from Final VMs on Linux x86_64
+    ```
+
+    The files API returns file contents base64-encoded, so binary files survive the trip through JSON. `jq` pulls out the encoded string, or prints the error code if the read failed, and `base64 --decode` turns it back into text. The same command works on macOS and Linux.
+
+    If `jq` reports `file_not_found`, the command hasn't finished yet. Wait a moment and try again.
+  </Step>
+
+  <Step title="Delete the VM">
+    ```bash
+    curl -sS -X DELETE "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq '.sandbox.state'
+    ```
+
+    The state becomes `deleting`, then `deleted`. Deleting a VM removes its disk, so read any files you need first. To keep a VM for later instead, [pause it](/vm-platform/lifecycle-and-snapshots#pause-and-resume).
+  </Step>
+</Steps>
+
+<Check>
+You created a VM, ran a command in it, and read its output through the API. The rest of these docs use the same `FINAL_API_KEY`, `FINAL_VM_API_URL`, and `SANDBOX_ID` variables.
+</Check>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Run a real workload" icon="terminal" href="/vm-platform/workloads">
+    Clone a repository and run its tests, or start a web server with a health check.
+  </Card>
+  <Card title="Pause and snapshot" icon="clock-rotate-left" href="/vm-platform/lifecycle-and-snapshots">
+    Set a VM aside and come back to it exactly as you left it.
+  </Card>
+  <Card title="Bring your own image" icon="layer-group" href="/vm-platform/images-and-templates">
+    Start from any Linux container image, or a template with your service already running.
+  </Card>
+  <Card title="Open the desktop" icon="display" href="/vm-platform/desktop">
+    Browse files, watch processes, and use the VM's desktop from the dashboard.
+  </Card>
+</Columns>

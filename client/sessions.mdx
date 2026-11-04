@@ -1,0 +1,208 @@
+---
+title: "Sessions and streaming"
+description: "Start a session from your server, stream the agent's reply into your UI, and let people approve actions."
+---
+
+A session is one ongoing thread with one agent, like a single chat. You send it a message, the agent works on it, and you watch the work stream in: text as it's written, tool calls as they happen, and requests for approval when the agent needs a person's OK. Use sessions when your app owns the chat UI or runs the agent as a task. If you'd rather have Final store the chat for you, use [conversations](/client/conversations).
+
+These examples use the release assistant from the [quickstart](/quickstart).
+
+## Create a client
+
+```ts server/final.ts
+import { createClient } from '@finalai/agents/client';
+
+export const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+```
+
+<Warning>
+Create the client on your server, never in browser code. Your [API key](/api-keys) can run every agent in its project. Browsers should call your backend, which calls Final.
+</Warning>
+
+## Send a message and wait for the answer
+
+`sessions.create` starts a session and, when you pass `message`, its first turn. `response.result()` waits for the turn to finish:
+
+```ts
+const { handle, response } = await client.sessions.create({
+  agent: 'release-assistant',
+  message: 'Is 1.2.0 ready to ship?',
+});
+
+const result = await response!.result();
+console.log(result.text);       // The agent's reply
+console.log(result.stopReason); // Why the turn ended, like "end_turn"
+```
+
+Check `stopReason` even when `text` is empty. A turn that was cancelled or hit an error can end without any text.
+
+## Stream the reply as it's written
+
+`response.stream()` yields the turn's events as they happen. Each event wraps one update from the agent. `sessionUpdateOf` unwraps it, and `textOf` pulls out the text:
+
+```ts
+import { sessionUpdateOf, textOf } from '@finalai/agents/client';
+
+for await (const event of response!.stream()) {
+  const update = sessionUpdateOf(event);
+  if (update?.sessionUpdate === 'agent_message_chunk') {
+    process.stdout.write(textOf(update));
+  }
+}
+```
+
+The loop ends when the turn ends. These are the updates you'll use most:
+
+| `sessionUpdate` | What it means | Show it as |
+| --- | --- | --- |
+| `agent_message_chunk` | The next piece of the reply. | Append to the message bubble. |
+| `agent_thought_chunk` | The model's reasoning, when it shares it. | A collapsible "thinking" block. |
+| `tool_call` | The agent started a tool call. Includes a `title`. | A status line, like "Checking release status". |
+| `tool_call_update` | A tool call's status or result changed. | Update or finish the status line. |
+| `state_update` | The session's state changed. `idle` with a `stopReason` ends the turn. | Stop the typing indicator. |
+
+### Stream to a browser
+
+In a web app, your server reads the stream and forwards the text to the browser. This route handler works in any framework that uses Web `Request` and `Response`, such as Next.js or Hono:
+
+```ts app/api/chat/route.ts
+import { sessionUpdateOf, textOf } from '@finalai/agents/client';
+import { client } from '@/server/final';
+
+export async function POST(request: Request) {
+  const { message } = await request.json();
+  const { handle, response } = await client.sessions.create({
+    agent: 'release-assistant',
+    message,
+  });
+
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    async start(controller) {
+      for await (const event of response!.stream()) {
+        const update = sessionUpdateOf(event);
+        if (update?.sessionUpdate === 'agent_message_chunk') {
+          controller.enqueue(encoder.encode(textOf(update)));
+        }
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(body, {
+    headers: { 'content-type': 'text/plain; charset=utf-8', 'x-session-id': handle.id },
+  });
+}
+```
+
+The browser reads the body as it arrives and keeps the session ID for follow-up messages.
+
+## Handle approvals
+
+Some actions wait for a person's OK: a tool with an [approval policy](/build/tools#ask-before-a-tool-runs), or a shell command when the agent runs with `permissionMode: 'ask'`. When the agent reaches one, the turn pauses and Final creates a **decision**, a request waiting for an answer. The turn continues as soon as someone answers it.
+
+```mermaid
+sequenceDiagram
+  participant Person
+  participant App as Your app
+  participant Final
+  App->>Final: Send "Publish 1.2.0"
+  Final-->>App: Stream text
+  Final-->>App: Event with decisionId
+  App->>Person: Show "Allow publish_release?"
+  Person->>App: Approve
+  App->>Final: respond(decisionId)
+  Final-->>App: Stream the rest of the turn
+```
+
+In the stream, the event that pauses the turn has a `decisionId`. Load the decision to see what it's asking, show it to the person, and send their answer:
+
+```ts
+import { DecisionKind, type DecisionRecordIface } from '@finalai/agents/client';
+
+for await (const event of response!.stream()) {
+  // ...render text as above...
+
+  if (event.decisionId) {
+    const decisions = await handle.decisions();
+    const decision = decisions.find((d) => d.id === event.decisionId);
+    if (decision) await answer(decision);
+  }
+}
+
+async function answer(decision: DecisionRecordIface) {
+  const { title, body, options } = decision.request;
+
+  if (decision.kind === DecisionKind.Permission) {
+    // A built-in action, like a shell command. Show one button per option.
+    const picked = await showChoices(title, body, options.map((option) => option.name));
+    await handle.respond({ decisionId: decision.id, optionId: options[picked].optionId });
+  } else {
+    // A tool approval or a question from the agent. Show Approve and Decline.
+    const approved = await showApproval(title, body);
+    await handle.respond({
+      decisionId: decision.id,
+      outcome: { action: approved ? 'accept' : 'decline' },
+    });
+  }
+}
+```
+
+`showChoices` and `showApproval` stand in for your UI. There are two kinds of decision, and they're answered differently:
+
+| `kind` | Raised by | Answer with |
+| --- | --- | --- |
+| `permission` | Built-in shell and file actions. `request.options` lists choices like allow once, allow always, and reject, each with an `optionId` and a `name`. | `{ decisionId, optionId }` |
+| `elicitation` | Your tools and connection tools that need approval, or a question from the agent. `request.body` has the message to show. | `{ decisionId, outcome: { action: 'accept' } }`, or `'decline'` |
+
+In a web app, the person's click arrives in a different request from the stream. Save the decision ID with the session ID, and answer from that request's handler:
+
+```ts
+await client.sessions.attach(sessionId).respond({ decisionId, optionId });
+```
+
+To build an inbox of everything waiting on someone, `client.conversations.decisions()` lists open decisions across all of the caller's conversations.
+
+## Send follow-ups
+
+The session keeps its history, so a follow-up has the full context of the chat. Send it with `handle.send` and read it like the first turn:
+
+```ts
+const next = await handle.send('The release owner signed off. Can we ship now?');
+console.log((await next.result()).text);
+```
+
+If you send while a turn is still running, `turnPolicy` decides what happens. `queue` runs the new message after the current turn finishes. `steer` adds it to the running turn so the agent can change course, which suits "stop, use 1.2.1 instead." Pass it per message, like `handle.send(text, { turnPolicy: 'steer' })`, or for the whole session in `sessions.create`.
+
+To give the agent context without asking for a reply, use `observe`. The text joins the history, and the agent sees it on its next turn:
+
+```ts
+await handle.observe('The release owner changed to Morgan.');
+```
+
+## Stop and clean up
+
+- `handle.cancel()` stops the running turn. The turn ends with the stop reason `cancelled`.
+- `handle.close()` ends the session. Do this when the chat or task is over, not after every turn.
+- `client.close()` ends your client's open streams when your process shuts down.
+
+Passing an `AbortSignal` to a call, like `response.stream({ signal })`, only stops your local request. The agent keeps working.
+
+## Reconnect after a disconnect
+
+A session lives on Final, not in your process, so you can pick it up again after a restart or a dropped connection. Save the session ID and the turn ID (`response.turnId`) when you start a turn, then reattach:
+
+```ts
+const session = client.sessions.attach(sessionId);
+const response = await session.response(turnId);
+console.log((await response.result()).text);
+```
+
+This doesn't resend the message. It returns the same turn, whether it's still running or already finished.
+
+To replay a session's events, for example to rebuild a chat view, use `session.stream({ fromSeq })`. Every event has a `seq` number that increases through the session. Save the last `seq` you rendered and pass the next number as `fromSeq` to continue where you left off.
+
+When you retry a request that might have reached Final, like `sessions.create` or `send` after a network error, pass the same `idempotencyKey` both times so the agent doesn't get the message twice.

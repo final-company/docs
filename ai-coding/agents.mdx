@@ -1,0 +1,163 @@
+---
+title: "Choose your agent"
+description: "Run stock Claude Code or Codex on a Final computer, or create a Final agent your team can chat with."
+icon: "robot"
+---
+
+Final doesn't replace your coding agent. It gives the agent a computer to work on. You can run the stock Claude Code or Codex CLI there yourself, or create a Final agent that anyone on your team can message and that starts on a prepared computer.
+
+| | Claude Code or Codex on a computer | Final agent |
+| --- | --- | --- |
+| **You talk to it** | In the computer's terminal | In Final chats, alone or with teammates |
+| **Its environment** | A computer you open and set up with your [setup script](/ai-coding/cloud-environments#write-a-setup-script) | A new computer from a [setup guide](/ai-coding/cloud-environments#prepare-computers-for-a-final-agent) for each session |
+| **Its settings** | Your CLI's own settings, instructions, and login | Instructions, tools, and model choice in the agent's source |
+| **Models** | Your Claude or ChatGPT subscription, or an API key | Final-provided models, or your own subscription or API key |
+
+## Set up your agent
+
+<Tabs>
+  <Tab title="Final agent">
+    A Final agent is a coding agent that lives in your project. Create it once, and anyone with access can chat with it. Each session gets a fresh computer prepared by your setup guide.
+
+    <Steps>
+      <Step title="Create the agent">
+        Open **Agents** and click **New agent**. Enter a name, such as `Storefront Coder`, set **Source** to **New Final repository**, and set **Template** to **Coding, with shell and files on a computer**. Click **Create agent and repository**.
+
+        Final creates a repository for the agent with `agent/agent.ts`, `agent/instructions.md`, and `agent/sandbox.ts`. The starter works on your organization's default computer, with shell and file tools.
+      </Step>
+      <Step title="Point it at your environment">
+        Make the agent's computer use your [setup guide](/ai-coding/cloud-environments#prepare-computers-for-a-final-agent), so it starts with your repository cloned and your app running:
+
+        ```ts agent/sandbox.ts
+        import { computerSetupGuide } from '@finalai/agents/sandboxes';
+
+        export const computer = computerSetupGuide({ ref: 'storefront', workspace: 'session' });
+        ```
+
+        Or, in the agent editor, choose the guide under **Sandboxes** > **Setup guide**.
+      </Step>
+      <Step title="Choose Claude or Codex">
+        The starter uses Final's own harness, the loop that drives the model and its tools. To work the way Claude Code or Codex does, switch to the Claude or Codex harness in the editor's **Harness** section, or in code:
+
+        ```ts agent/agent.ts
+        import { baseTools, credentials, defineAgent } from '@finalai/agents';
+        import { serverlessNanocodeClaude } from '@finalai/agents/harnesses';
+        import { computer } from './sandbox.js';
+
+        export default defineAgent({
+          name: 'Storefront Coder',
+          tools: baseTools({ files: computer, shell: computer }),
+          harness: serverlessNanocodeClaude({
+            credentials: credentials.chain({
+              payer: 'prompting-user',
+              tryInOrder: [
+                credentials.subscription({ owner: 'payer' }),
+                credentials.apiKey({ owner: 'organization' }),
+                credentials.platform(),
+              ],
+            }),
+          }),
+        });
+        ```
+
+        For Codex, import and use `serverlessNanocodeCodex` instead. The `credentials` chain decides who pays for the model: the person who sent the message uses their own subscription if they connected one, then the organization's API key, then Final-provided model access.
+      </Step>
+      <Step title="Connect your subscription">
+        Go to **Developer** > **Agent subscriptions** to let agents use your plan instead of Final-provided models:
+
+        - **Claude subscription**: run `claude setup-token` on your laptop, paste the token, and click **Connect Claude**.
+        - **ChatGPT subscription**: click **Connect ChatGPT**, open the login page, and enter the code shown.
+        - **API key**: pick OpenAI, Anthropic, or OpenRouter, paste a key, and click **Connect API key**.
+
+        Everyone in the project, and in the projects below it, can use a connection you add.
+      </Step>
+      <Step title="Test and publish">
+        Under **Test draft**, ask for something that proves the setup, such as `Run the test suite and tell me how many tests pass.` When the answer looks right, click **Publish**. Then click **Chat** on the agent's page, or add the agent to a project chat with **New Chat**.
+      </Step>
+    </Steps>
+
+    See [configuration](/build/configuration) and [publishing](/operate/publishing) in the Agent SDK docs for everything else you can set.
+  </Tab>
+  <Tab title="Claude Code">
+    Run the same Claude Code you use locally on a Final computer. Create a computer and clone your repository first, as in the [quickstart](/ai-coding/quickstart).
+
+    In the computer's editor terminal, install Claude Code and check it:
+
+    ```bash
+    curl -fsSL https://claude.ai/install.sh | bash
+    claude --version
+    ```
+
+    You should see a version number followed by `(Claude Code)`. Then start it from your repository:
+
+    ```bash
+    cd storefront
+    claude
+    ```
+
+    On first run, Claude Code asks you to sign in. The computer has no browser for it to open, so copy the login URL it shows (press `c`) and open it in your own browser. After you sign in, paste the code you get back at the `Paste code here if prompted` prompt. Claude Code stores the login on the computer, so you only do this once per computer.
+
+    **Your setup comes with the repository.** `CLAUDE.md`, `.claude/settings.json`, custom commands, and skills committed to the repository work as they do on your laptop. Settings that live only in your home directory, such as `~/.claude/CLAUDE.md` or user-scoped MCP servers, don't come along. Copy the files you rely on to the computer, or re-add servers with `claude mcp add`.
+
+    <Accordion title="Sign in without the browser flow">
+      Run `claude setup-token` on a machine with a browser. It prints a long-lived token for your Claude subscription. On the computer, set it before you start Claude Code:
+
+      ```bash
+      export CLAUDE_CODE_OAUTH_TOKEN='paste-your-token-here'
+      ```
+
+      To use a Claude Console API key instead, set `ANTHROPIC_API_KEY` and approve the key when Claude Code asks. Keep either value out of your repository and shell history files.
+    </Accordion>
+  </Tab>
+  <Tab title="Codex">
+    Run the same Codex CLI you use locally on a Final computer. Create a computer and clone your repository first, as in the [quickstart](/ai-coding/quickstart).
+
+    In the computer's editor terminal, install Codex:
+
+    <CodeGroup>
+      ```bash Installer
+      curl -fsSL https://chatgpt.com/codex/install.sh | sh
+      ```
+
+      ```bash npm
+      npm install -g @openai/codex
+      ```
+    </CodeGroup>
+
+    Sign in with a device code, which works without a browser on the computer. First turn on device code login in your ChatGPT security settings (workspace admins turn it on in workspace permissions), then run:
+
+    ```bash
+    codex login --device-auth
+    ```
+
+    Open the link it prints in your own browser and enter the code. To use an OpenAI API key instead, run `printenv OPENAI_API_KEY | codex login --with-api-key`.
+
+    Start Codex from your repository:
+
+    ```bash
+    cd storefront
+    codex
+    ```
+
+    **Your setup comes with the repository.** Codex reads `AGENTS.md` from the repository as it does on your laptop. Personal settings in `~/.codex/config.toml`, such as MCP servers or a default model, don't come along. Copy that file to the computer if you rely on it.
+  </Tab>
+</Tabs>
+
+<Note>
+On a computer you share, anyone with **Editor** access can open its editor and use the CLI login stored there. Give each person their own computer, or use a Final agent with per-person subscriptions.
+</Note>
+
+## Give the agent your tools
+
+Coding agents do better with context: the issue they're fixing, the design doc, the error in your logs. Add the [MCP gateway](/mcp-gateway/quickstart) to Claude Code or Codex, and they can reach the tools your organization connected in Final through one server. Final agents can use those connections directly; see [connections](/build/connections).
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Work with agents" icon="list-check" href="/ai-coding/working-with-agents">
+    Write tasks with a clear finish line and review what comes back.
+  </Card>
+  <Card title="Make the environment reproducible" icon="box" href="/ai-coding/cloud-environments">
+    Write a setup script and a setup guide so every computer starts ready.
+  </Card>
+</Columns>

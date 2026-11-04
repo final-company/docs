@@ -1,0 +1,43 @@
+---
+title: "Choose an app type"
+description: "Decide between a web app, service, cron job, or function in under a minute."
+---
+
+Every app has one type, set with `type` in `final-cloud.yaml`. To pick one, ask two questions about your code: does it answer HTTP requests, and does it ever finish on its own?
+
+| If your code... | Use | For example |
+| --- | --- | --- |
+| Runs its own HTTP server | [Web app](/cloud-apps/web-apps) (`type: web`) | A Next.js site, an Express or Hono API, a Django or Rails app |
+| Answers HTTP requests with one JavaScript `fetch` handler | [Function](/cloud-apps/functions) (`type: function`) | A webhook receiver, a small JSON API, a redirect service |
+| Runs until it's stopped, but serves no HTTP traffic | [Service](/cloud-apps/services) (`type: service`) | A queue worker, an event consumer, a sync loop |
+| Starts, does its work, and exits | [Cron job](/cloud-apps/cron-jobs) (`type: cron`) | A nightly cleanup, a weekly report, a one-off backfill |
+
+## Web app or function?
+
+Both answer HTTP requests at a public URL, so this is the choice people most often weigh.
+
+Pick a **function** when your handler is plain JavaScript and you'd rather not build a container. There's no Dockerfile, deploys are quick, and an idle function stops until the next request arrives. The trade-off is a smaller runtime: one module, web-standard APIs like `fetch` and `crypto.subtle`, 128 MB of memory, and no native packages or Node.js-only libraries.
+
+Pick a **web app** for anything else: a full framework, a language other than JavaScript, native dependencies, or a process that keeps state in memory between requests. A web app runs your container on a machine size you choose and stays running.
+
+## Compare the types
+
+|  | Web app | Function | Service | Cron job |
+| --- | --- | --- | --- | --- |
+| Public URL | Yes | Yes, unless `public: false` | No | No |
+| Runs from | A container | One JavaScript module | A container | A container |
+| Runs | All the time | When requests arrive | All the time | On a schedule or on demand, until it exits |
+| Success means | The health check passes | It answers requests | It's running | It exits with code `0` |
+| Required fields | `build` or `image`, `port`, `health.path` | `entry` | `build` or `image` | `build` or `image`, `command` |
+
+Containers are built from a Dockerfile or with buildpacks, or you can point at an image you've already built. See [container fields](/cloud-apps/manifest#containers) in the manifest reference.
+
+## Combine app types
+
+Real products often need more than one type. An online store might run:
+
+- A **web app** that serves the storefront and adds work to a `tasks` table.
+- A **service** that picks up those tasks and sends emails.
+- A **cron job** that deletes finished tasks every night.
+
+Each one is its own app with its own `final-cloud.yaml`, URL, and logs. They share data by [binding the same database](/cloud-apps/environment-and-data#databases). To deploy several apps from one codebase, give each manifest its own path and pass it when you create the app, for example `npx final-cloud apps create "Store worker" --manifest-path worker/final-cloud.yaml`. Then push the same commit to each app's remote.

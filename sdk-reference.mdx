@@ -1,0 +1,110 @@
+---
+title: "SDK reference"
+description: "Imports, client methods, CLI commands, and environment variables in @finalai/agents."
+icon: "book"
+---
+
+`@finalai/agents` contains three things: helpers for writing agents, a client for calling them, and the `final-agents` CLI. Install it with `npm install @finalai/agents zod`. It requires Node.js 26 or later. Full signatures are in the package's TypeScript declarations.
+
+## Imports
+
+| Import | Use it for | Main exports |
+| --- | --- | --- |
+| `@finalai/agents` | Writing agents | `defineAgent`, `credentials`, `baseTools`, `defineTool`, `defineInstructions`, `defineSkill`, `defineSchedule`, `defineDynamic`, `defineMcpClientConnection`, `defineFinalConnection`, `defineSandbox` |
+| `@finalai/agents/harnesses` | Choosing a [harness](/build/configuration#choose-a-harness) | `serverlessFinal`, `serverlessPi` |
+| `@finalai/agents/sandboxes` | Defining a [computer](/build/sandboxes) | `computer`, `computerSetupGuide` |
+| `@finalai/agents/approval` | [Approval policies](/build/tools#ask-before-a-tool-runs) | `always`, `never`, `whenInput` |
+| `@finalai/agents/tools` | Tools and their results | `defineTool`, `toolResultFrom` |
+| `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineHook` |
+| `@finalai/agents/channels` | [Channel routes](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS` |
+| `@finalai/agents/client` | Calling agents from your app | `createClient`, `sessionUpdateOf`, `textOf`, `isClientError`, and the API's types and enums |
+
+## Client
+
+`createClient({ host, auth })` returns a client with these areas. Each links to the guide that uses it.
+
+| Property | What it does |
+| --- | --- |
+| `sessions` | Start a session, or `attach` to one by ID. A session handle sends messages, streams events, lists and answers decisions, and cancels or closes. See [sessions](/client/sessions). |
+| `conversations` | Open direct and group chats, send and read messages, stream events, and list open decisions. See [conversations](/client/conversations). |
+| `definitions` | Register agents, test and publish revisions, compare revisions, and attach channels. See [publishing](/operate/publishing). |
+| `schedules` | List, update, and run schedules. See [schedules](/build/schedules). |
+| `agents` | List the agents your key can use. |
+| `people` | List your organization's members, for adding people to conversations. |
+| `providers` | List the harnesses installed for your organization. |
+| `computerSetupGuides` | List, inspect, and publish [setup guides](/build/sandboxes#use-a-saved-setup-guide). |
+| `close()` | End the client's open streams. |
+
+## CLI
+
+Run the CLI with `npx final-agents <command>`. `npx final-agents --help` lists every option.
+
+### `build [dir]`
+
+Compiles the agent directory, prints a summary, and writes the output to `.final/compile/`. With `FINAL_API_KEY` set, it also checks the agent against your organization's harness.
+
+```bash
+npx final-agents build ./agent
+```
+
+### `dev [dir]`
+
+Serves the agent's [channel routes](/build/channels#test-it-locally) on your machine and logs what the agent would receive. It reloads when you edit the files. It doesn't run the agent.
+
+```bash
+npx final-agents dev ./agent --port 3000
+```
+
+<ParamField path="--port" type="number" default="3000">
+  The local port to serve on.
+</ParamField>
+
+### `publish [dir]`
+
+Uploads and compiles the agent directory, then makes it the agent's current revision. See [publishing](/operate/publishing#publish).
+
+```bash
+npx final-agents publish ./agent --agent release-assistant --note 'Add release_status tool'
+```
+
+<ParamField path="--agent" type="string" required>
+  The agent's slug or ID.
+</ParamField>
+
+<ParamField path="--note" type="string">
+  A note that labels the revision in its history.
+</ParamField>
+
+<ParamField path="--message" type="string" default="Publish with final agents publish">
+  The commit message for the uploaded files.
+</ParamField>
+
+<ParamField path="--ref" type="string">
+  For agents backed by GitHub only: the branch, tag, or commit to publish. Defaults to the repository's default branch.
+</ParamField>
+
+### Options for `build` and `publish`
+
+<ParamField path="--host" type="URL" default="https://agent-session.final.ai/api">
+  The Final API to use. Overrides `FINAL_API_HOST`.
+</ParamField>
+
+## Environment variables
+
+| Variable | Used by | What it does |
+| --- | --- | --- |
+| `FINAL_API_KEY` | `build`, `publish` | Your [API key](/api-keys). Required to publish. |
+| `FINAL_API_HOST` | `build`, `publish` | The Final API to use, if not the default. |
+| `AGENT_LOCAL_SECRETS_JSON` | `dev` | Secret values for local routes, as a JSON object, like `{"deploy-webhook-token":"local-test-token"}`. Only secrets listed in `agent.ts` are available. |
+
+The client doesn't read environment variables. Pass the host and key to `createClient`.
+
+<Accordion title="Bring your own harness">
+  To run agents on a harness you build yourself, implement the contracts in `@finalai/agent-provider` and test your harness with the conformance kit:
+
+  ```bash
+  npx final-agents conformance ./harness.ts
+  ```
+
+  The module must export the harness as its default export, or pass `--export <name>`.
+</Accordion>

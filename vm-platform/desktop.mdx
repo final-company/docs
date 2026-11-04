@@ -1,0 +1,63 @@
+---
+title: "Desktop and dashboard"
+description: "See what's happening inside a VM: browse its files, watch its processes, and use its desktop or editor from your browser."
+icon: "display"
+---
+
+The Final dashboard shows every VM in your project, so you can look inside one without writing any API calls. Use it to check on a job, read a log, or click around a desktop app that your workload started.
+
+In the [dashboard](https://console.final.ai), select your organization and project, then go to **Developer** > **Computers**. The dashboard calls VMs *computers*; they're the same sandboxes you create through the API.
+
+## Open the desktop or editor
+
+<Steps>
+  <Step title="Open the VM">
+    Select a computer from the list. It must be `running`; resume or start it first if it isn't.
+  </Step>
+  <Step title="Start the desktop">
+    Click **Start desktop**. The VM keeps running its workload while the desktop starts alongside it.
+  </Step>
+  <Step title="Open a window">
+    Click **Open screen** to see and control the desktop, or **Open editor** to work with files in a browser-based code editor. Each opens in a new window. If nothing appears, allow pop-ups for the dashboard and try again.
+  </Step>
+</Steps>
+
+Members with view access get a view-only screen and can't open the editor or start the desktop. Click **Stop desktop** when you're done; the workload keeps running.
+
+<Warning>
+Screen and editor links carry temporary credentials. Don't paste them into chats or tickets.
+</Warning>
+
+## Inspect a VM
+
+Each computer has tabs for looking at it from different angles:
+
+| Tab | Use it to |
+| --- | --- |
+| **Files** | Browse the file system and read output files. |
+| **Processes** | See what's running, including your workload. |
+| **Activity** | Follow the VM's state changes, such as when it paused, resumed, or stopped. |
+| **Domains** | Check the custom domains pointed at the VM and their certificate status. |
+| **Tokens** | See and revoke preview tokens and other credentials for this VM. Create a five-minute preview token. |
+| **Settings** | Rename the computer and publish or unpublish ports. |
+
+Members with view access don't see **Tokens** or **Settings**.
+
+## Control the desktop from the API
+
+You can start and stop the desktop, and check on it, through the API too. Check its status:
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/desktop/status" \
+  -H "Authorization: Bearer $FINAL_API_KEY" | jq '{state, error}'
+```
+
+```json
+{ "state": "running", "error": null }
+```
+
+The state is one of `stopped`, `starting`, `running`, `paused`, `stopping`, or `error`. When it's `error`, the `error` field says what went wrong.
+
+Start or stop it with `POST /sandboxes/{id}/desktop/start` and `POST /sandboxes/{id}/desktop/stop`. Stopping the desktop doesn't stop the VM or its workload.
+
+Lifecycle history is also available as `GET /sandboxes/{id}/events`, which returns the same changes as the **Activity** tab, newest first, for the last 30 days.

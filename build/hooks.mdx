@@ -1,0 +1,88 @@
+---
+title: "Lifecycle hooks"
+sidebarTitle: "Hooks"
+description: "Run your own code when a session starts, a turn ends, or a tool finishes."
+---
+
+A hook runs your code when something happens in a session: a turn ends, a tool call completes, a decision is created. Hooks watch the session without changing what the agent does, which makes them the right place for audit logs, metrics, and notifications.
+
+## Add a hook
+
+Add a file to `agent/hooks/` that default-exports `defineHook(...)`. Each key in `events` is an event name, and its function runs every time that event happens:
+
+```ts agent/hooks/audit.ts
+import { defineHook } from '@finalai/agents/hooks';
+
+export default defineHook({
+  events: {
+    async 'turn.ended'(event, ctx) {
+      await fetch('https://audit.example.com/agent-events', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          eventId: event.meta.id,
+          session: ctx.session.id,
+          stopReason: event.data.stopReason,
+        }),
+      });
+    },
+  },
+});
+```
+
+`event.meta.id` is unique to the event and stays the same if the hook is delivered more than once. Send it along so the receiving system can drop duplicates.
+
+## Tell people when something goes wrong
+
+Hooks can post to the session's conversation with `ctx.final.post`. This one lets people know when a turn fails, instead of leaving them waiting:
+
+```ts agent/hooks/notify-errors.ts
+import { defineHook } from '@finalai/agents/hooks';
+
+export default defineHook({
+  events: {
+    async 'turn.ended'(event, ctx) {
+      if (event.data.stopReason === 'error') {
+        await ctx.final.post({ text: 'Something went wrong on my side. I have logged it.' });
+      }
+    },
+  },
+});
+```
+
+## React to a specific tool's result
+
+`toolResultFrom` reads the typed result of one of your tools from a `tool_call_update` event. It returns `undefined` for other tools, calls still in progress, and failed calls:
+
+```ts agent/hooks/release-metrics.ts
+import { defineHook } from '@finalai/agents/hooks';
+import { toolResultFrom } from '@finalai/agents/tools';
+import releaseStatus from '../tools/release_status.js';
+
+export default defineHook({
+  events: {
+    async tool_call_update(event) {
+      const status = toolResultFrom(event, releaseStatus);
+      if (status && !status.ciPassing) {
+        console.log('release blocked by CI', { version: status.version });
+      }
+    },
+  },
+});
+```
+
+This imports the `release_status` tool from [tools](/build/tools#write-a-tool), so `status` has that tool's output type.
+
+## Events you can handle
+
+| Event | When it fires |
+| --- | --- |
+| `session.opened` | A session starts. |
+| `turn.started`, `turn.ended` | A turn begins or ends. `turn.ended` includes the `stopReason`. |
+| `tool_call`, `tool_call_update` | The agent calls a tool, and the call's status or result changes. |
+| `decision.created`, `decision.resolved` | A [decision](/client/sessions#handle-approvals) is created or answered. |
+| `agent_message`, `agent_message_chunk` | The agent writes text. |
+| `session.failed`, `session.closed` | The session fails or closes. |
+| `*` | Every event. |
+
+Hooks can't stop or change a tool call, so use [approvals](/build/tools#ask-before-a-tool-runs) to require a person's OK. A hook can cancel the running turn with `ctx.cancel()`. Hooks run on Final like tools do, so they can use `fetch` and [`ctx.secrets`](/operate/authentication#use-secrets-in-your-code). Log IDs and outcomes, never secret values.

@@ -1,0 +1,147 @@
+---
+title: "Sandboxes and working files"
+sidebarTitle: "Sandboxes"
+description: "Give your agent a cloud computer with a shell and files, so it can run code and edit repositories."
+---
+
+A sandbox is a cloud computer your agent works on. With one, the agent can run shell commands, read and write files, and run your tests, the way a developer would in a terminal. Reach for a sandbox when the agent has to do real work on code or data, not only call APIs.
+
+## Give the agent a computer
+
+Export a computer from `agent/sandbox.ts`:
+
+```ts agent/sandbox.ts
+import { computer as finalComputer } from '@finalai/agents/sandboxes';
+
+export const computer = finalComputer({ workspace: 'session' });
+```
+
+Then bind the agent's built-in shell and file tools to it in `agent.ts`. They're off until you do:
+
+```ts agent/agent.ts
+import { baseTools, credentials, defineAgent } from '@finalai/agents';
+import { serverlessFinal } from '@finalai/agents/harnesses';
+import { computer } from './sandbox.js';
+
+export default defineAgent({
+  name: 'Test Runner',
+  description: 'Runs the test suite and explains failures.',
+  tools: baseTools({ shell: computer, files: computer }),
+  harness: serverlessFinal({
+    credentials: credentials.chain({
+      payer: 'organization',
+      tryInOrder: [credentials.platform()],
+    }),
+    permissionMode: 'ask',
+  }),
+});
+```
+
+The computer starts the first time the agent uses it. From then on, the agent can run commands like `npm test` and edit files with its built-in tools. `npx final-agents build` shows this as `base tools: shell → computer, files → computer`.
+
+## Ask before commands run
+
+`permissionMode` on the harness controls the built-in shell and file tools:
+
+| Mode | What happens |
+| --- | --- |
+| `ask` | The agent asks before running a command or changing a file. Reading is allowed. |
+| `auto` | Commands and edits run without asking. Use this once you trust the agent's setup. |
+| `readonly` | Commands and edits are refused. The agent can only read. |
+
+When the agent asks, the turn pauses until a person answers in your app. See [handle approvals](/client/sessions#handle-approvals).
+
+For finer control, `toolPolicy` in `agent.ts` overrides the mode for one capability. With `permissionMode: 'auto'`, this agent runs commands freely but still asks before it changes a file:
+
+```ts agent/agent.ts
+toolPolicy: { 'files.write': 'ask' },
+```
+
+A common pattern is to keep `ask` for the built-in shell and give the agent a dedicated tool for the commands it runs often, like the `run_tests` tool [below](#use-the-sandbox-from-a-tool). Your own tools run without asking unless you give them an [approval policy](/build/tools#ask-before-a-tool-runs).
+
+## Choose how long files last
+
+The `workspace` option decides how long the computer's disk lives:
+
+| Workspace | The disk lasts | Good for |
+| --- | --- | --- |
+| `ephemeral` | Until the computer is released. This is the default. | One-off commands with nothing to keep. |
+| `session` | As long as the session. | A task that spans several messages, like fixing a bug. |
+| `conversation` | As long as the conversation. Every agent in it shares the disk. | A team chat where several agents work on the same files. |
+
+Files never carry over between sessions in `session` mode. To start every session from the same prepared state, use a [setup guide](#use-a-saved-setup-guide).
+
+## Use the sandbox from a tool
+
+Your own tools can use the same computer through `ctx.getSandbox()`, passing the name of the export from `sandbox.ts`. This tool runs the test suite and returns a short summary instead of the full log:
+
+```ts agent/tools/run_tests.ts
+import { defineTool } from '@finalai/agents';
+import { z } from 'zod';
+
+export default defineTool({
+  description: 'Run the test suite and report whether it passed.',
+  inputSchema: z.object({ filter: z.string().optional().describe('Only run matching tests') }),
+  async execute({ filter }, ctx) {
+    const sandbox = await ctx.getSandbox('computer');
+    const result = await sandbox.run({
+      command: 'npm',
+      args: filter ? ['test', '--', filter] : ['test'],
+      timeoutMs: 10 * 60_000,
+      abortSignal: ctx.abortSignal,
+    });
+    return {
+      passed: result.exitCode === 0,
+      output: result.stdout.slice(-4000) + result.stderr.slice(-2000),
+    };
+  },
+});
+```
+
+The sandbox also has `readTextFile`, `writeTextFile`, `readDir`, `stat`, `removePath`, and `spawn` for long-running processes.
+
+## Use a saved setup guide
+
+A setup guide is a saved recipe for a computer: a base image plus setup steps, prepared ahead of time so sessions start quickly with your tools installed. Create one under **Developer** > **Computer Setup Guides** in the dashboard. When it shows **Ready**, click **Use in agent** to copy its configuration, or reference it by slug:
+
+```ts agent/sandbox.ts
+import { computerSetupGuide } from '@finalai/agents/sandboxes';
+
+export const computer = computerSetupGuide({
+  ref: 'acme-web-dev',
+  version: 'latest',
+  workspace: 'session',
+});
+```
+
+`ref` is the guide's slug in Final, not a local path. `version` can be a version number to pin the guide, or `'latest'`. Options you pass here override the guide's saved defaults.
+
+## Computer options
+
+`computer()` and `computerSetupGuide()` both accept these options:
+
+<ParamField path="workspace" type="'ephemeral' | 'session' | 'conversation'" default="'ephemeral'">
+  How long the disk lasts. See [choose how long files last](#choose-how-long-files-last).
+</ParamField>
+
+<ParamField path="repositories" type="{ alias, repository, ref? }[]">
+  Repositories to check out on the computer, such as `{ alias: 'web', repository: 'acme/web', ref: 'main' }`.
+</ParamField>
+
+<ParamField path="variables" type="string[]">
+  Names of secrets to set as environment variables when the computer starts, such as `NPM_TOKEN`.
+</ParamField>
+
+<ParamField path="env" type="Record<string, string>">
+  Plain environment variables. Use `variables` for anything secret.
+</ParamField>
+
+<ParamField path="networkPolicy" type="'allow-all' | 'deny-all' | { mode: 'allowlist', allow }">
+  Which hosts the computer can reach.
+</ParamField>
+
+<ParamField path="image" type="string">
+  `computer()` only. A container image to start from instead of your organization's default guide.
+</ParamField>
+
+To create, snapshot, or manage VMs directly from your own code, see [Final VMs](/vm-platform/overview).

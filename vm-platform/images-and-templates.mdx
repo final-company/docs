@@ -1,0 +1,194 @@
+---
+title: "Images and templates"
+description: "Start VMs from the default image, your own container image, a template with your service already running, or a snapshot."
+icon: "layer-group"
+---
+
+Every VM starts from something: an image that supplies its files and installed software, a template that's already booted with your service running, or a snapshot of another VM. This page helps you pick one and shows how to set up each.
+
+The examples use the `FINAL_API_KEY` and `FINAL_VM_API_URL` variables from the [quickstart](/vm-platform/quickstart).
+
+## Choose a starting point
+
+| Start from | What it is | Reach for it when |
+| --- | --- | --- |
+| **Default image** | Ubuntu 24.04 with Git, curl, build tools, Python 3, Node.js, uv, the GitHub CLI, ripgrep, and jq. | You're getting started, or your project only needs common tools. Leave out `source`. |
+| **Your image** | Any Linux container image, such as `python:3.13-slim` or one from your own registry. | You need a specific toolchain or want the same environment you use in Docker. |
+| **Template** | An image plus a start command. Final boots it once, waits until it's ready, and saves it. | Many VMs need the same service running, and you don't want each one to wait through startup. |
+| **Snapshot** | A saved copy of a specific VM's disk and memory. | You want to continue from one VM's exact state, such as a workspace after a long install. See [save a snapshot](/vm-platform/lifecycle-and-snapshots#save-a-snapshot). |
+
+In short: images are for **what software** a VM has, templates are for **starting fast** with a known setup, and snapshots are for **resuming a particular VM's state**.
+
+In the default image, commands run as `user` in `/home/user/workspace`, and `user` can run `sudo` without a password.
+
+## Use your own image
+
+Import an image by its reference. Final pulls it and converts it to a VM disk:
+
+```bash
+export IMAGE_ID=$(curl -sS "$FINAL_VM_API_URL/images" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"reference": "docker.io/library/python:3.13-slim"}' | jq -r '.id')
+```
+
+Conversion takes a little while for large images. Check its state until it's `ready`:
+
+```bash
+curl -sS "$FINAL_VM_API_URL/images/$IMAGE_ID" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  | jq '{id, reference, state, has_shell, default_user, error_code}'
+```
+
+```json
+{
+  "id": "img_5Tg7hJ2kL9mN4pQ8rS3vW6",
+  "reference": "docker.io/library/python:3.13-slim",
+  "state": "ready",
+  "has_shell": true,
+  "default_user": null,
+  "error_code": null
+}
+```
+
+The state goes from `pending` to `converting` to `ready`, or to `failed` with an `error_code`. `has_shell` tells you whether a `/bin/sh` workload will work, and `default_user` is the user commands run as when you don't set one.
+
+Then create a VM from it:
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"source\": {\"kind\": \"image\", \"image_id\": \"$IMAGE_ID\"}, \"labels\": {\"name\": \"python-scratch\"}}" \
+  | jq '.sandbox | {id, state}'
+```
+
+The VM runs the image's own entrypoint and command, the same way `docker run` does. Add a [workload](/vm-platform/workloads) to run something else.
+
+<Tip>
+Images must include a `linux/amd64` build. To make sure every VM gets exactly the same software, import a reference pinned to a digest, like `python:3.13-slim@sha256:...`. A tag such as `3.13-slim` can point to a different build later.
+</Tip>
+
+### Pull from a private registry
+
+Save the registry's credentials once, then refer to them when you import an image:
+
+```bash
+export CREDENTIAL_ID=$(curl -sS "$FINAL_VM_API_URL/registry-credentials" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\": \"acme-ghcr\", \"registry_host\": \"ghcr.io\", \"kind\": \"ghcr\", \"secret\": \"$GHCR_TOKEN\"}" \
+  | jq -r '.id')
+
+curl -sS "$FINAL_VM_API_URL/images" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"reference\": \"ghcr.io/acme/acme-web:1.2.0\", \"registry_credential_id\": \"$CREDENTIAL_ID\"}" \
+  | jq '{id, state}'
+```
+
+| `kind` | Registry | `secret` |
+| --- | --- | --- |
+| `ghcr` | GitHub Container Registry | A personal access token with `read:packages`. |
+| `gcp_sa` | Google Artifact Registry or Container Registry | A service account's JSON key. |
+| `basic` | Any registry with username and password sign-in | `username:password` |
+
+Final stores the secret encrypted and never returns it.
+
+## Prepare a template
+
+A template saves a VM after its service has started, so new VMs skip the slow part. Here's a template that starts a Python web server and waits until it answers:
+
+```json web-template.json
+{
+  "name": "python-web",
+  "image_id": "img_5Tg7hJ2kL9mN4pQ8rS3vW6",
+  "start_cmd": "mkdir -p /tmp/site && cd /tmp/site && echo ok > index.html && python3 -m http.server 8000 --bind 0.0.0.0",
+  "ready_cmd": "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')\"",
+  "vcpu": 2,
+  "memory_mb": 2048
+}
+```
+
+<ParamField body="name" type="string" required>
+  Lowercase letters, digits, `.`, `_`, and `-`, up to 63 characters. Must be unique in the project.
+</ParamField>
+<ParamField body="image_id" type="string" required>
+  A `ready` image to build from.
+</ParamField>
+<ParamField body="start_cmd" type="string">
+  Shell command that starts your service. It runs in the background.
+</ParamField>
+<ParamField body="ready_cmd" type="string">
+  Shell command Final runs repeatedly until it exits with `0`, for up to 10 minutes. Without one, Final waits 20 seconds after starting.
+</ParamField>
+<ParamField body="warmup_cmd" type="string">
+  Optional command run once after the service is ready, such as a first request that loads caches. VMs created from the template start faster on whatever it touches.
+</ParamField>
+<ParamField body="vcpu" type="integer" default="2">
+  vCPUs for the build and for every VM created from the template. 1 to 64.
+</ParamField>
+<ParamField body="memory_mb" type="integer" default="2048">
+  Memory in MiB, 256 to 262144.
+</ParamField>
+<ParamField body="tools" type="string[]">
+  Platform tools to run, such as `["docker"]`. They're running in every VM created from the template.
+</ParamField>
+
+<Steps>
+  <Step title="Create the template">
+    ```bash
+    export TEMPLATE_ID=$(curl -sS "$FINAL_VM_API_URL/templates" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d @web-template.json | jq -r '.id')
+    ```
+  </Step>
+  <Step title="Build it">
+    Building boots a VM from the image, runs `start_cmd`, waits for `ready_cmd` to pass, and saves the result:
+
+    ```bash
+    curl -sS -X POST "$FINAL_VM_API_URL/templates/$TEMPLATE_ID/build" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq '{id, state}'
+    ```
+
+    Check the template until its `state` is `ready`. It goes from `pending` to `building` to `ready`, or to `failed`.
+
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/templates/$TEMPLATE_ID" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq '{name, state}'
+    ```
+  </Step>
+  <Step title="Create VMs from it">
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/sandboxes" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{\"source\": {\"kind\": \"template\", \"template_id\": \"$TEMPLATE_ID\"}, \"labels\": {\"name\": \"python-web-1\"}}" \
+      | jq '.sandbox | {id, state}'
+    ```
+
+    The new VM starts with the server already running on port 8000.
+  </Step>
+</Steps>
+
+Keep these in mind when you design a template:
+
+- `env` from a create request doesn't reach `start_cmd`, because the service started during the build. Have the service read settings it needs at request time, or bake them into the image.
+- A template can't include volumes. Attach them to each VM after you create it.
+- Templates can't be edited. To change one, create a new template and delete the old one.
+
+## Clean up
+
+Delete images with `DELETE /images/{id}` and templates with `DELETE /templates/{id}`. An image that a template or VM still uses returns `image_in_use`. List what you have with `GET /images` and `GET /templates`, optionally filtered with `?project_id=`.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Run workloads" icon="terminal" href="/vm-platform/workloads">
+    Override an image's command and add health checks.
+  </Card>
+  <Card title="Snapshots" icon="camera" href="/vm-platform/lifecycle-and-snapshots#save-a-snapshot">
+    Save one VM's exact state and start new VMs from it.
+  </Card>
+</Columns>

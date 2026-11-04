@@ -1,0 +1,154 @@
+---
+title: "Tools and approvals"
+description: "Write functions your agent can call, and choose which ones need a person's OK first."
+---
+
+A tool is a TypeScript function the agent can call, like "read the release status" or "publish the release." The model decides when to call it based on its description, and Final runs it and hands the result back. Write a tool when the agent needs live data or needs to take an action in your systems.
+
+## Write a tool
+
+Add a file to `agent/tools/` that default-exports `defineTool(...)`. The file name becomes the tool's name, so this file defines `release_status`:
+
+```ts agent/tools/release_status.ts
+import { defineTool } from '@finalai/agents';
+import { z } from 'zod';
+
+const releaseStatus = z.object({
+  version: z.string(),
+  ciPassing: z.boolean(),
+  changelogUpdated: z.boolean(),
+  signedOffBy: z.string().nullable(),
+});
+
+export default defineTool({
+  description: 'Get the CI, changelog, and sign-off status of a release.',
+  inputSchema: z.object({ version: z.string().describe('Semantic version, like 1.2.0') }),
+  outputSchema: releaseStatus,
+  annotations: { readOnlyHint: true },
+  async execute({ version }, ctx) {
+    const token = await ctx.secrets.get('release-service-token');
+    if (!token) throw new Error('The release-service-token secret is not set');
+
+    const response = await fetch(`https://releases.example.com/api/releases/${version}`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: ctx.abortSignal,
+    });
+    if (!response.ok) throw new Error(`Release service returned ${response.status}`);
+    return releaseStatus.parse(await response.json());
+  },
+});
+```
+
+A few things are happening here:
+
+- **`description` and `inputSchema`** are what the model reads to decide when to call the tool and what to pass. Write them for the model: say what the tool returns, and describe each argument.
+- **`outputSchema`** checks the result before it goes back to the agent.
+- **`ctx.secrets.get()`** reads a value you've stored in Final, so the token never appears in your source. Add the name to `secrets` in `agent.ts` and set its value under **Developer** > **Secrets** in the dashboard. See [secrets](/operate/authentication#use-secrets-in-your-code).
+- **`ctx.abortSignal`** fires when someone cancels the turn. Pass it to `fetch` so the request stops too.
+- **Throwing an error** tells the agent the call failed, with your message. It can then retry, try something else, or explain the problem.
+
+## Ask before a tool runs
+
+Tools run without asking by default. For a tool that changes something, like publishing a release or sending an email, set `approval` so a person confirms each call first:
+
+```ts agent/tools/publish_release.ts
+import { defineTool } from '@finalai/agents';
+import { always } from '@finalai/agents/approval';
+import { z } from 'zod';
+
+export default defineTool({
+  description: 'Publish a release to production.',
+  inputSchema: z.object({ version: z.string() }),
+  approval: always(),
+  async execute({ version }, ctx) {
+    const token = await ctx.secrets.get('release-service-token');
+    if (!token) throw new Error('The release-service-token secret is not set');
+
+    const response = await fetch(`https://releases.example.com/api/releases/${version}/publish`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+      signal: ctx.abortSignal,
+    });
+    if (!response.ok) throw new Error(`Publish failed with ${response.status}`);
+    return { published: version };
+  },
+});
+```
+
+When the agent calls this tool, the turn pauses and Final creates a **decision** asking whether to allow it. The tool runs only after someone approves. Your app is responsible for showing that request and sending the answer; see [handle approvals](/client/sessions#handle-approvals).
+
+Import the policy from `@finalai/agents/approval`:
+
+| Policy | When it asks |
+| --- | --- |
+| `never()` | Never. The tool runs right away. This is the default. |
+| `always()` | Before every call. |
+| `whenInput(predicate)` | When `predicate` returns `true` for the call's input. |
+
+`whenInput` is useful when only some calls are risky. This one asks only for production deploys:
+
+```ts
+import { whenInput } from '@finalai/agents/approval';
+
+const approval = whenInput<{ environment: 'staging' | 'production' }>(
+  (input) => input.environment === 'production',
+);
+```
+
+## Shape what the model sees
+
+A tool can return a plain value, a promise, or an async iterable. With an async iterable, each `yield` reports progress and the last value is the result.
+
+If the result is large, add `toModelOutput` to send the model a shorter version. Your app and [hooks](/build/hooks) still get the full result:
+
+```ts
+toModelOutput: (status) =>
+  `${status.version}: CI ${status.ciPassing ? 'passing' : 'failing'}, ` +
+  `signed off by ${status.signedOffBy ?? 'nobody yet'}`,
+```
+
+## Tool reference
+
+<ParamField path="description" type="string" required>
+  What the tool does and returns, written for the model.
+</ParamField>
+
+<ParamField path="inputSchema" type="Zod schema | JSON Schema" required>
+  The arguments. Any Standard Schema library works, such as Zod, Valibot, or ArkType.
+</ParamField>
+
+<ParamField path="execute" type="(input, ctx) => result" required>
+  Runs the tool. Returns a value, a promise, or an async iterable whose last value is the result.
+</ParamField>
+
+<ParamField path="outputSchema" type="Zod schema | JSON Schema">
+  Checks the result before it's returned.
+</ParamField>
+
+<ParamField path="approval" type="never() | always() | whenInput(fn)" default="never()">
+  When to ask a person before the tool runs.
+</ParamField>
+
+<ParamField path="annotations" type="object">
+  MCP hints about the tool: `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint`. Set `readOnlyHint: true` on tools that only read, so they still work when the agent runs with `permissionMode: 'readonly'`.
+</ParamField>
+
+<ParamField path="label" type="string | { start, delta?, complete? }">
+  A short title for the tool call in chat UIs. Functions let the label change as the call progresses, like `Checking 1.2.0...` then `Checked 1.2.0`.
+</ParamField>
+
+<ParamField path="toModelOutput" type="(output) => JSON value">
+  Replaces what the model sees with a shorter version of the result.
+</ParamField>
+
+The `ctx` argument gives your tool its surroundings:
+
+| Field | What it is |
+| --- | --- |
+| `ctx.secrets.get(name)` | Reads a [secret](/operate/authentication#use-secrets-in-your-code). Returns `null` if it isn't set. |
+| `ctx.abortSignal` | Fires when the turn is cancelled. |
+| `ctx.session` | The session, agent, revision, conversation, and who sent the current message. |
+| `ctx.messages` | The session's transcript so far. |
+| `ctx.getSandbox(name?)` | Opens the agent's [sandbox](/build/sandboxes#use-the-sandbox-from-a-tool) to read files or run commands. |
+| `ctx.final.post({ text })` | Posts a message to the session's conversation. |
+| `ctx.callId` | This call's ID, which matches the `toolCallId` in the session's events. |

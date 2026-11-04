@@ -1,0 +1,98 @@
+---
+title: "Troubleshooting"
+description: "Fix common problems with building, publishing, and running agents."
+---
+
+Find the symptom that matches what you're seeing. Each entry explains the cause, then the fix.
+
+## Building
+
+<AccordionGroup>
+  <Accordion title="The build says it needs a newer version of Node.js">
+    The compiler needs Node.js 26 or later. Run `node --version`, upgrade if needed, and run the build again.
+  </Accordion>
+  <Accordion title="A tool, connection, or schedule doesn't show up in the build summary">
+    The compiler finds files by location, and only reads files directly inside `tools/`, `connections/`, `schedules/`, and `channels/`. Check that the file is in the right folder, ends in `.ts`, and default-exports its definition. See [project structure](/build/project-structure).
+  </Accordion>
+  <Accordion title="The build rejects memory/, subagents/, or extensions/">
+    These folders aren't supported yet. Use [instructions and skills](/build/instructions-and-skills) for knowledge, [sandbox files](/build/sandboxes) for working state, and ordinary modules for shared code.
+  </Accordion>
+  <Accordion title="The build says compatibility wasn't checked">
+    Without an API key, the build can't ask Final which harness features your organization has. Set `FINAL_API_KEY` and build again.
+  </Accordion>
+</AccordionGroup>
+
+## Publishing
+
+<AccordionGroup>
+  <Accordion title="Publish says the directory isn't inside a Git checkout">
+    The CLI uses Git to decide which files to upload. Run `git init` in your project, or publish from inside an existing repository.
+  </Accordion>
+  <Accordion title="Publish can't find the agent">
+    The agent hasn't been registered, or `--agent` has a typo. [Register it](/quickstart#register-the-agent) once, then pass its slug or ID to `--agent`. Check that your API key belongs to the same project.
+  </Accordion>
+  <Accordion title="Publish fails with a symlink or UTF-8 error">
+    The agent directory can only contain text files, and no symlinks. Move binary files and symlinked folders out of it.
+  </Accordion>
+  <Accordion title="My changes aren't in the published agent">
+    For an agent backed by GitHub, publishing reads from GitHub, not your local files. Push your changes first, then publish with `--ref`. See [agents backed by GitHub](/operate/publishing#agents-backed-by-github).
+  </Accordion>
+</AccordionGroup>
+
+## Running sessions
+
+<AccordionGroup>
+  <Accordion title="The session fails to start with a model or credentials error">
+    The harness couldn't get model access with the agent's credential chain. Check the `model` name and each source in `tryInOrder`, and make sure your organization has the provider key or subscription the chain asks for. Adding `credentials.platform()` as the last source gives the chain a fallback. See [model credentials](/build/configuration#model-credentials).
+  </Accordion>
+  <Accordion title="A turn seems stuck">
+    The agent is most likely waiting for an approval. List the open decisions and answer them, or cancel the turn:
+
+    ```ts
+    const session = client.sessions.attach(sessionId);
+    console.log(await session.decisions());
+    ```
+
+    See [handle approvals](/client/sessions#handle-approvals).
+  </Accordion>
+  <Accordion title="The turn finished, but the reply is empty">
+    Check `stopReason` on the result. `cancelled` means someone stopped the turn, and `error` means it failed. An agent can also finish a turn with tool calls and no text.
+  </Accordion>
+  <Accordion title="ctx.secrets.get() returns null">
+    The secret is either not declared or not set. Add its name to `secrets` in `agent.ts`, publish, and create the value under **Developer** > **Secrets**. See [secrets](/operate/authentication#use-secrets-in-your-code).
+  </Accordion>
+  <Accordion title="A tool or the shell is refused without asking">
+    The agent runs with `permissionMode: 'readonly'`, which refuses changes. Read-only tools still work if they set `annotations: { readOnlyHint: true }`. Switch to `ask` to approve changes one at a time.
+  </Accordion>
+</AccordionGroup>
+
+## Channels and schedules
+
+<AccordionGroup>
+  <Accordion title="My local webhook returns 202, but the agent never replies">
+    `final-agents dev` only runs your route code. It logs what the agent would receive, but doesn't start the agent. Publish, then send the event to the route's public URL.
+  </Accordion>
+  <Accordion title="A published webhook fails with 'attached to no conversation'">
+    The route uses `target: { kind: 'bound-conversation' }`, but the channel isn't attached to a conversation yet. [Attach one](/build/channels#connect-it-to-a-conversation), or use `owner-direct`.
+  </Accordion>
+  <Accordion title="A schedule doesn't run">
+    Schedules only run for the published revision. Publish, then check `nextRunAt` with `client.schedules.list({ agent })`. Use `runNow` to test it right away. See [schedules](/build/schedules#run-a-schedule-now).
+  </Accordion>
+</AccordionGroup>
+
+## Read client errors
+
+SDK calls throw typed errors. `isClientError` tells you the HTTP status and an error code you can act on:
+
+```ts
+import { isClientError } from '@finalai/agents/client';
+
+try {
+  await client.sessions.create({ agent: 'release-assistant', message: 'Is 1.2.0 ready?' });
+} catch (error) {
+  if (!isClientError(error)) throw error;
+  console.error(error.status, error.code, error.message);
+}
+```
+
+Two other guards cover common failures. `isDecisionError` means a decision was already answered, expired, or isn't addressed to you, and its `reason` says which. `isTurnRejectedError` means the session isn't accepting messages right now.

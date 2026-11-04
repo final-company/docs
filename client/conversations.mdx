@@ -1,0 +1,114 @@
+---
+title: "Conversations"
+description: "Use chats that Final stores, with history, read state, and several people and agents in one room."
+---
+
+A conversation is a chat that Final stores for you. People and agents are its participants, every message is kept in order, and Final delivers each message to the right agent. Use conversations when you want a persistent chat without building your own message storage, or when several people or agents share one room.
+
+| | [Sessions](/client/sessions) | Conversations |
+| --- | --- | --- |
+| What it is | A direct line to one agent | A chat room with people and agents |
+| History | Kept per session | Kept as messages, with read state and threads |
+| Who's in it | You and the agent | Any number of people and agents |
+| Good for | Tasks, your own chat UI with your own storage | Shared, long-lived chats |
+
+Under the hood, each agent in a conversation works in its own session. When you send a message, Final routes it to the right agents, and each one replies in a turn of its session.
+
+## Send a message
+
+`conversations.direct` opens your one-to-one chat with an agent, creating it the first time. `send` posts a message and returns its **deliveries**: one per agent the message was routed to, with the session and turn that's handling it. Use them to wait for the reply:
+
+```ts
+const chat = await client.conversations.direct({ agent: 'release-assistant' });
+const sent = await chat.send('What is blocking 1.2.0?');
+
+for (const delivery of sent.deliveries) {
+  if (!delivery.sessionId || !delivery.turnId) continue; // still queued
+  const turn = await client.sessions.attach(delivery.sessionId).response(delivery.turnId);
+  console.log((await turn.result()).text);
+}
+```
+
+A delivery without a `turnId` is queued, for example because the agent is still busy with an earlier message. Check again later with `chat.deliveries({ messageId: sent.messageId })`.
+
+Save `chat.conversation.id` to reopen the same chat later with `client.conversations.get(conversationId)`.
+
+## Show messages live
+
+For a chat UI, subscribe to the conversation's events. The agent's reply appears as a message that updates while it's being written, so you can render every message the same way:
+
+```ts
+import { AgentRealtimeKind } from '@finalai/agents/client';
+
+for await (const event of chat.events()) {
+  if (
+    event.kind === AgentRealtimeKind.MessageCreated ||
+    event.kind === AgentRealtimeKind.MessageUpdated
+  ) {
+    const { id, author, body, streaming } = event.message;
+    render({ id, author: author.displayName, text: body, typing: streaming !== null });
+  }
+}
+```
+
+`render` stands in for your UI. Key messages by `id`, because the same message arrives again each time it changes. `streaming` is set while the agent is still writing.
+
+## Load history and mark it read
+
+`messages` returns a page of history. Each message has a `seq`, its position in the conversation. Mark everything up to a message as read by passing its `seq`:
+
+```ts
+const page = await chat.messages({ limit: 50 });
+for (const message of page.messages) {
+  console.log(`${message.author.displayName}: ${message.body}`);
+}
+
+const last = page.messages.at(-1);
+if (last) await chat.markRead({ throughSeq: last.seq });
+```
+
+## Create a group conversation
+
+A group conversation can have several people and agents. Each agent's **routing mode** decides which messages it answers:
+
+| Routing mode | The agent... |
+| --- | --- |
+| `default` | Replies to messages by default. |
+| `all` | Reads every message in the room. |
+| `mention` | Replies only when someone mentions it. |
+
+This room has a person and the release assistant, then adds a reviewer agent that speaks only when asked:
+
+```ts
+const room = await client.conversations.create({
+  kind: 'group',
+  title: 'Release 1.2.0',
+  participants: [
+    { user: userId },
+    { agent: 'release-assistant', routingMode: 'default' },
+  ],
+});
+
+const reviewer = await room.addParticipant({ agent: 'release-reviewer', routingMode: 'mention' });
+await room.send('Review the release checklist, please.', { mentions: [reviewer.id] });
+```
+
+User IDs come from `client.people.all()`, which lists your organization's members. Agents must be published before you add them. To mention someone, pass their participant ID, which `addParticipant` and `room.participants()` return.
+
+## Post an event from another system
+
+`postEvent` tells the conversation's default agent that something happened outside the chat, like a finished build. The agent receives it as input and replies in the conversation, with the source shown as the reply's caption:
+
+```ts
+await room.postEvent({
+  source: { id: 'release-build', name: 'Release build' },
+  eventId: `build-${buildId}:completed`,
+  text: 'The release build for 1.2.0 completed. All 214 tests passed.',
+});
+```
+
+Final accepts each `eventId` from a source once, so retrying a failed request never notifies the agent twice. To receive events from systems you don't control, like GitHub webhooks, use a [channel](/build/channels).
+
+## Approvals and stopping work
+
+Agents in conversations ask for approval the same way they do in sessions. Answer with `room.respond({ decisionId, optionId })` or `room.respond({ decisionId, outcome })`; see [handle approvals](/client/sessions#handle-approvals). `room.cancel()` stops every agent's running turn in the conversation.

@@ -1,0 +1,8 @@
+<Prompt description="**Deploy this app with Final Cloud Apps.** Paste this into Claude Code, Codex, or Cursor from your app's repository.">
+Deploy this repository with Final Cloud Apps, following Final's Cloud Apps documentation for exact steps.
+Read the code and pick one app type: web for an HTTP server, service for a background worker, cron for a job that runs and exits, or function for a single JavaScript fetch handler. Ask me if it isn't clear.
+Write final-cloud.yaml, plus a Dockerfile for a web, service, or cron app, and run npx final-cloud validate until it passes.
+Create the app with npx final-cloud apps create, then commit and push to the Git remote it prints. If the push is rejected, tell me to hand the push and deploy to my agent in Final. Read FINAL_API_KEY from my environment and never write keys or secret values to files.
+Run npx final-cloud deploy. If it asks to confirm new access, such as a public URL, secrets, or a database, show me what changes and wait for my answer.
+When the deployment is healthy, prove it works: call the URL or run the job, and show me the logs. Tell me the app slug, the deployment ID, and how to ship the next change.
+</Prompt>

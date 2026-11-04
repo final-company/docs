@@ -1,0 +1,224 @@
+---
+title: "Cloud environments"
+description: "Give your agent a Final computer where your app runs, and make every new computer start the same way."
+icon: "box"
+---
+
+A cloud environment is a Final computer: a cloud machine with your repository checked out, your toolchain installed, and your app able to start. The agent runs commands there, so it can install packages, run tests, and open your app in a browser without touching your laptop.
+
+The goal is a computer you never set up by hand twice. You get there in two steps: a setup script in your repository, and, for Final agents, a setup guide that runs it on every new computer.
+
+## Create a computer
+
+Go to **Developer** > **Computers**, enter a name, and click **Create computer**. Once it's **Running**, you can work in it from the dashboard:
+
+| Action | What you get |
+| --- | --- |
+| **Open editor** | VS Code in your browser, with a terminal on the computer. |
+| **Start desktop**, then **Open screen** | A Linux desktop with a browser, for checking UI changes. |
+| **Files**, **Processes**, **Activity** tabs | The computer's files, running commands, and lifecycle history. |
+| **Settings** tab | The computer's name, preview port, stop timer, and **Allow internet access**. |
+
+New computers use the **Desktop (default)** image. If your stack needs heavy system dependencies, build a container image with them preinstalled, add it with **Import a container image**, and choose it under **Image for new computer**. See [images and templates](/vm-platform/images-and-templates) for more on images.
+
+## Write a setup script
+
+Put everything it takes to go from a fresh clone to passing tests in one script in your repository. It's the single source of truth for your environment: you run it on a computer you opened yourself, a setup guide runs it for Final agents, and new teammates can run it on their laptops.
+
+```bash scripts/setup.sh
+#!/usr/bin/env bash
+# Prepare a fresh checkout for development. Safe to run more than once.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# Dependencies, exactly as pinned in the lockfile.
+npm ci
+
+# Local config with development-only values.
+[ -f .env.local ] || cp .env.example .env.local
+
+# Development database with schema and test data.
+npm run db:migrate
+npm run db:seed
+```
+
+Keep it idempotent, so running it twice does no harm, and keep secrets out of it: copy development defaults from a committed `.env.example`, and have people supply real credentials themselves. Make it executable and commit it:
+
+```bash
+chmod +x scripts/setup.sh
+git add scripts/setup.sh && git commit -m "Add setup script"
+```
+
+When you work on a computer yourself, run `./scripts/setup.sh` after you clone, then run the tests to confirm the computer is ready. When a task turns up a missing dependency, fix the script, not the computer, so the next computer gets the fix too.
+
+## Prepare computers for a Final agent
+
+A Final agent gets a new computer for its work, so it needs to know how to prepare one. A **computer setup guide** tells it: the base image, the tools to install, the repositories to clone, the setup to run, and the services to start.
+
+Final builds the slow part, such as installing toolchains, ahead of time. When the agent starts a session, its computer is created from that prepared base, clones your repository, runs your setup, and starts your services before the agent runs its first command.
+
+### Add a guide to your agent's repository
+
+Keep the guide next to your agent's code so the two change together. Each guide is a directory under `.final/setup-guides/` in the agent directory, named by the guide's slug:
+
+<Tree>
+
+- agent/
+  - agent.ts
+  - instructions.md
+  - sandbox.ts
+  - .final/
+    - setup-guides/
+      - storefront/
+        - guide.json
+        - sandbox-template.yaml
+        - instructions.md
+
+</Tree>
+
+`guide.json` names the base image and the repositories to clone. Each repository is checked out at `/workspaces/<alias>`:
+
+```json agent/.final/setup-guides/storefront/guide.json
+{
+  "title": "Storefront development",
+  "image": "docker.io/library/node:22-bookworm",
+  "defaults": {
+    "repositories": [
+      { "alias": "storefront", "repository": "acme/storefront", "ref": "main" }
+    ]
+  }
+}
+```
+
+`sandbox-template.yaml` says what to run, and when:
+
+```yaml agent/.final/setup-guides/storefront/sandbox-template.yaml
+version: 2
+
+# Runs once, when Final builds the base. Install system tools here.
+build:
+  steps:
+    - run: |
+        apt-get update
+        apt-get install -y --no-install-recommends sqlite3
+  verify:
+    - run: node --version && sqlite3 --version
+
+# Runs once in each new workspace, after the repositories are cloned.
+workspace:
+  setup:
+    - cwd: storefront
+      whenMissing: fail
+      run: ./scripts/setup.sh
+
+# Starts every time the computer starts.
+services:
+  - name: web
+    cwd: storefront
+    whenMissing: fail
+    run: npm run dev -- --port 3000
+    ready:
+      url: http://localhost:3000/api/health
+
+# Named commands the agent can see and run.
+commands:
+  e2e:
+    cwd: storefront
+    whenMissing: fail
+    description: Run the browser tests against the dev server.
+    run: npm run test:e2e
+```
+
+Add an optional `instructions.md` with notes about the environment, such as test accounts or which service listens where. The dashboard shows it with the guide.
+
+When you publish the agent, Final publishes each guide that changed as a new version and builds it. Open **Developer** > **Computer Setup Guides** to follow the build: a version moves from **Queued** to **Building** to **Ready**. Then point the agent's sandbox at the guide:
+
+```ts agent/sandbox.ts
+import { computerSetupGuide } from '@finalai/agents/sandboxes';
+
+export const computer = computerSetupGuide({ ref: 'storefront', workspace: 'session' });
+```
+
+You can also pick the guide in the agent editor under **Sandboxes** > **Setup guide**, or copy this snippet with **Use in agent** on the guide's page. See [choose your agent](/ai-coding/agents) to connect it to a Final agent.
+
+<AccordionGroup>
+  <Accordion title="Template reference">
+    | Section | Runs | Notes |
+    | --- | --- | --- |
+    | `build.steps` | Once per base build | Toolchains and system packages. The whole build has a 30-minute timeout by default (`build.timeoutMinutes`). |
+    | `build.verify` | After `build.steps` | Checks that fail the build if they fail. |
+    | `workspace.setup` | Once per new workspace | Runs after repositories are cloned. `cwd` is `.` or a repository alias. |
+    | `services` | Every computer start | Long-running processes. `ready.url` must be on `localhost`; Final waits up to `timeoutSeconds` (default 90) for a response. |
+    | `commands` | When the agent runs them | Named scripts, listed to the agent with their `description`. |
+
+    Steps, services, and commands that use a repository alias as `cwd` must set `whenMissing` to `fail` or `skip`. Steps time out after `timeoutMinutes` (default 20). Set `required: false` on a step or service that may fail without stopping the computer.
+  </Accordion>
+  <Accordion title="Create a guide in the dashboard instead">
+    If your agent's source isn't in a repository you edit, create the guide in **Developer** > **Computer Setup Guides** with **New guide**. The source is JSON with the same template under `templateConfig`, and the repositories under `defaultParameters`:
+
+    ```json
+    {
+      "slug": "storefront",
+      "title": "Storefront development",
+      "image": "docker.io/library/node:22-bookworm",
+      "templateConfig": {
+        "version": 2,
+        "workspace": {
+          "setup": [{ "cwd": "storefront", "whenMissing": "fail", "run": "./scripts/setup.sh" }]
+        }
+      },
+      "defaultParameters": {
+        "repositories": [{ "alias": "storefront", "repository": "acme/storefront", "ref": "main" }]
+      }
+    }
+    ```
+
+    Click **Publish version**. Each publish creates a new version that can't be changed. Agents that use `version: 'latest'` pick it up for new sessions.
+  </Accordion>
+</AccordionGroup>
+
+## Choose what each session keeps
+
+A setup guide decides how a computer starts. The workspace setting decides how long its files last:
+
+| `workspace` | Agent editor label | Use it for |
+| --- | --- | --- |
+| `session` | **Kept for the session** | Most coding work. The checkout lasts as long as the agent's session. |
+| `conversation` | **Shared by the conversation** | Several agents in one chat working on the same checkout. |
+| `ephemeral` | **Discarded after use** | One-off jobs that should leave nothing behind. |
+
+For parallel tasks, give each task its own session, so each one gets its own computer, checkout, and database.
+
+## Preview your app
+
+The fastest way to check a UI change is the computer's own browser: click **Start desktop**, then **Open screen**, and open `http://localhost:3000`.
+
+To share a preview with someone else, open the computer's **Settings** tab, enter the port under **Preview port**, and click **Publish port**. A public port is reachable by anyone with its URL, so use it only with development data. To keep the port private, create a short-lived token for it on the **Tokens** tab instead. See [networking](/vm-platform/networking) for custom domains and access rules.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The setup guide version says Build failed">
+    A `build.steps` or `build.verify` command exited with an error. Run the same commands on a computer created from the guide's image to see the output, fix the template, and publish again. Final retries temporary failures on its own before it marks a build failed.
+  </Accordion>
+  <Accordion title="The agent's session fails with &quot;needs /workspaces/storefront, which is missing&quot;">
+    A step uses a repository alias as `cwd`, but no repository with that alias was cloned. Check that the alias in `guide.json` matches the `cwd` exactly, and that Final's GitHub App can reach the repository.
+  </Accordion>
+  <Accordion title="A service is not ready in time">
+    Final polls `ready.url` and gives up after `timeoutSeconds`. Make sure the service listens on the same port as the URL, and raise `timeoutSeconds` (up to 600) if your app is slow to boot.
+  </Accordion>
+  <Accordion title="Package installs fail with network errors">
+    Open the computer's **Settings** tab and check **Allow internet access**. Network allowlists and denylists still apply, so also check that your package registry is allowed.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Choose your agent" icon="robot" href="/ai-coding/agents">
+    Run Claude Code or Codex on the computer, or connect the guide to a Final agent.
+  </Card>
+  <Card title="Sandboxes in the Agent SDK" icon="code" href="/build/sandboxes">
+    All the ways a Final agent can use computers and working files.
+  </Card>
+</Columns>

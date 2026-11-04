@@ -1,0 +1,153 @@
+---
+title: "Cron jobs"
+description: "Run a command on a schedule or on demand, and let it exit when it's done."
+---
+
+Use a cron job for work that starts, finishes, and exits: a nightly cleanup, a weekly report, a data export, or a one-off backfill. Final starts a fresh container for each run, runs your command, and records whether it succeeded. Nothing runs between runs.
+
+If your code needs to keep running and wait for work, use a [service](/cloud-apps/services) instead.
+
+## Deploy a nightly cleanup
+
+This job deletes finished tasks older than 30 days from a `tasks` table in a Final [SQLite database](/cloud-apps/environment-and-data#databases), every night at 03:00 UTC. It pairs with the [task worker](/cloud-apps/services#deploy-a-task-worker), but any table works.
+
+<Steps>
+  <Step title="Set up the database">
+    If you built the task worker, you already have the `tasks` database and can skip this step.
+
+    Otherwise, in the [dashboard](https://console.final.ai), go to **Developer** > **Cloud**, click **New app or database**, and choose **Database**. Name it `tasks`, click **Create database**, and run this in its **Query** tab:
+
+    ```sql
+    CREATE TABLE tasks (
+      id INTEGER PRIMARY KEY,
+      kind TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
+  </Step>
+
+  <Step title="Write the script">
+    The script sends one SQL statement to the database, prints how many rows it removed, and exits with a non-zero code if anything goes wrong. That exit code is how Final knows the run failed.
+
+    ```js cleanup.mjs
+    const { TASKS_DB_URL, TASKS_DB_TOKEN } = process.env;
+
+    const response = await fetch(`${TASKS_DB_URL}/query`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TASKS_DB_TOKEN}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sql: "DELETE FROM tasks WHERE status = 'done' AND created_at < datetime('now', '-30 days')",
+        format: 'objects',
+      }),
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error(`cleanup failed: ${result.error}`);
+      process.exit(1);
+    }
+    console.log(`deleted ${result.changes} finished tasks`);
+    ```
+
+    `format: 'objects'` asks the database to include write details, such as `changes`, in the result.
+  </Step>
+
+  <Step title="Add a Dockerfile and manifest">
+    ```dockerfile Dockerfile
+    FROM node:26-alpine
+    WORKDIR /app
+    COPY cleanup.mjs .
+    ```
+
+    ```yaml final-cloud.yaml
+    name: nightly-cleanup
+    type: cron
+    build:
+      method: dockerfile
+    command: node cleanup.mjs
+    schedule: "0 3 * * *"   # every day at 03:00 UTC
+    timeoutSeconds: 600
+    retries: 2
+    size: small
+    databases:
+      - name: tasks
+    ```
+
+    `command` is what each run executes. `retries: 2` gives a failed run two more attempts, and `timeoutSeconds` stops a run that hangs.
+  </Step>
+
+  <Step title="Deploy">
+    ```bash
+    npx final-cloud validate
+    npx final-cloud apps create "Nightly cleanup"
+    git add . && git commit -m "Add nightly cleanup"
+    git remote add final https://<your-app-repository>.git   # printed by apps create
+    git push final HEAD:main
+    npx final-cloud deploy nightly-cleanup
+    ```
+
+    Confirm access to the `tasks` database on the first deploy. A healthy deployment means the job is built and scheduled. The first run happens at the next 03:00 UTC.
+  </Step>
+
+  <Step title="Run it now">
+    You don't have to wait for the schedule. Start a run by naming the app and the job, which is the manifest's `name`:
+
+    ```bash
+    npx final-cloud jobs run nightly-cleanup nightly-cleanup
+    ```
+
+    ```text
+    started nightly-cleanup: <job-run-id>
+    ```
+
+    The command returns as soon as the run starts. Read its output from the runtime logs:
+
+    ```bash
+    npx final-cloud logs nightly-cleanup --source runtime --limit 20
+    ```
+
+    You should see a line like `deleted 214 finished tasks`.
+  </Step>
+</Steps>
+
+## Write schedules
+
+`schedule` takes a standard five-field cron expression: minute, hour, day of month, month, and day of week. Every schedule runs in UTC.
+
+| Schedule | Runs |
+| --- | --- |
+| `"*/15 * * * *"` | Every 15 minutes |
+| `"0 3 * * *"` | Every day at 03:00 UTC |
+| `"0 9 * * 1"` | Every Monday at 09:00 UTC |
+| `"0 0 1 * *"` | At midnight UTC on the first of each month |
+
+Quote the expression in YAML, because a value that starts with `*` otherwise has a special meaning.
+
+For a job you only run by hand, such as a backfill, leave `schedule` out. The job deploys normally, and you start it with `jobs run`.
+
+## Retries, timeouts, and overlap
+
+Each attempt starts in a fresh container. When a run exits with a non-zero code, Final tries again up to `retries` times (0 by default, at most 10). A run that's still going after `timeoutSeconds` (3600 by default) is stopped and marked as timed out.
+
+Because a retry repeats the whole command, make the job safe to run twice. The cleanup above is: deleting rows that are already gone does nothing. For a job that sends something, like a report email, record what you've sent and skip it on the next attempt.
+
+`concurrencyPolicy` decides what happens when a run is due while the previous one is still going:
+
+| `concurrencyPolicy` | Behavior |
+| --- | --- |
+| `forbid` (default) | The new run doesn't start. The current run continues. |
+| `replace` | Final stops the current run and starts the new one. |
+| `allow` | Both runs go ahead at the same time. |
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Cron job fields" icon="file-code" href="/cloud-apps/manifest#cron-jobs">
+    Every cron field, with types and defaults.
+  </Card>
+  <Card title="Deployments and logs" icon="clock-rotate-left" href="/cloud-apps/deployments">
+    Read logs from earlier runs and follow deployments.
+  </Card>
+</Columns>

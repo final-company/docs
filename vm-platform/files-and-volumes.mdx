@@ -1,0 +1,195 @@
+---
+title: "Files and volumes"
+description: "Read files out of a VM, and keep data that outlives any one VM in a named volume."
+icon: "hard-drive"
+---
+
+Use the files API to read what a VM produced, like test output, build artifacts, or logs. It works whether the VM is running, paused, or stopped. When data needs to outlive a VM or move between VMs, such as a dependency cache, a dataset, or a workspace, keep it in a volume.
+
+The examples use the `FINAL_API_KEY`, `FINAL_VM_API_URL`, and `SANDBOX_ID` variables from the [quickstart](/vm-platform/quickstart).
+
+## Read a file
+
+```bash
+curl -sS --get "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/files" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  --data-urlencode "path=/home/user/workspace/test-output.txt" \
+  | jq -r '.result.data_b64 // error(.error)' | base64 --decode
+```
+
+Contents come back base64-encoded in `result.data_b64`, so binary files work too. Paths must be absolute. Each request returns up to 1 MiB, starting at byte `offset` (default `0`) and reading `length` bytes (default and maximum 1048576).
+
+To save a binary file, redirect the decoded output: `... | base64 --decode > report.tar.gz`.
+
+<Accordion title="Read a file larger than 1 MiB">
+  Look up the file's size with `op=stat`, then read it in 1 MiB chunks. Passing the `generation` from the first response on every later read makes the API return `409 conflict` if the VM changes partway through, so you never stitch together two versions of a file.
+
+  ```bash
+  FILE=/home/user/workspace/build.log
+  CHUNK=1048576
+
+  read -r size generation < <(curl -sS --get "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/files" \
+    -H "Authorization: Bearer $FINAL_API_KEY" \
+    --data-urlencode "op=stat" --data-urlencode "path=$FILE" \
+    | jq -r '"\(.result.entry.size) \(.generation)"')
+
+  : > build.log
+  for ((offset = 0; offset < size; offset += CHUNK)); do
+    curl -sS --fail-with-body --get "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/files" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      --data-urlencode "path=$FILE" \
+      --data-urlencode "offset=$offset" \
+      --data-urlencode "length=$CHUNK" \
+      --data-urlencode "generation=$generation" \
+      | jq -r '.result.data_b64' | base64 --decode >> build.log
+  done
+  ```
+
+  If the VM is paused or stopped, the response also includes a `snapshot_id`. Pass it alongside `generation`.
+</Accordion>
+
+## List a directory
+
+```bash
+curl -sS --get "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/files" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  --data-urlencode "op=list" \
+  --data-urlencode "path=/home/user/workspace" \
+  | jq -r '.result.entries[] | "\(.kind)\t\(.size)\t\(.path_b64 | @base64d)"'
+```
+
+```text
+directory	4096	home/user/workspace/acme-web
+file	18342	home/user/workspace/test-output.txt
+file	2	home/user/workspace/exit-code.txt
+```
+
+Each entry has a `kind` (`file`, `directory`, `symlink`, or `other`), a `size` in bytes, a `mode`, and a modification time in `mtime_seconds`. Each entry's full path, without the leading `/`, is base64-encoded in `path_b64` because Linux file names aren't always valid text. `@base64d` in `jq` decodes it.
+
+A page holds up to 256 entries (set fewer with `limit`). If `result.next_b64` isn't `null`, pass it as `cursor` to get the next page. To look up a single path without reading it, use `op=stat`.
+
+<Note>
+The files API only reads. To get files into a VM, download them from the workload (for example, with `git clone` or `curl`), attach a volume that already holds them, or create them in the dashboard's [editor](/vm-platform/desktop).
+</Note>
+
+## Keep data in a volume
+
+A volume is a named disk that exists on its own, apart from any VM. When you attach it to a VM, the VM gets its own private copy of the volume's latest version. Changes stay in that copy until you **commit** them, which saves them as the volume's next version for every VM that attaches afterward.
+
+That makes volumes a good fit for a package cache that each CI-style VM starts warm with, or a workspace you hand from one VM to the next. Two VMs can work from the same volume at once without seeing each other's half-finished changes.
+
+<Steps>
+  <Step title="Create a volume">
+    ```bash
+    export VOLUME_ID=$(curl -sS "$FINAL_VM_API_URL/volumes" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "acme-web/npm-cache", "size_gb": 10}' | jq -r '.id')
+    ```
+
+    Names can use letters, digits, and `. _ : / @ + = -`, up to 255 characters, and must be unique in the project. Sizes go from 1 to 2048 GB.
+  </Step>
+  <Step title="Attach it to a VM">
+    Attach it when you create the VM, so it's mounted before the workload starts:
+
+    ```json
+    {
+      "labels": { "name": "acme-web-tests" },
+      "volumes": [{ "volume_id": "vol_8Fh3jK6mN2pR5tV9wX4yZ7", "path": "/home/user/.npm" }]
+    }
+    ```
+
+    Or attach it to a VM that already exists:
+
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/volumes" \
+      -H "Authorization: Bearer $FINAL_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d "{\"volume_id\": \"$VOLUME_ID\", \"path\": \"/home/user/.npm\"}" \
+      | jq '{id, path, base_version, state}'
+    ```
+
+    A VM can have up to 8 volumes, each at its own path. Attaching to a paused VM resumes it first.
+  </Step>
+  <Step title="Commit your changes">
+    When the VM has written something worth keeping, commit it:
+
+    ```bash
+    export COMMIT_ID=$(curl -sS -X POST "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/volumes/$VOLUME_ID/commit" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq -r '.commit_id')
+    ```
+
+    The VM keeps running while Final saves the copy. The commit finishes in the background, so check it until it leaves `pending`:
+
+    ```bash
+    curl -sS "$FINAL_VM_API_URL/volumes/$VOLUME_ID/commits/$COMMIT_ID" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq '{state, version, error}'
+    ```
+
+    ```json
+    { "state": "committed", "version": 1, "error": null }
+    ```
+  </Step>
+  <Step title="Detach it">
+    Detach and commit in one call with `?commit=true`:
+
+    ```bash
+    curl -sS -X DELETE "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/volumes/$VOLUME_ID?commit=true" \
+      -H "Authorization: Bearer $FINAL_API_KEY" | jq
+    ```
+
+    The response includes the `commit_id` to check.
+  </Step>
+</Steps>
+
+<Warning>
+Changes that you haven't committed are discarded when you detach without `?commit=true` or delete the VM. Commit first, and confirm the commit reached `committed`, if you need those changes.
+</Warning>
+
+### Avoid overwriting someone else's changes
+
+By default, the last commit wins: if two VMs commit the same volume, the later one becomes the current version. To make a commit fail instead when someone else committed first, send the version your copy started from as `if_version`. Find it as `base_version` in the sandbox's `volumes` list:
+
+```bash
+BASE=$(curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  | jq --arg v "$VOLUME_ID" '.volumes[] | select(.volume_id == $v) | .base_version')
+
+curl -sS -X POST "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/volumes/$VOLUME_ID/commit" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"if_version\": $BASE}" | jq
+```
+
+If the volume moved on in the meantime, the commit ends in `conflict` and the volume is unchanged. Attach the volume to a fresh VM to start from the newer version, then redo your changes.
+
+### Commit states
+
+| State | Meaning |
+| --- | --- |
+| `pending` | Final is saving the changes. |
+| `committed` | The volume's `version` moved forward. New attachments see the changes. |
+| `conflict` | `if_version` no longer matched the volume's version. Nothing changed. |
+| `failed` | The commit didn't complete. `error` says why. |
+
+### Manage volumes
+
+| Task | Request |
+| --- | --- |
+| List volumes | `GET /volumes`, optionally with `?project_id=` |
+| Grow a volume | `PATCH /volumes/{id}` with `{"size_gb": 20}`. Volumes can't shrink. The new size applies the next time the volume is attached. |
+| Expire unused volumes | Set `expires_after_unused_s` when you create or update the volume. Send `null` to clear it. |
+| Delete a volume | `DELETE /volumes/{id}`. VMs that still have it attached keep their copies, but can no longer commit. |
+
+Attaching with `"allow_commit": false` gives a VM a read-only relationship with the volume: it can change its own copy, but its commits are refused with `commit_not_allowed`.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Snapshots" icon="camera" href="/vm-platform/lifecycle-and-snapshots#save-a-snapshot">
+    Save a whole VM, memory included, instead of one disk.
+  </Card>
+  <Card title="Dashboard file browser" icon="folder-open" href="/vm-platform/desktop">
+    Browse a VM's files and open them in the editor.
+  </Card>
+</Columns>

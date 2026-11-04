@@ -1,0 +1,248 @@
+---
+title: "Audit log for agent actions"
+sidebarTitle: "Audit log"
+description: "Record every tool call, approval, and turn to Datadog with lifecycle hooks, without changing what the agent does."
+icon: "list-check"
+---
+
+This example is an ops assistant that can reach every service your organization has connected to Final, with an audit trail of what it did. A hook records each tool call, each approval request and its answer, and each finished turn to Datadog, with the session and the person who asked. Use this pattern for any agent that takes real actions, so you can answer "who did what, and who approved it?" later.
+
+**What it shows:** [lifecycle hooks](/build/hooks) for `tool_call_update`, `decision.created`, `decision.resolved`, and `turn.ended`, posting to the conversation when a turn fails, and the [Final connection](/build/connections#connect-to-final), which gives the agent the tools of your connected accounts.
+
+## Files
+
+<Tree>
+
+- ops-assistant/
+  - package.json
+  - .gitignore
+  - ask.ts
+  - agent/
+    - agent.ts
+    - instructions.md
+    - connections/
+      - final.ts
+    - hooks/
+      - audit.ts
+    - lib/
+      - datadog.ts
+
+</Tree>
+
+```ts agent/agent.ts
+import { credentials, defineAgent } from '@finalai/agents';
+import { serverlessFinal } from '@finalai/agents/harnesses';
+
+export default defineAgent({
+  name: 'Ops Assistant',
+  description: 'Helps the platform team across the services connected to Final.',
+  secrets: ['datadog-api-key'],
+  harness: serverlessFinal({
+    credentials: credentials.chain({
+      payer: 'organization',
+      tryInOrder: [credentials.platform()],
+    }),
+    permissionMode: 'auto',
+  }),
+});
+```
+
+The Final connection needs no URL or token. It gives the agent the tools of every service connected under **Connectors** in Final, like GitHub, Linear, or Slack, and the agent searches for the ones it needs:
+
+```ts agent/connections/final.ts
+import { defineFinalConnection } from '@finalai/agents';
+
+export default defineFinalConnection();
+```
+
+```markdown agent/instructions.md
+You help the Acme platform team with day-to-day operations across the services connected to Final.
+Before you change anything, say what you're about to do and why.
+Prefer reading over writing. If a request is ambiguous, ask instead of guessing.
+```
+
+### The audit hook
+
+A hook watches the session without changing it. This one sends a log entry to Datadog for every event that matters in an audit:
+
+- `tool_call_update` fires each time a tool call's status changes. The hook logs only the final status, `completed` or `failed`, so each call is logged once.
+- `decision.created` and `decision.resolved` record each approval request and its answer.
+- `turn.ended` records why each turn ended, and posts a short message to the conversation when one fails, so nobody is left waiting.
+
+```ts agent/hooks/audit.ts
+import { defineHook } from '@finalai/agents/hooks';
+import { audit } from '../lib/datadog.js';
+
+export default defineHook({
+  events: {
+    async tool_call_update(event, ctx) {
+      const { status, toolName, toolCallId } = event.data;
+      if (status !== 'completed' && status !== 'failed') return;
+      await audit(ctx, event, `${toolName} ${status}`, {
+        tool: toolName,
+        tool_call_id: toolCallId,
+        status,
+      });
+    },
+
+    async 'decision.created'(event, ctx) {
+      await audit(ctx, event, `approval requested (${event.data.kind})`, {
+        decision_id: event.data.decisionId,
+        kind: event.data.kind,
+      });
+    },
+
+    async 'decision.resolved'(event, ctx) {
+      await audit(ctx, event, 'approval answered', {
+        decision_id: event.data.decisionId,
+        outcome: event.data.outcome,
+      });
+    },
+
+    async 'turn.ended'(event, ctx) {
+      const { stopReason, turnId } = event.data;
+      await audit(ctx, event, `turn ended: ${stopReason}`, { turn_id: turnId, stop_reason: stopReason });
+      if (stopReason === 'error') {
+        await ctx.final.post({ text: "Something went wrong on my side, and it's been logged." });
+      }
+    },
+  },
+});
+```
+
+The helper adds the context every entry needs: which agent and revision, which session, and who sent the message. `event.meta.id` is unique to each event and stays the same if a hook is delivered twice, so you can drop duplicates in Datadog by `event_id`. Hooks run on Final, so the helper reads the API key with `ctx.secrets` and calls Datadog's HTTP intake with `fetch`:
+
+```ts agent/lib/datadog.ts
+import type { HookContextIface } from '@finalai/agents';
+
+export async function audit(
+  ctx: HookContextIface,
+  event: { type: string; meta: { id: string; at: string } },
+  message: string,
+  attributes: Record<string, unknown>,
+) {
+  const apiKey = await ctx.secrets.get('datadog-api-key');
+  if (!apiKey) throw new Error('The datadog-api-key secret is not set');
+
+  const response = await fetch('https://http-intake.logs.datadoghq.com/api/v2/logs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'dd-api-key': apiKey },
+    body: JSON.stringify([
+      {
+        ddsource: 'final-agents',
+        service: 'ops-assistant',
+        message,
+        event_type: event.type,
+        event_id: event.meta.id,
+        occurred_at: event.meta.at,
+        session_id: ctx.session.id,
+        conversation_id: ctx.session.conversation?.id ?? null,
+        user: ctx.session.author?.displayName ?? null,
+        agent: ctx.agent.name,
+        revision_id: ctx.agent.revisionId,
+        ...attributes,
+      },
+    ]),
+  });
+  if (!response.ok) throw new Error(`Datadog returned ${response.status}`);
+}
+```
+
+The hook logs tool names and outcomes but not tool inputs or results, which can contain customer data. Add only the fields your audit actually needs, and never log secret values.
+
+## Build and publish it
+
+<Steps>
+  <Step title="Set up the project">
+    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+
+    ```bash
+    mkdir ops-assistant && cd ops-assistant
+    git init
+    npm init -y && npm pkg set type=module
+    npm install @finalai/agents zod
+    npm install --save-dev typescript tsx @types/node
+    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
+    ```
+  </Step>
+  <Step title="Add the Datadog key">
+    In Datadog, create an API key under **Organization Settings** > **API Keys**. In the Final dashboard, add it under **Developer** > **Secrets** with the name `datadog-api-key`.
+  </Step>
+  <Step title="Compile it">
+    ```bash
+    npx final-agents build ./agent
+    ```
+
+    The summary lists the hook with the events it handles:
+
+    ```text
+    agent: Ops Assistant
+    description: Helps the platform team across the services connected to Final.
+    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
+    mcp servers: dynamic
+    ...
+    secrets: datadog-api-key
+    dynamic slots: mcpServers
+    ...
+    hooks:
+      audit (hooks/audit): tool_call_update, decision.created, decision.resolved, turn.ended
+    ...
+    wrote /Users/you/ops-assistant/agent/.final/compile
+    ```
+
+    `mcp servers: dynamic` is the Final connection. Its tools depend on what's connected when a session starts, so the build can't list them.
+  </Step>
+  <Step title="Register and publish it">
+    Register the `ops-assistant` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
+
+    ```bash
+    npx final-agents publish ./agent --agent ops-assistant
+    ```
+  </Step>
+</Steps>
+
+## Try it
+
+Ask for something that uses one of your connected services:
+
+```ts ask.ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+
+const { handle, response } = await client.sessions.create({
+  agent: 'ops-assistant',
+  message: 'Which GitHub issues labeled incident were opened in acme/web this week?',
+});
+console.log((await response!.result()).text);
+
+await handle.close();
+client.close();
+```
+
+```bash
+npx tsx ask.ts
+```
+
+Then search Datadog's Log Explorer for `service:ops-assistant`. Each tool call and the end of the turn has its own entry. Leaving out the IDs, a tool call looks like this:
+
+```json
+{
+  "message": "search_issues completed",
+  "event_type": "tool_call_update",
+  "user": "Morgan Chen",
+  "agent": "Ops Assistant",
+  "tool": "search_issues",
+  "status": "completed"
+}
+```
+
+The tool names depend on which services you've connected.
+
+## Make it yours
+
+- **Add the hook to any agent.** Copy `hooks/audit.ts` and `lib/datadog.ts` into another agent, add `datadog-api-key` to its `secrets`, and change `service`. The [billing support agent](/examples/billing-support) is a good candidate.
+- **Send it somewhere else.** Replace the `fetch` in `lib/datadog.ts` with your log pipeline or SIEM's HTTP endpoint. If you use a Datadog site outside US1, change the intake host, for example to `http-intake.logs.datadoghq.eu`.

@@ -1,0 +1,8 @@
+<Prompt description="**Move a CI job to Final.** Paste this into Claude Code, Codex, or Cursor from the repository that holds your GitHub Actions workflows.">
+Move one GitHub Actions job in this repository to Final CI Runners, following Final's CI Runners documentation.
+Read the workflows in .github/workflows and pick a Linux build or test job that is a good first candidate. Tell me which one you picked and why.
+Change only its runs-on line to a Final runner label, sized for the job: final-4vcpu-ubuntu-2404 unless the job clearly needs less or more. Keep the job name, triggers, permissions, and steps as they are.
+If the job relies on tools that GitHub's hosted image preinstalls, add the matching setup action or install step.
+Push the change to a new branch, open a pull request, and watch the run. If it stays queued, check the label against the docs and tell me whether CI runners still need to be enabled for my organization.
+When it passes, show me the diff, the run link, and how its duration compares with a recent run on the old runner.
+</Prompt>

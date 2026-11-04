@@ -1,0 +1,318 @@
+---
+title: "Billing support agent"
+sidebarTitle: "Billing support"
+description: "Look up Stripe customers, issue credits, and cancel subscriptions, with approval only for the risky calls."
+icon: "credit-card"
+---
+
+This agent helps your support team with billing requests in Stripe. It looks up customers, applies account credits, and cancels subscriptions. Small credits and end-of-period cancellations go through on their own, while large credits and immediate cancellations wait for a person's OK. Use this pattern for any tool where most calls are routine and a few are risky, like refunds, deletes, or production changes.
+
+**What it shows:** [tools](/build/tools) that call a real API with a stored secret, a helper module in `lib/` shared by several tools, and [`whenInput`](/build/tools#ask-before-a-tool-runs) approvals that look at each call's input.
+
+## Files
+
+<Tree>
+
+- billing-support/
+  - package.json
+  - .gitignore
+  - support.ts
+  - agent/
+    - agent.ts
+    - instructions.md
+    - lib/
+      - stripe.ts
+    - tools/
+      - find_customer.ts
+      - credit_account.ts
+      - cancel_subscription.ts
+
+</Tree>
+
+```ts agent/agent.ts
+import { credentials, defineAgent } from '@finalai/agents';
+import { serverlessFinal } from '@finalai/agents/harnesses';
+
+export default defineAgent({
+  name: 'Billing Support',
+  description: 'Looks up Stripe customers, issues credits, and cancels subscriptions.',
+  secrets: ['stripe-secret-key'],
+  harness: serverlessFinal({
+    credentials: credentials.chain({
+      payer: 'organization',
+      tryInOrder: [credentials.platform()],
+    }),
+    permissionMode: 'ask',
+  }),
+});
+```
+
+```markdown agent/instructions.md
+You help the Acme support team with billing requests in Stripe.
+
+Always start with find_customer, and confirm the customer's name and email with the support agent before you change anything.
+Amounts are in cents: 2500 means $25.00. Say amounts in dollars when you talk to people.
+Credits of $50 or less and cancellations at the end of the billing period go through right away.
+Larger credits and immediate cancellations need a manager's approval, so tell the support agent that you're asking for it.
+After every change, say what you did and the customer's new balance or cancellation date.
+```
+
+### A shared Stripe helper
+
+Every tool calls Stripe the same way, so the request code lives in `lib/`. The compiler doesn't scan `lib/`, so the file isn't mistaken for a tool. Stripe takes form-encoded bodies, and `Idempotency-Key` makes retries safe: `ctx.callId` is unique to each tool call, so if a request is retried, Stripe applies it once.
+
+```ts agent/lib/stripe.ts
+import type { ToolContextIface } from '@finalai/agents';
+
+export async function stripe<T>(
+  ctx: ToolContextIface,
+  path: string,
+  options: { method?: 'GET' | 'POST' | 'DELETE'; form?: Record<string, string> } = {},
+): Promise<T> {
+  const key = await ctx.secrets.get('stripe-secret-key');
+  if (!key) throw new Error('The stripe-secret-key secret is not set');
+
+  const method = options.method ?? 'GET';
+  const response = await fetch(`https://api.stripe.com/v1${path}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${key}`,
+      'content-type': 'application/x-www-form-urlencoded',
+      ...(method === 'POST' ? { 'idempotency-key': ctx.callId } : {}),
+    },
+    body: options.form ? new URLSearchParams(options.form) : undefined,
+    signal: ctx.abortSignal,
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(`Stripe: ${data.error?.message ?? response.status}`);
+  return data as T;
+}
+```
+
+### The tools
+
+`find_customer` only reads, so it never asks. It returns a compact summary instead of Stripe's full objects, which keeps the model's context small:
+
+```ts agent/tools/find_customer.ts
+import { defineTool } from '@finalai/agents';
+import { z } from 'zod';
+import { stripe } from '../lib/stripe.js';
+
+interface Customer {
+  id: string;
+  name: string | null;
+  email: string | null;
+  balance: number;
+}
+interface Subscription {
+  id: string;
+  status: string;
+  cancel_at_period_end: boolean;
+  items: { data: { price: { nickname: string | null; id: string } }[] };
+}
+
+export default defineTool({
+  description: 'Find a Stripe customer by email, with their balance and active subscriptions.',
+  inputSchema: z.object({ email: z.email() }),
+  annotations: { readOnlyHint: true },
+  async execute({ email }, ctx) {
+    const query = new URLSearchParams({ query: `email:'${email}'` });
+    const customers = await stripe<{ data: Customer[] }>(ctx, `/customers/search?${query}`);
+    const customer = customers.data[0];
+    if (!customer) return { found: false };
+
+    const subscriptions = await stripe<{ data: Subscription[] }>(
+      ctx,
+      `/subscriptions?customer=${customer.id}&status=active`,
+    );
+    return {
+      found: true,
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      // Stripe stores credit as a negative balance.
+      creditCents: Math.max(0, -customer.balance),
+      subscriptions: subscriptions.data.map((s) => ({
+        id: s.id,
+        plan: s.items.data[0]?.price.nickname ?? s.items.data[0]?.price.id,
+        cancelsAtPeriodEnd: s.cancel_at_period_end,
+      })),
+    };
+  },
+});
+```
+
+`credit_account` asks for approval only when the credit is over $50. `whenInput` runs your function on each call's input before the tool runs, and asks a person only when it returns `true`. The type argument names the input fields the rule reads:
+
+```ts agent/tools/credit_account.ts
+import { defineTool } from '@finalai/agents';
+import { whenInput } from '@finalai/agents/approval';
+import { z } from 'zod';
+import { stripe } from '../lib/stripe.js';
+
+export default defineTool({
+  description: "Add a credit to a customer's Stripe balance. It applies to their next invoice.",
+  inputSchema: z.object({
+    customerId: z.string().startsWith('cus_'),
+    amountCents: z.number().int().positive().max(50_000).describe('The credit, in cents'),
+    reason: z.string().describe('Why the credit was given, shown on the customer record'),
+  }),
+  approval: whenInput<{ amountCents: number }>((input) => input.amountCents > 5_000),
+  async execute({ customerId, amountCents, reason }, ctx) {
+    const transaction = await stripe<{ id: string; ending_balance: number }>(
+      ctx,
+      `/customers/${customerId}/balance_transactions`,
+      {
+        method: 'POST',
+        form: { amount: String(-amountCents), currency: 'usd', description: reason },
+      },
+    );
+    return { transactionId: transaction.id, creditCents: -transaction.ending_balance };
+  },
+});
+```
+
+`cancel_subscription` lets a subscription run to the end of the period without asking, but asks before cutting it off now:
+
+```ts agent/tools/cancel_subscription.ts
+import { defineTool } from '@finalai/agents';
+import { whenInput } from '@finalai/agents/approval';
+import { z } from 'zod';
+import { stripe } from '../lib/stripe.js';
+
+export default defineTool({
+  description: 'Cancel a Stripe subscription, either at the end of the billing period or now.',
+  inputSchema: z.object({
+    subscriptionId: z.string().startsWith('sub_'),
+    when: z.enum(['period_end', 'now']),
+  }),
+  approval: whenInput<{ when: 'period_end' | 'now' }>((input) => input.when === 'now'),
+  async execute({ subscriptionId, when }, ctx) {
+    if (when === 'now') {
+      await stripe(ctx, `/subscriptions/${subscriptionId}`, { method: 'DELETE' });
+      return { subscriptionId, canceled: 'now' };
+    }
+    await stripe(ctx, `/subscriptions/${subscriptionId}`, {
+      method: 'POST',
+      form: { cancel_at_period_end: 'true' },
+    });
+    return { subscriptionId, canceled: 'at period end' };
+  },
+});
+```
+
+## Build and publish it
+
+<Steps>
+  <Step title="Set up the project">
+    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+
+    ```bash
+    mkdir billing-support && cd billing-support
+    git init
+    npm init -y && npm pkg set type=module
+    npm install @finalai/agents zod
+    npm install --save-dev typescript tsx @types/node
+    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
+    ```
+  </Step>
+  <Step title="Add a Stripe key">
+    In Stripe, create a restricted key with write access to **Customers** and **Subscriptions** and nothing else. Start with a test-mode key while you try the agent. In the Final dashboard, add it under **Developer** > **Secrets** with the name `stripe-secret-key`.
+  </Step>
+  <Step title="Compile it">
+    ```bash
+    npx final-agents build ./agent
+    ```
+
+    ```text
+    agent: Billing Support
+    description: Looks up Stripe customers, issues credits, and cancels subscriptions.
+    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
+    mcp servers: authored (worker)
+    ...
+    secrets: stripe-secret-key
+    ...
+    wrote /Users/you/billing-support/agent/.final/compile
+    ```
+
+    `authored (worker)` is your three tools, which run on Final.
+  </Step>
+  <Step title="Register and publish it">
+    Register the `billing-support` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
+
+    ```bash
+    npx final-agents publish ./agent --agent billing-support
+    ```
+  </Step>
+</Steps>
+
+## Try it
+
+This script plays the support agent: it sends a request, streams the reply, and asks you in the terminal whenever a call needs approval. Change the email to a customer in your Stripe test data.
+
+```ts support.ts
+import { createInterface } from 'node:readline/promises';
+import { createClient, sessionUpdateOf, textOf } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+const terminal = createInterface({ input: process.stdin, output: process.stdout });
+
+const { handle } = await client.sessions.create({ agent: 'billing-support' });
+
+// Each line you type is a message. Approval requests interrupt the stream.
+let message = await terminal.question('> ');
+while (message.trim()) {
+  const turn = await handle.send(message);
+  const answered = new Set<string>();
+  for await (const event of turn.stream()) {
+    const update = sessionUpdateOf(event);
+    if (update?.sessionUpdate === 'agent_message_chunk') process.stdout.write(textOf(update));
+
+    if (event.decisionId && !answered.has(event.decisionId)) {
+      answered.add(event.decisionId);
+      const decision = (await handle.decisions()).find((d) => d.id === event.decisionId);
+      if (!decision) continue;
+      const { title, body } = decision.request;
+      const reply = await terminal.question(`\n\n${title}\n${body ?? ''}\nApprove? (y/n) `);
+      await handle.respond({
+        decisionId: decision.id,
+        outcome: { action: reply.trim() === 'y' ? 'accept' : 'decline' },
+      });
+    }
+  }
+  message = await terminal.question('\n\n> ');
+}
+
+terminal.close();
+await handle.close();
+client.close();
+```
+
+```bash
+npx tsx support.ts
+```
+
+Ask for a small credit, then a large one. Only the second one stops for approval:
+
+```text
+> jordan@example.com was double-charged for March. Credit them $20.
+Found Jordan Lee (jordan@example.com) on the Team plan. I added a $20.00 credit,
+which applies to their next invoice. Their credit balance is now $20.00.
+
+> Actually, the outage cost them a week. Make it another $120.
+That's over $50, so I'm asking a manager to approve it.
+
+Allow credit_account?
+...
+Approve? (y/n) y
+Done. I added $120.00. Jordan's credit balance is now $140.00.
+```
+
+## Make it yours
+
+- **Route approvals to the right people.** In a real support tool, show the decision in your UI and let only managers answer it. The [support chat example](/examples/support-chat) shows how to forward decisions to a browser.
+- **Keep an audit trail.** Add the [audit log hook](/examples/audit-log) so every credit and cancellation is recorded with who asked for it and who approved it.

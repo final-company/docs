@@ -1,0 +1,92 @@
+---
+title: "Projects and repositories"
+sidebarTitle: "Projects"
+description: "Organize coding work in a project, connect your repository, and keep agent instructions in Git."
+icon: "folder"
+---
+
+A project is where a team's coding work lives in Final. It holds the repositories your agents work on, the computers and setup guides they run on, your agents, and the people who can use them. Set one up per team or product, and use branches, not new projects, for individual tasks.
+
+## Create a project
+
+Every member has a personal project called **My Work**, which is a good place to experiment. For work you share with a team, create a project:
+
+1. In the sidebar, hover a project and click **+**.
+2. Choose **New Subproject** and enter a name, such as `storefront`.
+3. Click **Create Project**.
+
+Subprojects inherit from their parent. Agents, computer setup guides, and connected subscriptions in a parent project are available in the projects below it, so you can share a setup across several teams by putting it one level up.
+
+To invite people to a shared project, open its menu (**...**), choose **Members**, and add them with a role:
+
+| Role | Can |
+| --- | --- |
+| **Viewer** | See the project's agents, computers, and repositories. |
+| **Editor** | Create and change computers, agents, and setup guides. |
+| **Admin** | Everything an editor can, plus manage members and access. |
+
+## Connect your repository
+
+Connect your repository so Final agents can clone it onto their computers. If you only run Claude Code or Codex on a computer yourself, you can skip this and clone with Git as usual.
+
+1. Go to **Developer** > **Git Repositories** and click **New Git repository**.
+2. Choose **Use GitHub repository** and pick your repository from the list.
+3. If it isn't listed, use **Manage repositories** for your GitHub account to give Final's GitHub App access to it, then come back to the dialog.
+
+The repository's page shows its default branch and remote, and an **Access** section where you can grant other projects or people access beyond the project's members.
+
+<Note>
+**Create a Git Repository** in the same dialog starts an empty repository hosted by Final. Use it for new code, or for a Final agent's own source, when you don't want a GitHub repository.
+</Note>
+
+## Keep agent instructions in your repository
+
+Agents work better when the repository tells them how it works. Commit the same facts you'd give a new teammate: how to set up, which commands to run, and the conventions reviewers check. Put lasting knowledge in the repository, and put the current task in your prompt.
+
+```markdown AGENTS.md
+# Storefront
+
+## Setup
+Run `./scripts/setup.sh` on a fresh checkout. It installs dependencies
+and migrates and seeds the development database.
+
+## Commands
+- `npm run dev` starts the app on http://localhost:3000.
+- `npm test` runs the unit tests. `npm run test:e2e` runs the browser tests.
+- `npm run lint` must pass before you commit.
+
+## Conventions
+- Validate API input with zod in `src/app/api/`.
+- Every bug fix needs a regression test.
+```
+
+Codex reads `AGENTS.md`, and Claude Code reads `CLAUDE.md`. To keep one copy, put the content in `AGENTS.md` and make `CLAUDE.md` a single line, `@AGENTS.md`, which tells Claude Code to import it.
+
+Commit the setup script the instructions mention, too. The [cloud environments](/ai-coding/cloud-environments) guide shows how to write one and how Final runs it on every new computer.
+
+## Agent source and application source
+
+<AccordionGroup>
+  <Accordion title="Where does a Final agent's own code live?">
+    A Final agent is defined by a few files, such as `agent.ts`, `instructions.md`, and `sandbox.ts`. When you create an agent with **New Final repository**, Final creates a repository for those files with them in an `agent/` directory. You can also keep them in a directory of a GitHub repository you connected, including your application repository.
+
+    Either way, the agent's source is separate from the code it works on. Connecting the agent's repository doesn't put your application on its computer. The computer gets your application from the repositories listed in its [setup guide](/ai-coding/cloud-environments#prepare-computers-for-a-final-agent).
+  </Accordion>
+  <Accordion title="Do Claude Code and Codex need an agent definition?">
+    No. Stock Claude Code and Codex run directly in your checkout and read `CLAUDE.md`, `AGENTS.md`, and their own settings files from the repository and your home directory. You only write an agent definition when you want a Final agent.
+  </Accordion>
+  <Accordion title="Monorepos">
+    Clone the whole repository and tell the agent which package to change, with that package's test command. A short `AGENTS.md` in each package directory helps agents pick the right commands when they work there.
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Set up the cloud environment" icon="box" href="/ai-coding/cloud-environments">
+    Create a computer and make its setup reproducible.
+  </Card>
+  <Card title="Choose your agent" icon="robot" href="/ai-coding/agents">
+    Run Claude Code, Codex, or a Final agent in the project.
+  </Card>
+</Columns>

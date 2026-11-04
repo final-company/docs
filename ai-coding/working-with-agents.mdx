@@ -1,0 +1,75 @@
+---
+title: "Working with agents"
+description: "Write tasks with a clear finish line, check the evidence, and hand off a change that's ready to review."
+icon: "list-check"
+---
+
+Once the agent has a computer where your app runs, the quality of its work depends mostly on two things: how clearly you describe the task, and how you check what comes back. This page covers both, plus running several tasks at once.
+
+## Describe the task
+
+Tell the agent what's wrong now, what done looks like, and how to prove it. Name the constraints a reviewer would care about. Leave out setup steps and conventions; those belong in `AGENTS.md` or `CLAUDE.md`, where every task picks them up.
+
+> **Vague:** "Add filtering to the orders page."
+>
+> **Clear:** "Add a status filter to the orders page with the options All, Pending, and Shipped. Reuse the existing `FilterSelect` component and keep pagination working. Add tests for each option and for an empty result, run the full suite, and check the page in the browser. Tell me which commands you ran and what you didn't verify."
+
+The clear version gives the agent a finish line it can check on its own, and gives you a report you can review quickly. Link the issue, paste the error, or include the steps to reproduce when you have them.
+
+## Ask for evidence
+
+Because the agent can run your app, ask it to show its work instead of describing it. Match the evidence to the change:
+
+| Change | Ask the agent to |
+| --- | --- |
+| Bug fix | Reproduce the bug first, then show the regression test failing before the fix and passing after. |
+| UI change | Start the dev server and check each state, such as empty, loading, and error, in the computer's browser. |
+| API change | Call the endpoint with a real request and show the response, then run the focused tests. |
+| Database change | Run the migration against the development database and roll it back once. |
+
+Ask the agent to separate what it checked from what it skipped. "Tests pass" and "I couldn't run the browser tests because Chrome isn't installed" are both useful; a summary that blurs them isn't.
+
+## Review the change
+
+Treat the agent's work like a pull request from a new teammate.
+
+1. **Read the diff.** Run `git diff main` on the computer, or push the branch and read it on GitHub. Look for changes outside the task's scope.
+2. **Rerun the checks yourself.** Run the tests in your own terminal. For UI changes, click **Start desktop**, then **Open screen**, and try the page.
+3. **Push and open a pull request.** Commit on a branch, push, and let your normal CI run. [Final CI Runners](/ci-runners/overview) can run those checks on Final machines.
+
+If something's off, reply in the same session with what you saw. The agent still has the context and the running app, so follow-ups are fast.
+
+## Run tasks in parallel
+
+Agents are most useful when several work at once. Give each task its own space so they never collide:
+
+- **One computer per task.** Two agents editing the same checkout, or migrating the same database, will undo each other's work. With a Final agent, each new session gets its own computer when its workspace is **Kept for the session**.
+- **One branch per task.** Name it after the task, such as `fix/empty-signup-email`, so reviews stay small.
+- **One setup for all of them.** Every computer runs the same [setup script](/ai-coding/cloud-environments#write-a-setup-script), so a fix to the environment reaches every task.
+
+## Hand off and clean up
+
+Push the branch before you're done with a computer. The pull request, not the computer, is the record of the work.
+
+<Warning>
+Deleting a computer deletes its workspace, including any commits you haven't pushed.
+</Warning>
+
+When a task uncovers a missing dependency or a flaky setup step, fix `scripts/setup.sh` or the setup guide in the same pull request. To keep idle computers from running, set **Stop after** on the computer's **Settings** tab. When the change is ready to ship, use your normal release process or [Final Cloud Apps](/cloud-apps/overview).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The agent edits the wrong directory or package">
+    Start Claude Code or Codex from the repository root, and name the package in the task for a monorepo. For a Final agent, check the repository alias in the setup guide; checkouts live at `/workspaces/<alias>`.
+  </Accordion>
+  <Accordion title="Tests pass on the computer but fail in CI">
+    The computer and CI are set up differently. Compare runtime versions and environment variables, and run the same command CI runs. Pin tool versions in your setup guide's `build.steps` or your container image so both match.
+  </Accordion>
+  <Accordion title="The agent keeps stopping to ask for approval">
+    Claude Code and Codex ask before running commands by default. Approve commands you trust for the rest of the session when prompted, or configure their permission settings in the repository so every computer gets the same rules.
+  </Accordion>
+  <Accordion title="The agent says it can't reach a service or package registry">
+    Check **Allow internet access** on the computer's **Settings** tab, and that any network allowlist includes the host. For a Final agent, check that the service starts in the setup guide's `services` and answers its `ready.url`.
+  </Accordion>
+</AccordionGroup>

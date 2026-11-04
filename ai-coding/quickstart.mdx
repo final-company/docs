@@ -1,0 +1,138 @@
+---
+title: "Quickstart"
+description: "Run Claude Code or Codex on a Final computer and review its first tested change."
+icon: "rocket"
+---
+
+In this quickstart you create a cloud computer, check out your repository on it, and have Claude Code or Codex fix a small bug with a test. It takes about 20 minutes.
+
+<Tip>
+Prefer to delegate? Copy the [setup prompt](/ai-coding/overview#let-an-agent-set-it-up) into your coding agent and it walks you through these steps.
+</Tip>
+
+**You need:**
+
+- Access to an organization in the [Final dashboard](https://console.final.ai).
+- A repository you can clone, with tests you can run from the command line.
+- A Claude subscription or Claude Console account for Claude Code, or a ChatGPT plan or OpenAI API key for Codex.
+
+The examples use a Node.js app called `storefront`. Swap in your own repository and commands.
+
+<Steps>
+  <Step title="Choose a project">
+    Everything you create next belongs to a [project](/ai-coding/projects). Your personal project, **My Work**, is fine for trying things out.
+
+    To make a new one, hover a project in the sidebar, click **+**, choose **New Subproject**, enter a name like `storefront`, and click **Create Project**. You need the **Editor** or **Admin** role in a project to create computers there.
+  </Step>
+  <Step title="Create a computer">
+    Go to **Developer** > **Computers**. Leave **Image for new computer** set to **Desktop (default)**, enter a name like `storefront-dev`, and click **Create computer**.
+
+    Select the computer and wait for its state to show **Running**. Then click **Open editor**. A VS Code editor opens in a new browser tab, connected to the computer.
+  </Step>
+  <Step title="Check out your code and run the tests">
+    In the editor, open a terminal (**Terminal** > **New Terminal**) and clone your repository. For a private repository, sign in to Git the way you would on a new laptop, for example with a GitHub personal access token.
+
+    ```bash
+    git clone https://github.com/acme/storefront.git
+    cd storefront
+    npm ci
+    npm test
+    ```
+
+    The tests should pass before the agent touches anything. If they don't, fix the environment first: a failing baseline makes it impossible to tell whether the agent's change worked.
+
+    The default image doesn't include every language runtime. If `npm` isn't found, install Node.js the way you normally would, such as with a version manager, and note the step for your [setup script](/ai-coding/cloud-environments#write-a-setup-script). If installs fail with network errors, open the computer's **Settings** tab and check **Allow internet access**.
+  </Step>
+  <Step title="Install your agent and sign in">
+    Install the CLI on the computer, then start it from the repository. Your laptop's login doesn't carry over, so you sign in once on the computer.
+
+    <Tabs>
+      <Tab title="Claude Code">
+        ```bash
+        curl -fsSL https://claude.ai/install.sh | bash
+        claude --version
+        ```
+
+        You should see a version number followed by `(Claude Code)`. If the shell can't find `claude`, open a new terminal so it picks up the updated `PATH`.
+
+        Start Claude Code from the repository:
+
+        ```bash
+        claude
+        ```
+
+        The computer has no browser for Claude Code to open, so copy the login URL it shows (press `c` to copy) and open it in your own browser. After you sign in, paste the code you get back at the `Paste code here if prompted` prompt.
+      </Tab>
+      <Tab title="Codex">
+        ```bash
+        curl -fsSL https://chatgpt.com/codex/install.sh | sh
+        ```
+
+        Sign in with a device code, which works without a browser on the computer. First turn on device code login in your ChatGPT security settings, then run:
+
+        ```bash
+        codex login --device-auth
+        ```
+
+        Open the link it prints in your own browser and enter the code. To use an API key instead, run `printenv OPENAI_API_KEY | codex login --with-api-key`.
+
+        Start Codex from the repository:
+
+        ```bash
+        codex
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Give it a small task">
+    Pick a real bug that's easy to check. Say what's wrong, what done looks like, and how to prove it:
+
+    ```text
+    The signup form accepts an empty email address. Make it show
+    "Enter your email" and refuse to submit. Add a regression test,
+    run the full test suite, and tell me which commands you ran.
+    ```
+
+    The agent reads the code, makes the change, and runs the tests on the computer. Approve its commands when it asks.
+  </Step>
+  <Step title="Review the change">
+    Read the diff and run the tests yourself in a second terminal:
+
+    ```bash
+    git diff
+    npm test
+    ```
+
+    To try the fix in a browser, start the dev server, click **Start desktop** and then **Open screen** on the computer's page, and open `http://localhost:3000` in the desktop's browser.
+
+    When you're happy, commit on a branch and open a pull request as usual:
+
+    ```bash
+    git switch -c fix/empty-signup-email
+    git add -A
+    git commit -m "Reject empty email on signup"
+    git push -u origin fix/empty-signup-email
+    ```
+  </Step>
+</Steps>
+
+<Check>
+You have a cloud computer with your app running, an agent signed in on it, and a tested change on a branch. The computer keeps your checkout and login, so your next task starts where this one left off.
+</Check>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Make setup reproducible" icon="box" href="/ai-coding/cloud-environments">
+    Turn the commands you just ran into a setup script so every computer starts ready.
+  </Card>
+  <Card title="Try a Final agent" icon="robot" href="/ai-coding/agents">
+    Give your team a shared coding agent that starts on a prepared computer.
+  </Card>
+  <Card title="Write better tasks" icon="list-check" href="/ai-coding/working-with-agents">
+    Get changes that are easier to review, and run tasks in parallel.
+  </Card>
+  <Card title="Connect your tools" icon="plug" href="/mcp-gateway/quickstart">
+    Let the agent read issues and docs through the MCP gateway.
+  </Card>
+</Columns>

@@ -1,0 +1,173 @@
+---
+title: "Run workloads"
+sidebarTitle: "Workloads"
+description: "Run a one-off job or a long-running service in a VM, with restarts and health checks."
+icon: "terminal"
+---
+
+A workload is the command a VM runs when it boots. It can be a job that does some work and exits, like a test run, or a service that keeps running, like a web server. Final starts it, restarts it if it crashes, and can check that it's healthy.
+
+You set the workload when you create a VM, and you can replace it later. The examples use the `FINAL_API_KEY`, `FINAL_VM_API_URL`, and `SANDBOX_ID` variables from the [quickstart](/vm-platform/quickstart).
+
+## Run a one-off job
+
+This VM clones a repository, runs its tests, and writes the output and exit code to files you can read afterward:
+
+```json test-run.json
+{
+  "labels": { "name": "acme-web-tests", "branch": "main" },
+  "timers": { "wall_clock_limit_s": 1800, "idle_timeout_s": null },
+  "workload": {
+    "entrypoint": ["/bin/bash", "-c"],
+    "cmd": ["git clone --depth 1 https://github.com/acme/acme-web.git && cd acme-web && npm ci && npm test > ../test-output.txt 2>&1; echo $? > ../exit-code.txt"],
+    "restart": false
+  }
+}
+```
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @test-run.json | jq '.sandbox | {id, state}'
+```
+
+Three settings matter for jobs:
+
+- **`restart: false`.** Workloads restart by default, which is what you want for a server but not for a job. Without this, your tests would run in a loop.
+- **`idle_timeout_s: null`.** A VM counts as idle when nothing is talking to it, meaning no file reads, no requests to its ports, and no dashboard sessions, even if your job is busy. Setting the idle timeout to `null` turns it off, so a long build isn't paused halfway through.
+- **`wall_clock_limit_s`.** With the idle timeout off, this is your safety net. After 30 minutes, Final pauses the VM whatever it's doing.
+
+The VM's state doesn't tell you whether the job passed: it stays `running` after the command exits. Read the exit code file to find out:
+
+```bash
+curl -sS --get "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/files" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  --data-urlencode "path=/home/user/workspace/exit-code.txt" \
+  | jq -r '.result.data_b64 // error(.error)' | base64 --decode
+```
+
+A `file_not_found` error means the job is still running. `0` means the tests passed.
+
+<Note>
+The files API is read-only, so code gets into a VM through the workload itself: `git clone`, `curl`, or a package manager. For a private repository, pass a read-only token in `env` and use it in the clone URL. To reuse files across VMs, [attach a volume](/vm-platform/files-and-volumes#keep-data-in-a-volume).
+</Note>
+
+## Run a service
+
+For a server, leave `restart` on and add a health check so you can tell when it's ready. This VM serves a page on port 8000:
+
+```json web-preview.json
+{
+  "labels": { "name": "web-preview" },
+  "ports": [8000],
+  "workload": {
+    "entrypoint": ["/bin/sh", "-c"],
+    "cmd": ["echo '<h1>Hello from Final VMs</h1>' > index.html && exec python3 -m http.server 8000 --bind 0.0.0.0"],
+    "health_check": {
+      "port": 8000,
+      "path": "/",
+      "interval_s": 5,
+      "timeout_s": 2,
+      "grace_s": 15
+    }
+  }
+}
+```
+
+Final sends an HTTP request to `path` on `port` every `interval_s` seconds, and counts the check as failed if no answer arrives within `timeout_s`. Failures during the first `grace_s` seconds are ignored while the server boots.
+
+Read the workload's health:
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/workload" \
+  -H "Authorization: Bearer $FINAL_API_KEY" | jq '.health'
+```
+
+```json
+{ "healthy": true, "error": null, "checked_at": 1793817600000 }
+```
+
+`healthy` is `null` until the first check runs. When it's `false`, `error` says why. A running server is still private; to reach it from outside, [publish its port](/vm-platform/networking#publish-a-port).
+
+## Change the workload
+
+Replace the workload of an existing VM with `PUT /sandboxes/{id}/workload`:
+
+```bash
+curl -sS -X PUT "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID/workload" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"workload": {"entrypoint": ["/bin/sh", "-c"], "cmd": ["exec python3 -m http.server 9000 --bind 0.0.0.0"]}}' \
+  | jq '{state: .sandbox.state, pending}'
+```
+
+Changing the workload restarts the VM. Final stops the current process, giving it `termination_grace_s` seconds (30 by default) to shut down cleanly, then stops and starts the VM with the new command. Files on disk are kept, but anything held only in memory is lost.
+
+If the response has `"pending": true` (with HTTP status `202`), the restart is still in progress. Read the sandbox until its state is `running` again.
+
+## Pass environment variables
+
+Set `env` when you create the VM. Final stores the values encrypted and hands them to the workload when it starts:
+
+```json
+{
+  "labels": { "name": "release-assistant" },
+  "env": { "NODE_ENV": "production", "GITHUB_TOKEN": "ghp_your_read_only_token" }
+}
+```
+
+You can set up to 256 variables, 64 KiB in total. Build request files with secrets from your secret manager at run time, and keep them out of Git.
+
+## Use Docker inside a VM
+
+Add `"tools": ["docker"]` to the create request to run Docker in the VM. Final installs it as the VM starts. Wait until the sandbox's `tools` list shows it ready before you run containers:
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes/$SANDBOX_ID" \
+  -H "Authorization: Bearer $FINAL_API_KEY" | jq '.tools[] | {tool, ready}'
+```
+
+```json
+{ "tool": "docker", "ready": true }
+```
+
+`docker` is currently the only tool. Asking for any other name returns `unknown_tool`.
+
+## Workload fields
+
+| Field | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `entrypoint` | string array | The image's entrypoint | The program to run and its first arguments. Use `["/bin/sh", "-c"]` to run a shell command with pipes, `&&`, or redirects. |
+| `cmd` | string array | The image's command | Arguments added after `entrypoint`. With a shell entrypoint, this is the command line. |
+| `workdir` | string | The image's working directory | Absolute path to start in. |
+| `user` | string | The image's user | User to run as, by name or UID, optionally with a group (`user:group`). |
+| `restart` | boolean | `true` | Restart the command when it exits. Turn off for jobs. |
+| `termination_grace_s` | integer, 0-600 | `30` | Seconds to wait after asking the process to stop before killing it. |
+| `health_check` | object | None | HTTP check with `port`, `path`, `interval_s` (1-3600), `timeout_s` (1-60), and `grace_s` (0-3600). All five are required. |
+
+<AccordionGroup>
+  <Accordion title="My command works in a terminal but fails as a workload">
+    `entrypoint` and `cmd` run a program directly, without a shell. Pipes, `&&`, `>`, `$VAR`, and `~` only work if the entrypoint is a shell, such as `["/bin/sh", "-c"]`. Also check that the program exists in the image: the default image has `bash`, Git, Python 3, and Node.js, while slim images often lack `bash` and `curl`.
+  </Accordion>
+  <Accordion title="My server is running but nothing can reach it">
+    Bind to `0.0.0.0`, not `127.0.0.1` or `localhost`. A server bound to the loopback address only accepts connections from inside the VM.
+  </Accordion>
+  <Accordion title="I need root">
+    The default image runs commands as `user`, which can run `sudo` without a password. To run the whole workload as root, set `"user": "root"`.
+  </Accordion>
+  <Accordion title="Where do I see what's running?">
+    Open the VM in the dashboard and use the **Processes** tab. The **Activity** tab shows each state change. See [desktop and dashboard](/vm-platform/desktop).
+  </Accordion>
+</AccordionGroup>
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Publish a service" icon="globe" href="/vm-platform/networking">
+    Make a port public or put it on your own domain.
+  </Card>
+  <Card title="Start faster with a template" icon="layer-group" href="/vm-platform/images-and-templates#prepare-a-template">
+    Boot your service once and start new VMs with it already running.
+  </Card>
+</Columns>

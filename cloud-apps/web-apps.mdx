@@ -1,0 +1,200 @@
+---
+title: "Web apps"
+description: "Deploy a website or API that runs its own HTTP server."
+---
+
+Use a web app when your code runs its own HTTP server: a website, a REST or GraphQL API, or a framework like Next.js, Express, Django, or Rails. Final builds a container from your repository, starts it, waits for your health check to pass, and serves it at a public HTTPS URL.
+
+If your handler is a single JavaScript `fetch` function, a [function](/cloud-apps/functions) is lighter. [Choose an app type](/cloud-apps/workloads) compares the two.
+
+## Deploy a Hono API
+
+This example is a small JSON API built with [Hono](https://hono.dev). The project looks like this:
+
+<Tree>
+
+- acme-api/
+  - final-cloud.yaml
+  - Dockerfile
+  - .dockerignore
+  - package.json
+  - package-lock.json
+  - src/
+    - server.js
+
+</Tree>
+
+<Steps>
+  <Step title="Write the server">
+    Create the project and install Hono:
+
+    ```bash
+    mkdir acme-api && cd acme-api
+    git init -b main
+    npm init -y
+    npm pkg set type=module
+    npm install hono @hono/node-server
+    ```
+
+    Then add the server. It has one route for visitors and a `/health` route for Final to check.
+
+    ```js src/server.js
+    import { serve } from '@hono/node-server';
+    import { Hono } from 'hono';
+
+    const app = new Hono();
+
+    app.get('/', (c) => c.json({ service: 'acme-api', version: process.env.APP_VERSION }));
+    app.get('/health', (c) => c.text('ok'));
+
+    const port = Number(process.env.PORT ?? 3000);
+    serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, () => {
+      console.log(`acme-api listening on port ${port}`);
+    });
+    ```
+
+    The server listens on `0.0.0.0`, not `localhost`, so traffic from outside the container can reach it.
+  </Step>
+
+  <Step title="Add a Dockerfile">
+    ```dockerfile Dockerfile
+    FROM node:26-alpine
+    WORKDIR /app
+    COPY package.json package-lock.json ./
+    RUN npm ci --omit=dev
+    COPY src ./src
+    CMD ["node", "src/server.js"]
+    ```
+
+    ```text .dockerignore
+    node_modules
+    ```
+
+    Add a `.gitignore` with `node_modules/` too, so dependencies stay out of Git.
+  </Step>
+
+  <Step title="Describe the app">
+    ```yaml final-cloud.yaml
+    name: acme-api
+    type: web
+    build:
+      method: dockerfile # builds ./Dockerfile
+    port: 3000           # the port your server listens on
+    health:
+      path: /health      # must answer before the app gets traffic
+    env:
+      APP_VERSION: 1.2.0
+    ```
+
+    `port` must match the port your server listens on. Final doesn't set a `PORT` variable for you, so the server's `3000` default is what's used here.
+  </Step>
+
+  <Step title="Deploy">
+    Validate, create the app, push, and deploy, the same way as in the [quickstart](/cloud-apps/quickstart):
+
+    ```bash
+    npx final-cloud validate
+    npx final-cloud apps create "Acme API"
+    git add . && git commit -m "Add acme-api"
+    git remote add final https://<your-app-repository>.git   # printed by apps create
+    git push final HEAD:main
+    npx final-cloud deploy acme-api
+    ```
+
+    Web apps are always public, so confirm the access prompt on the first deploy. When the deployment is healthy, the CLI prints the app's URL.
+  </Step>
+
+  <Step title="Call the API">
+    ```bash
+    curl https://<your-app-url>
+    ```
+
+    ```json
+    {"service":"acme-api","version":"1.2.0"}
+    ```
+  </Step>
+</Steps>
+
+## Health checks
+
+Final decides whether your app is working by sending `GET` requests to `health.path` on your `port`. Any response from `200` to `399` counts as healthy.
+
+During a deploy, Final starts the new version next to the one that's running and waits up to `health.gracePeriodSeconds` (60 seconds by default) for it to pass. Traffic moves only once it does. If it never passes, the deployment fails and the previous version keeps serving, so a bad release doesn't take your site down.
+
+After the app is live, Final keeps checking every `health.intervalSeconds` (10 seconds by default) and restarts any instance that stops responding. Set `health.onUnhealthy: none` to turn the restarts off.
+
+Make the health route cheap and honest: it should answer quickly, and it should fail when the app can't serve requests, for example when it can't reach its database.
+
+<Warning>
+Your image needs `curl` or `wget` installed for health checks to run. Alpine-based images such as `node:26-alpine` include `wget`. On Debian-based `-slim` images, add `RUN apt-get update && apt-get install -y --no-install-recommends curl` to your Dockerfile.
+</Warning>
+
+## Choose a size and instance count
+
+Every instance runs on its own machine. Set the machine with `size` and the number of instances with `scaling.min`:
+
+```yaml final-cloud.yaml
+size: large
+scaling:
+  min: 2
+  max: 2
+```
+
+| `size` | vCPU | Memory |
+| --- | --- | --- |
+| `small` | 1 | 512 MB |
+| `standard` (default) | 2 | 4 GB |
+| `large` | 4 | 8 GB |
+| `extra-large` | 8 | 16 GB |
+
+Final runs `scaling.min` instances, one by default. `scaling.max` must be at least `min`. With more than one instance, keep shared state such as sessions and uploads in a database or external store instead of in memory or on local disk.
+
+## Other ways to build
+
+<AccordionGroup>
+  <Accordion title="Use a different Dockerfile or build folder">
+    `build.context` is the folder the build runs in, relative to the repository root. `build.dockerfile` is the Dockerfile's path inside that folder. They default to `.` and `Dockerfile`. This builds `services/api/Dockerfile.prod`:
+
+    ```yaml
+    build:
+      method: dockerfile
+      context: services/api
+      dockerfile: Dockerfile.prod
+    ```
+  </Accordion>
+  <Accordion title="Build without a Dockerfile">
+    Set `method: buildpacks` and Final detects your language and builds an image from your source. Your app still needs to listen on the `port` you declare.
+
+    ```yaml
+    build:
+      method: buildpacks
+    ```
+  </Accordion>
+  <Accordion title="Deploy an image you've already built">
+    If your CI already publishes a container image, replace `build` with `image`. Pin it with a `tag` or, for an exact build, a `digest`.
+
+    ```yaml
+    image:
+      repository: ghcr.io/acme/acme-api
+      tag: 1.2.0
+    ```
+  </Accordion>
+  <Accordion title="Override the start command">
+    `command` replaces the image's default command. It's handy when one image runs several apps, such as an API and a worker:
+
+    ```yaml
+    command: node src/server.js
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Add secrets, databases, and domains" icon="database" href="/cloud-apps/environment-and-data">
+    Configure your app's environment and give it a custom hostname.
+  </Card>
+  <Card title="Web app fields" icon="file-code" href="/cloud-apps/manifest#web-apps">
+    Every web app field, with types and defaults.
+  </Card>
+</Columns>

@@ -1,0 +1,79 @@
+---
+title: "Troubleshoot the MCP gateway"
+sidebarTitle: "Troubleshooting"
+description: "Fix problems adding the gateway, signing in, reaching your connected accounts, and getting actions approved."
+---
+
+Find the symptom that matches what you see. Each entry explains the cause and how to fix it. For how sign-in, accounts, and approvals fit together, see [accounts and approvals](/mcp-gateway/accounts-and-approvals).
+
+## Adding the server and signing in
+
+<AccordionGroup>
+  <Accordion title="The Connect your agent dialog says MCP is not available here yet">
+    The gateway isn't turned on for the Final environment you're signed in to, so there's no server URL to show.
+
+    If the dialog says it couldn't load the URL instead, that's a temporary error. Close the dialog and open it again in a moment.
+  </Accordion>
+  <Accordion title="My client won't add the server or never offers to sign in">
+    The gateway is a remote MCP server that uses HTTP (sometimes called Streamable HTTP) and OAuth sign-in. Check that you added it as a remote or HTTP server, not a local command, and that the URL is exactly `https://api.final.ai/v1/connectors/mcp`.
+
+    In Claude Code, include `--transport http`. In Codex, use `--url`. Some workspaces block custom MCP servers, so if your client is managed by your company, ask an admin to allow it. On Claude Team and Enterprise plans, an owner must add the connector before members can connect it.
+  </Accordion>
+  <Accordion title="The sign-in page shows the wrong organization, or none">
+    The gateway connects to one Final organization at a time, and it only sees that organization's connections. If you belong to several, the sign-in page asks you to choose one. If it picked the wrong one, remove Final from your client's authentication (in Claude Code, **Clear authentication** in `/mcp`), sign in again, and choose the right organization.
+
+    If the page says no organization is available, your Final account isn't a member of one yet. Ask an admin to invite you.
+  </Accordion>
+  <Accordion title="I added my Final API key and the server rejects it">
+    The gateway doesn't accept [API keys](/api-keys). It signs in as you through your browser so it can use your connected accounts. Remove any `Authorization` header or API key from the server's configuration, then sign in from your client.
+  </Accordion>
+  <Accordion title="My client asks me to sign in again">
+    Your sign-in lasts up to 90 days, and it can expire sooner if you don't use the client for a while. Sign in again from your client (`/mcp` in Claude Code, `codex mcp login final` in Codex). Your connections and settings in Final aren't affected.
+  </Accordion>
+</AccordionGroup>
+
+## Reaching your connected accounts
+
+<AccordionGroup>
+  <Accordion title="My agent says no account can run the tool">
+    Either the service isn't connected, or your connection doesn't include the access that tool needs. The error names the service and the missing scopes, and often includes a link.
+
+    Open **Connectors** in Final and check the service. If it's missing, add it. If it's there, open it and connect the account again, granting the access the tool needs. Signing in to Final alone never connects a service.
+  </Accordion>
+  <Accordion title="A connection shows Needs attention">
+    The service stopped accepting the saved sign-in, usually because a token expired, a password changed, or access was revoked on the service's side. Open the connection in **Connectors** and connect the account again.
+  </Accordion>
+  <Accordion title="A service I connected doesn't show up in my client">
+    Check that you signed in to the same Final organization where you connected it. Connections belong to an organization, and your client only sees the one it signed in to.
+
+    If you're relying on a teammate's account, make sure they shared it with a project you belong to. See [share an account with your team](/mcp-gateway/accounts-and-approvals#share-an-account-with-your-team).
+  </Accordion>
+  <Accordion title="My agent keeps asking which account to use">
+    More than one of your accounts can run the tool, and the gateway never picks one for you. Tell the agent which to use, like "use my work GitHub account". To make the choice automatic, add a description to each account under **Connectors** with **Edit description**.
+  </Accordion>
+  <Accordion title="My agent says a tool doesn't exist or rejects its inputs">
+    The agent probably guessed a tool path or field name. Ask it to call `search_tools` for the task, then `describe_tools` on the result, and use the exact path and fields from the response. See [how a request flows](/mcp-gateway/tools#how-a-request-flows).
+  </Accordion>
+  <Accordion title="My client lists catalog tools instead of my service tools">
+    You added the **Catalog MCP URL** instead of the **Final MCP URL**. The catalog server manages connectors but can't call your service tools. Add `https://api.final.ai/v1/connectors/mcp` as your main server. You can keep the catalog server alongside it under a different name.
+  </Accordion>
+</AccordionGroup>
+
+## Approvals
+
+<AccordionGroup>
+  <Accordion title="A call is stuck awaiting approval">
+    The tool can change data, so it needs your approval, and your client can't show an approval prompt in the chat. Open **Code Mode** > **Approvals** in Final, review the call, and click **Approve**. Then tell your agent to continue. It resumes with the approval ID from the error.
+
+    Nothing has run while a call is waiting.
+  </Accordion>
+  <Accordion title="My agent says the approval expired, was already used, or changed">
+    Each approval covers one exact call. It can't be reused once it has run, and it doesn't carry over if the agent changes the inputs. Ask the agent to make the call again and approve the new request. To stop being asked for a tool you trust, choose **Always allow** when you approve, or add an **Allow** policy under **Code Mode** > **Policies**.
+  </Accordion>
+  <Accordion title="A tool call was denied">
+    You or a teammate rejected the call, or a **Deny** policy covers that tool. Check **Code Mode** > **Policies** and look at **Effective policy** for the tool. Policies set on a parent project apply to its subprojects too.
+  </Accordion>
+  <Accordion title="Catalog changes fail because they need confirmation">
+    Changes made through the catalog server, like adding a connector or sharing an account, ask you to confirm in the chat. If your client can't show that prompt, make the change in the Final dashboard instead.
+  </Accordion>
+</AccordionGroup>

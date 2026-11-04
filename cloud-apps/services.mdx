@@ -1,0 +1,161 @@
+---
+title: "Services"
+description: "Run a background worker that stays up without a public URL."
+---
+
+Use a service for code that runs all the time but doesn't answer web traffic: a queue worker, an event consumer, or a loop that keeps two systems in sync. Final builds your container and runs your process in the background. A service has no public URL.
+
+If your code does a batch of work and exits, use a [cron job](/cloud-apps/cron-jobs) instead. If it serves HTTP, use a [web app](/cloud-apps/web-apps).
+
+## Deploy a task worker
+
+This worker processes tasks from a `tasks` table in a Final [SQLite database](/cloud-apps/environment-and-data#databases). Your web app adds rows; the worker claims one at a time, does the work, and marks it done. Because the queue lives in a database Final already hosts, you can run the whole example without any other infrastructure.
+
+<Steps>
+  <Step title="Create the database">
+    In the [dashboard](https://console.final.ai), go to **Developer** > **Cloud**, click **New app or database**, and choose **Database**. Name it `tasks` and click **Create database**.
+
+    Open the database's **Query** tab and create the table:
+
+    ```sql
+    CREATE TABLE tasks (
+      id INTEGER PRIMARY KEY,
+      kind TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
+  </Step>
+
+  <Step title="Write the worker">
+    Final gives the app two environment variables for the database, `TASKS_DB_URL` and `TASKS_DB_TOKEN`. The worker sends SQL to the database's `/query` endpoint with them.
+
+    ```js worker.mjs
+    const { TASKS_DB_URL, TASKS_DB_TOKEN } = process.env;
+
+    async function sql(statement, params = []) {
+      const response = await fetch(`${TASKS_DB_URL}/query`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${TASKS_DB_TOKEN}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ sql: statement, params }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      return result.rows;
+    }
+
+    async function handle(kind, payload) {
+      // Replace with your real work, such as sending an email.
+      console.log(`handled ${kind} for ${payload.to}`);
+    }
+
+    let running = true;
+    process.on('SIGTERM', () => (running = false));
+
+    console.log('worker started');
+    while (running) {
+      // Claim the oldest queued task, so two workers never take the same one.
+      const [task] = await sql(`
+        UPDATE tasks SET status = 'running'
+        WHERE id = (SELECT id FROM tasks WHERE status = 'queued' ORDER BY id LIMIT 1)
+        RETURNING id, kind, payload`);
+
+      if (!task) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        continue;
+      }
+
+      const [id, kind, payload] = task;
+      try {
+        await handle(kind, JSON.parse(payload));
+        await sql(`UPDATE tasks SET status = 'done' WHERE id = ?`, [id]);
+      } catch (error) {
+        console.error(`task ${id} failed: ${error.message}`);
+        await sql(`UPDATE tasks SET status = 'failed' WHERE id = ?`, [id]);
+      }
+    }
+    ```
+
+    The worker uses only built-in Node.js APIs, so there are no dependencies to install.
+  </Step>
+
+  <Step title="Add a Dockerfile and manifest">
+    ```dockerfile Dockerfile
+    FROM node:26-alpine
+    WORKDIR /app
+    COPY worker.mjs .
+    CMD ["node", "worker.mjs"]
+    ```
+
+    ```yaml final-cloud.yaml
+    name: task-worker
+    type: service
+    build:
+      method: dockerfile
+    size: small
+    databases:
+      - name: tasks
+    ```
+
+    `databases` binds the `tasks` database to this app, which is what adds `TASKS_DB_URL` and `TASKS_DB_TOKEN`. A worker that mostly waits on I/O runs fine on `small` (1 vCPU, 512 MB).
+  </Step>
+
+  <Step title="Deploy">
+    Create the app, push, and deploy, as in the [quickstart](/cloud-apps/quickstart):
+
+    ```bash
+    npx final-cloud validate
+    npx final-cloud apps create "Task worker"
+    git add . && git commit -m "Add task worker"
+    git remote add final https://<your-app-repository>.git   # printed by apps create
+    git push final HEAD:main
+    npx final-cloud deploy task-worker
+    ```
+
+    The first deploy asks you to confirm access to the `tasks` database. Type `y`.
+  </Step>
+
+  <Step title="Send it a task">
+    Follow the worker's output:
+
+    ```bash
+    npx final-cloud logs task-worker --source runtime --follow
+    ```
+
+    Then, in the database's **Query** tab, add a task:
+
+    ```sql
+    INSERT INTO tasks (kind, payload)
+    VALUES ('welcome-email', '{"to": "ada@acme.dev"}');
+    ```
+
+    Within a few seconds, the log shows `handled welcome-email for ada@acme.dev`. Press Ctrl+C to stop following.
+  </Step>
+</Steps>
+
+## Write workers that survive restarts
+
+Final replaces a service's instance every time you deploy, and an instance can stop at any point in a task. Two habits keep that from losing or repeating work:
+
+- **Mark work done only after it succeeds.** The worker above sets `done` after `handle` returns, so a task that was interrupted stays visible instead of disappearing. This applies to any queue: acknowledge a message only after you've processed it.
+- **Make each task safe to run twice.** Most queues deliver a message again if a worker stops mid-task. Use an ID to check whether the work already happened, such as an email you've already sent.
+
+To run more than one copy, raise `scaling.min`. Check first that your queue hands each message to only one consumer. The `UPDATE ... RETURNING` claim above does.
+
+```yaml
+scaling:
+  min: 3
+  max: 3
+```
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Secrets and databases" icon="database" href="/cloud-apps/environment-and-data">
+    Add credentials for your queue or email provider, and query databases.
+  </Card>
+  <Card title="Service fields" icon="file-code" href="/cloud-apps/manifest#services">
+    Every service field, with types and defaults.
+  </Card>
+</Columns>

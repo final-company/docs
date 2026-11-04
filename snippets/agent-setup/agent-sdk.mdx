@@ -1,0 +1,9 @@
+<Prompt description="**Build an agent with the Agent SDK.** Paste this into Claude Code, Codex, or Cursor from the repository where the agent should live.">
+Help me build and publish a Final agent in this repository with the @finalai/agents TypeScript SDK, following Final's Agent SDK docs.
+Look at the project first, then ask me what the agent should do if it isn't obvious.
+Create an agent/ directory with agent.ts, instructions.md, and one tool in agent/tools/ that does the agent's core job. Use the serverlessFinal harness with platform credentials paid by the organization.
+Run npx final-agents build ./agent and fix every error before moving on.
+If FINAL_API_KEY isn't set, walk me through creating a key in the Final dashboard and exporting it in my shell. Never write the key to a file tracked by Git.
+Pick a slug, register the agent with client.definitions.create, publish it with npx final-agents publish ./agent --agent followed by the slug, then send it one test message and show me the reply.
+Finish by listing the files you created and how to send the next message.
+</Prompt>
