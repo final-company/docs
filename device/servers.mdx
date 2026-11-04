@@ -1,0 +1,91 @@
+---
+title: "Connect a server"
+description: "Install Final Device on a machine with no browser or desktop, and keep it available from boot."
+icon: "server"
+---
+
+Use this setup for a build box, a machine on your office network, or anything else you reach over SSH. You run one command on the server, approve it from your phone or laptop, and Final Device starts with the machine from then on. All connections are outbound, so the server doesn't need a public address or an open port.
+
+Servers get files, commands, and [local MCP servers](/device/local-mcp-servers). [Computer use](/device/computer-use) needs a signed-in desktop, so it isn't available on a headless machine.
+
+## Install with one command
+
+<Steps>
+  <Step title="Copy the command">
+    In the [Final dashboard](https://console.final.ai), open **Settings** > **Your devices**, click **Add a server**, and pick your platform. The command for your platform looks like this:
+
+    <CodeGroup>
+    ```bash Mac and Linux
+    curl -fsSL https://final.ai/install-device.sh | sh
+    ```
+
+    ```powershell Windows
+    irm https://final.ai/install-device.ps1 | iex
+    ```
+    </CodeGroup>
+  </Step>
+  <Step title="Run it as the right account">
+    Connect over SSH and run the command as the account that should run Final Device. Don't use root: agent commands run as this account, with all of its access. A dedicated account is a good choice.
+
+    On Windows, use an interactive PowerShell window, or an elevated one over SSH.
+  </Step>
+  <Step title="Approve the server">
+    Open the printed link on your phone or laptop and approve the matching code. The server doesn't need a browser.
+  </Step>
+  <Step title="Allow boot startup">
+    Enter your administrator password when asked. The service still runs as the account you chose, never as root or SYSTEM.
+  </Step>
+</Steps>
+
+<Check>
+You're done when the command prints `Final Device is connected and will start at boot.` and the server shows **Connected** under **Your devices**.
+</Check>
+
+<Note>
+A Mac with FileVault may need its disk unlocked after a cold boot before Final Device can start.
+</Note>
+
+## Automate the setup
+
+To set up a machine with no person present, use a one-time token instead of a pairing code.
+
+<Steps>
+  <Step title="Create a token">
+    Under **Your devices**, click **Add a server**, open **Unattended setup**, and click **Generate enrollment token**. Each token works once and expires in ten minutes. Put it in your secret manager.
+  </Step>
+  <Step title="Install with the token">
+    Pass the token on standard input, never as a command argument. This example installs on Linux from a token file:
+
+    ```bash
+    sh Final-Device-linux-x86_64.run --enrollment-stdin --mode server --no-start < /run/secrets/final-device-token
+    ```
+
+    On a Mac, mount the disk image and run the same options with `install` on the program inside the installer app:
+
+    ```bash
+    "/Volumes/Final Device Installer/Final Device Installer.app/Contents/MacOS/final-node-device" install --enrollment-stdin --mode server --no-start < /run/secrets/final-device-token
+    ```
+  </Step>
+  <Step title="Turn on boot startup">
+    Run this with `sudo`, naming the account that should run Final Device. This Linux example uses the `deploy` account:
+
+    ```bash
+    sudo "/home/deploy/.local/share/Final Device/final-node-device" server-startup --user deploy
+    ```
+  </Step>
+</Steps>
+
+The machine supplies its own name, and you can rename it under **Your devices**.
+
+## Reinstall or remove
+
+To upgrade by hand, rerun the installer with `--no-start`. The existing boot service restarts on the new version, and your settings stay in place. Final Device also updates itself automatically.
+
+To remove Final Device from a server, turn off startup, then uninstall:
+
+```bash
+final-node-device settings --startup off
+final-node-device uninstall
+```
+
+See [run Device commands](/device/troubleshooting#run-device-commands) for the program's full path. If a dedicated service account can't turn startup off itself, an administrator can run `sudo final-node-device server-startup --user deploy --remove`.

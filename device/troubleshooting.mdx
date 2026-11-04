@@ -1,0 +1,78 @@
+---
+title: "Troubleshooting"
+description: "Check a device's status, fix common problems, and collect diagnostics."
+icon: "wrench"
+---
+
+Start by opening **Settings** > **Your devices**, which shows whether each device is connected and whether computer use is ready. If that doesn't explain the problem, check the device itself.
+
+## Run Device commands
+
+The commands in these docs use the program `final-node-device`. Run it by its full path, as the account that installed it:
+
+<CodeGroup>
+```bash Mac
+"$HOME/Library/Application Support/Final Device/final-node-device" status
+```
+
+```bash Linux
+"${XDG_DATA_HOME:-$HOME/.local/share}/Final Device/final-node-device" status
+```
+
+```powershell Windows
+& "$env:LOCALAPPDATA\Final Device\final-node-device.exe" status
+```
+</CodeGroup>
+
+`status` reports installation and account connection separately. These commands cover most of what you need:
+
+| Command | What it does |
+| --- | --- |
+| `status` | Shows the machine name, installation state, and readiness. |
+| `connect` | Starts pairing. Add `--no-browser` to print the link instead of opening it. |
+| `settings` | Prints current settings. Add `--paused true` or `--paused false` to pause or resume, or `--startup` with `off`, `login`, or `boot` to change how it starts. |
+| `check-updates` | Checks for an update now. Final Device also checks when it starts and every hour. |
+| `uninstall` | Stops the service, revokes the device, and removes its credentials. |
+
+## Common problems
+
+<AccordionGroup>
+  <Accordion title="The device shows Offline">
+    Check that the machine is awake and online, and that Final Device isn't paused. Open Final Device from its menu bar or tray icon, or run `settings --paused false`. On Windows, clicking **Exit** in the tray stops it until you reopen Final Device from the Start menu.
+
+    If you hid the icon on a Mac, opening Final Device from `~/Applications` brings it back.
+  </Accordion>
+  <Accordion title="The pairing code expired">
+    Codes last ten minutes. Run `connect` or click **Connect** again for a new one. Your installation isn't affected.
+  </Accordion>
+  <Accordion title="Work stopped when the computer slept">
+    Running commands stop when the computer sleeps or the connection drops, and they don't restart by themselves. Final Device keeps the computer awake during active turns, but it can't override closing the lid or choosing **Sleep**. Ask the agent to run the work again, and see [sleep, pause, and connection loss](/device/working-on-your-computer#sleep-pause-and-connection-loss).
+  </Accordion>
+  <Accordion title="A tool works in my terminal but not for the agent">
+    Commands get a small environment captured from your shell's startup files. If you just installed the tool, ask the agent to refresh the environment. If it depends on a variable other than `PATH`, set that variable in the command. See [how commands run](/device/working-on-your-computer#how-commands-run).
+
+    If shell startup fails or takes longer than ten seconds, commands fall back to `/bin/sh` with a standard environment. Keep slow setup out of your shell's startup files.
+  </Accordion>
+  <Accordion title="Computer use isn't ready">
+    On a Mac, click **Finish computer-use setup** in the menu bar icon and grant **Screen Recording** and **Accessibility**. Older installations may need to update first, so run `check-updates`. Without a signed-in desktop session, computer use isn't available. See [set it up](/device/computer-use#set-it-up).
+  </Accordion>
+  <Accordion title="My local MCP tools don't appear">
+    Start or reload the agent session, because servers are discovered when a session starts. Check that the server is on in `mcp list`, that the chat can write to the device, and that the server starts on its own from your terminal. If a server's name matches one the agent already has, the local one is skipped. Rename it.
+  </Accordion>
+  <Accordion title="Archiving a chat failed">
+    Your local files stay in place when a backup fails, and Final Device retries for you. Backups fail on folders over [the size limits](/device/working-on-your-computer#archive-a-chat) and on unsupported special files. Clear the folder's generated files and try again. A full disk or files your account can't remove need fixing on the machine.
+  </Accordion>
+</AccordionGroup>
+
+## Collect diagnostics
+
+Final Device keeps a short local log for up to seven days and never uploads it automatically. It records events, timings, and counts, not your messages, paths, screenshots, or credentials.
+
+To capture a problem, turn on detailed logging for 30 minutes, reproduce the issue, then export the log:
+
+```bash
+final-node-device diagnostics enable
+final-node-device diagnostics export --output ./device-diagnostics.jsonl
+```
+
+These commands work without a network connection or an account. Use `diagnostics status` to check the log, `diagnostics disable` to end detailed logging early, and `diagnostics clear` to delete the log.

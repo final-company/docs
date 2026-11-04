@@ -136,6 +136,34 @@
         ]
       },
       {
+        "tab": "Final Device",
+        "icon": "laptop",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "device/overview",
+              "device/quickstart"
+            ]
+          },
+          {
+            "group": "Use your device",
+            "pages": [
+              "device/working-on-your-computer",
+              "device/computer-use",
+              "device/local-mcp-servers",
+              "device/servers"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "device/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Final VMs",
         "icon": "server",
         "groups": [

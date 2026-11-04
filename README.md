@@ -1,6 +1,6 @@
 # Final documentation
 
-Mintlify docs for AI coding, the Agent SDK, MCP gateway, VMs, CI runners, and
+Mintlify docs for AI coding, the Agent SDK, MCP gateway, Final Device, VMs, CI runners, and
 Cloud Apps. Pages are MDX; navigation is in `docs.json`.
 
 ## Local development

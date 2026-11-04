@@ -1,0 +1,55 @@
+---
+title: "Computer use"
+description: "Let an agent see your screen and control desktop apps on your computer."
+icon: "arrow-pointer"
+---
+
+Computer use lets an agent work with the apps on your computer the way you do, by looking at the screen, moving the cursor, and typing. Use it for desktop programs and websites that have no API, or to check how your own app behaves on a real machine.
+
+It's on by default and only starts when an agent needs it. Ordinary file and command work doesn't touch your desktop.
+
+## Set it up
+
+<Tabs>
+  <Tab title="Mac">
+    A setup window opens after you install Final Device. Click **Allow** for each permission, and macOS asks you to confirm it in System Settings:
+
+    - **Screen Recording** lets the agent see the screen.
+    - **Accessibility** lets it click and type.
+
+    The window closes once both are granted. If you skip it or revoke a permission later, click **Finish computer-use setup** in the menu bar icon.
+
+    When Google Chrome is installed, the window also offers optional **Google Chrome** access, which lets the agent use your signed-in Chrome directly. Without it, computer use still works in Chrome through accessibility actions. To turn it on, click **Allow**, then turn on the **Google Chrome** switch under Final Device in **Privacy & Security** > **Files & Folders**.
+
+    Allow the local network prompt as well, so you can watch the computer live.
+  </Tab>
+  <Tab title="Windows">
+    Stay signed in so that the agent has a desktop to use. If **Your devices** says computer use needs desktop permissions, open Final Device on that computer to finish setup.
+  </Tab>
+  <Tab title="Linux">
+    Computer use needs a signed-in X11 desktop session with `DISPLAY` set. Wayland-only sessions and headless servers don't have a desktop for it to use.
+  </Tab>
+</Tabs>
+
+**Your devices** shows whether computer use is ready on each computer. To check from a terminal, [run](/device/troubleshooting#run-device-commands) `final-node-device status`. Grant permissions on the computer being controlled: you can't approve them from another device.
+
+## Give an agent a task
+
+Start a [chat on the device](/device/working-on-your-computer#start-a-chat-on-a-device) and ask it to use the computer:
+
+```text
+Create a chat using my MacBook as its workspace. Use the computer to open Numbers,
+export budget.numbers as a PDF, and put the PDF in the chat's folder.
+```
+
+Only one chat can control the desktop at a time. The agent shares your screen, cursor, and keyboard, so avoid using the computer while it works. Recordings of the session are available in the chat.
+
+<Warning>
+The agent sees whatever is on the screen and can act in any app you're signed in to, including your browser. Close what it shouldn't see before you start the task.
+</Warning>
+
+## Stop computer use
+
+Click **Pause** in the menu bar or tray to stop the agent's control and any input in progress right away. Disconnecting the device stops it too.
+
+To turn computer use off on a machine, [run](/device/troubleshooting#run-device-commands) `final-node-device computer-use disable`. File and command tools keep working.

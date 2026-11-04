@@ -1,0 +1,60 @@
+---
+title: "Final Device"
+description: "Connect your own computer or server to Final, so agents can work with its files, tools, and desktop."
+icon: "laptop"
+---
+
+import AgentSetup from '/snippets/agent-setup/device.mdx';
+
+Final Device lets your agents work on a machine you already own. Install it on a Mac, Windows PC, or Linux server, connect it to your Final account, and start a chat that uses that machine as its workspace. The agent can then read and write files there, run commands with the tools you have installed, and control the desktop.
+
+Reach for it when the work depends on something a cloud computer doesn't have: an app that only runs on your laptop, a build machine on your office network, or a desktop program with no API. If the work doesn't need your machine, a [Final VM](/vm-platform/overview) keeps it isolated from your files.
+
+The agent itself still runs in Final's cloud, along with its model credentials and approval rules. Final Device is a small background service that carries out the agent's file, command, and desktop requests. It only makes outbound connections, so you don't need to open a port.
+
+<Warning>
+Commands run as the operating system account that runs Final Device, with all of that account's access, including files outside the chat's folder. Final Device doesn't contain them. On a shared or sensitive machine, install it under a dedicated account with only the access the agent needs.
+</Warning>
+
+## Let an agent set it up
+
+Give this prompt to your coding agent on the machine you want to connect. It checks that the machine is supported, walks you through installing and pairing, and confirms the connection.
+
+<AgentSetup />
+
+## What you can do
+
+<Columns cols={2}>
+  <Card title="Work in your local files" icon="folder-open" href="/device/working-on-your-computer">
+    Start a chat on your computer and let the agent edit files and run your tools there.
+  </Card>
+  <Card title="Control desktop apps" icon="arrow-pointer" href="/device/computer-use">
+    Let an agent click and type in apps on your computer, including your signed-in Chrome.
+  </Card>
+  <Card title="Use local MCP servers" icon="plug" href="/device/local-mcp-servers">
+    Give agents tools that have to run on your machine, with secrets kept in your keychain.
+  </Card>
+  <Card title="Connect a server" icon="server" href="/device/servers">
+    Install on a machine with no browser and keep it available from boot.
+  </Card>
+</Columns>
+
+## Key concepts
+
+| Term | What it means |
+| --- | --- |
+| **Device** | A computer or server connected to your Final account. Only you, its owner, can choose it as a workspace. |
+| **Chat workspace** | Where a chat's files and commands live. Each chat has one workspace, in the cloud or on one device, and you choose it when you create the chat. |
+| **Pairing** | Approving a machine from a signed-in phone or computer, using a code that lasts ten minutes. |
+| **Pause** | Takes the device offline from its menu bar or tray until you resume. Automatic updates continue. |
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Connect your computer" icon="rocket" href="/device/quickstart">
+    Install Final Device, pair it, and run a first task in about five minutes.
+  </Card>
+  <Card title="Work on your computer" icon="laptop-code" href="/device/working-on-your-computer">
+    Learn where files live, how commands run, and what happens when the computer sleeps.
+  </Card>
+</Columns>
