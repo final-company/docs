@@ -1,0 +1,77 @@
+---
+title: "Work on your computer"
+description: "Start chats on a device, and learn how files, commands, schedules, and sleep work there."
+icon: "laptop-code"
+---
+
+A device chat works like any other Final chat, except that its files and commands live on your machine. This page covers what changes when they do.
+
+## Start a chat on a device
+
+Ask Home to create a chat and name the device you want it to use:
+
+```text
+Create a chat using my MacBook as its workspace and run the tests in ~/code/acme-web.
+```
+
+Only the device's owner can choose it as a workspace. The choice is fixed when the chat is created, so start a new chat to work somewhere else. Home itself always stays in the cloud.
+
+Everyone in the chat shares that workspace, including other people you've added, every agent session, and any scheduled tasks. The chat's normal permission mode decides when an agent has to ask before it acts.
+
+<Warning>
+Anyone who can direct the agent in a device chat can reach what your operating system account can reach. Add people to these chats with the same care you'd give to sharing your login.
+</Warning>
+
+## Where files live
+
+Each chat gets its own empty folder on the device, and different chats never share one. The folder stays in place across turns, agent sessions, and scheduled runs. Final doesn't create a repository for you, so ask the agent to clone what it needs.
+
+Keep clones, worktrees, and generated files inside the chat's folder. Commands can reach the rest of your computer, but [archiving a chat](#archive-a-chat) only backs up and cleans up that folder.
+
+## How commands run
+
+On Mac and Linux, commands use your account's configured shell. On Windows, they use Windows PowerShell. A command times out after five minutes by default, and the agent can raise that to as much as one hour.
+
+Commands see a small environment captured from your shell's startup files, including `PATH`, `HOME`, and locale settings. Other exports, such as `JAVA_HOME` or `SSH_AUTH_SOCK`, aren't copied, and neither are aliases or shell functions. Set those explicitly in the command that needs them.
+
+Final Device refreshes this environment in the background about every ten minutes while it's in use. After you install a tool or edit your shell profile, ask the agent to refresh the environment so the next command picks up the change right away.
+
+## Send and receive files
+
+Files you attach to a device chat are copied to `.final/attachments/` in its folder, up to 512 MiB each. Large files on a slow connection can run out of time before that limit, so split them if a transfer fails.
+
+The device has to be online for attachments to download. To keep a file available when the device is offline, ask Home to copy it to its cloud workspace.
+
+## Schedule work
+
+Scheduled tasks in a device chat run on the device, in the same folder as your interactive turns. The schedule itself lives in Final, not in your computer's cron or Task Scheduler, so the device has to be connected when a task comes due. Disconnecting a device pauses its schedules.
+
+## Sleep, pause, and connection loss
+
+While an agent is working, Final Device stops your computer from going to sleep on its own. The display can still sleep, and closing the lid or choosing **Sleep** works as usual. Open chats that aren't doing anything don't keep the computer awake.
+
+A device chat never moves to the cloud or to another machine. When the device isn't available, the chat shows a notice and its files and tasks wait until it's back.
+
+| What happens | Effect on running work | How to get back |
+| --- | --- | --- |
+| **Computer sleeps or loses its connection** | Commands, local MCP servers, and computer use stop. They don't restart on their own. | Final Device reconnects by itself. Ask the agent to run the work again. |
+| **You click Pause** | The device goes offline and its work stops. Updates continue. | Click **Resume**. |
+| **You remove the device** | Access is revoked immediately. | Pair the machine again. |
+
+## Archive a chat
+
+Archiving a device chat frees the disk space it used. Final Device stops the chat's commands, packs its folder, and uploads the archive to private storage at Final. Once Final has verified the upload, it removes the local files. Unarchiving downloads the archive and restores the folder to its original path.
+
+The archive includes Git repositories in the folder, along with uncommitted and unpushed work. It doesn't include anything outside the folder, so stop detached processes first and move external files in if you need them.
+
+An archive can be up to 4 GiB compressed, 16 GiB expanded, and one million entries. If a backup fails for any reason, your local files stay in place and the chat reports the error. An offline device finishes pending archive work when it next connects.
+
+## Disconnect or uninstall
+
+To disconnect a device, open **Settings** > **Your devices**, click **Remove**, then click **Disconnect**. This revokes its access but leaves Final Device installed.
+
+To uninstall, [run](/device/troubleshooting#run-device-commands) `final-node-device uninstall`, or remove it from **Apps** in Windows settings. Uninstalling stops startup, revokes the device, and removes its local credentials. Folders that still contain files stay on disk, so your work isn't deleted. If the machine is offline when you uninstall, remove it under **Your devices** too.
+
+## Use a device from an agent you build
+
+Agents you build with the Agent SDK can use a device as their sandbox. See [run on a Final Device](/build/sandboxes#run-on-a-final-device).

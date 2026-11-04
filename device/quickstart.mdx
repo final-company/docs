@@ -1,0 +1,84 @@
+---
+title: "Connect your computer"
+description: "Install Final Device, pair it with your account, and have an agent write a file on your computer."
+---
+
+In about five minutes, you'll install Final Device, connect it to your account, and have an agent create a file on your computer.
+
+<Tip>
+Prefer to have your agent do the setup? Copy the [setup prompt](/device/overview#let-an-agent-set-it-up) and paste it into your client on the machine you want to connect.
+</Tip>
+
+You need a Final account and an Apple silicon Mac, an x86_64 Windows PC, or an x86_64 Linux machine. To connect a machine with no desktop, follow [connect a server](/device/servers) instead.
+
+<Steps>
+  <Step title="Install Final Device">
+    In the [Final dashboard](https://console.final.ai), open **Settings**, go to **Your devices**, and click **Add a computer**. Pick your platform to download its installer.
+
+    <Tabs>
+      <Tab title="Mac">
+        Open the disk image, then open the installer app inside it.
+      </Tab>
+      <Tab title="Windows">
+        Run the downloaded installer.
+      </Tab>
+      <Tab title="Linux">
+        Run the installer from a terminal:
+
+        ```bash
+        sh Final-Device-linux-x86_64.run
+        ```
+      </Tab>
+    </Tabs>
+
+    Installing doesn't touch your account yet, so you can stop here and connect later. Final Device starts when you sign in to your computer.
+  </Step>
+  <Step title="Start pairing">
+    <Tabs>
+      <Tab title="Mac">
+        Click **Connect account** on the last screen of the installer. To connect later, open Final Device from `~/Applications` and click **Connect** in its menu bar icon.
+      </Tab>
+      <Tab title="Windows">
+        Choose to connect on the installer's finish screen. To connect later, reopen Final Device from the Start menu.
+      </Tab>
+      <Tab title="Linux">
+        Run the installed program, then open the link it prints:
+
+        ```bash
+        "${XDG_DATA_HOME:-$HOME/.local/share}/Final Device/final-node-device" connect --no-browser
+        ```
+      </Tab>
+    </Tabs>
+
+    A pairing page shows a code that lasts ten minutes. If it expires, start pairing again for a new one.
+  </Step>
+  <Step title="Approve the computer">
+    Sign in on the pairing page, check that the computer name and code match, and approve it. You can also scan the page's QR code to approve from the Final app on your phone, or enter the code under **Settings** > **Your devices**.
+
+    Your computer now appears under **Your devices** as **Connected**. You can rename it there.
+  </Step>
+  <Step title="Run a first task">
+    In Final, ask Home, your main chat, to start a chat on your computer. Use the name it has under **Your devices**:
+
+    ```text
+    Create a chat using my MacBook as its workspace and write a hello.txt file there.
+    ```
+
+    The new chat gets its own folder on your computer, and the agent writes `hello.txt` into it.
+  </Step>
+</Steps>
+
+<Check>
+You're done when the new chat reports that it wrote `hello.txt`. Ask it to run `pwd` (or `Get-Location` on Windows) to see where that folder is on your computer.
+</Check>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Work on your computer" icon="laptop-code" href="/device/working-on-your-computer">
+    Learn how files, commands, and schedules work in a device chat.
+  </Card>
+  <Card title="Set up computer use" icon="arrow-pointer" href="/device/computer-use">
+    Grant desktop access so an agent can use the apps on your computer.
+  </Card>
+</Columns>

@@ -1,0 +1,63 @@
+---
+title: "Local MCP servers"
+description: "Give agents in a device chat tools that run on your own machine."
+icon: "plug"
+---
+
+A local MCP server is a program on your machine that gives agents extra tools over standard input and output. Use one when a tool has to run locally, such as a notes app, a hardware controller, or an internal service that's only reachable from your network. For hosted services like GitHub or Linear, use the [MCP gateway](/mcp-gateway/overview) instead.
+
+Your servers are available in chats that use the device as their workspace. Each one appears to the agent with a `device_` prefix, so a server named `notes` shows up as `device_notes`.
+
+## Add a server
+
+<Tabs>
+  <Tab title="Final Desktop">
+    Open **Settings** > **Your devices** > **Local MCP servers** in the Final desktop app. From there you can add, edit, turn on or off, and remove servers, and manage their environment variables. The web and mobile apps can't configure these servers, because they don't run on the machine.
+  </Tab>
+  <Tab title="Command line">
+    [Run](/device/troubleshooting#run-device-commands) these commands on the device. Everything after `--` is the program to start:
+
+    ```bash
+    final-node-device mcp add notes -- /usr/local/bin/notes-mcp --stdio
+    final-node-device mcp add project --cwd /Users/sam/code/acme-web -- /usr/local/bin/project-mcp
+    final-node-device mcp list
+    ```
+
+    Turn a server off and on, or remove it:
+
+    ```bash
+    final-node-device mcp disable notes
+    final-node-device mcp enable notes
+    final-node-device mcp remove notes
+    ```
+  </Tab>
+</Tabs>
+
+A device can have up to 16 servers. Names can be 1 to 40 letters, numbers, underscores, or hyphens. Install the server's packages before you add it.
+
+Start or reload an agent session to pick up a new server. After you change, turn off, or remove a server, its running copies stop, so reconnect the agent to use the new configuration.
+
+## Store secrets
+
+Keep secrets in environment values, not in the command itself. `env-set` reads the value from standard input, so it never appears in your shell history:
+
+```bash
+final-node-device mcp env-set notes API_TOKEN < /path/to/token-file
+final-node-device mcp env-remove notes API_TOKEN
+```
+
+Values are stored in macOS Keychain, Windows Credential Manager, or Linux Secret Service. They aren't uploaded to Final or included in chat archives. Listings show variable names only, and removing a server removes its saved values.
+
+On a server with no keychain, add `--plaintext` to `env-set` to store the value in a private configuration file instead.
+
+<Warning>
+An agent with command access runs as the same account as these servers, so it can change a server's command and read its secrets. Whatever a server returns from a tool goes to the agent, so make sure tools don't return secrets.
+</Warning>
+
+## How servers run
+
+Final Device starts your servers when a chat's agent session starts, using the same account as Final Device. They start in the chat's folder unless you set `--cwd`, and they get a small standard environment plus the values you configured.
+
+Servers need the chat to have write access. They stop when the device pauses or disconnects, and when the chat's access to the device lapses. After an idle period, the next message reconnects them. If tools disappear after an update or restart, reload the agent session.
+
+To use a Node-based server on Windows, give the absolute path to `node.exe` with the script as an argument, because `npx` may not resolve when Final Device starts in the background. On Mac and Linux, `npx` and `/usr/bin/env node` work when `node` is on the `PATH` from your shell's startup files.

@@ -116,6 +116,20 @@ export const computer = computerSetupGuide({
 
 `ref` is the guide's slug in Final, not a local path. `version` can be a version number to pin the guide, or `'latest'`. Options you pass here override the guide's saved defaults.
 
+## Run on a Final Device
+
+To have the agent work on a machine you own instead of a cloud computer, use `device` in place of `computer`. The machine needs [Final Device](/device/overview) installed and connected:
+
+```ts agent/sandbox.ts
+import { device } from '@finalai/agents/sandboxes';
+
+export const workstation = device({ deviceId: '6f1c2a7e-3b4d-4e8f-9a21-7c5d0e1b2f34' });
+```
+
+Bind it the same way, with `baseTools({ shell: workstation, files: workstation })`. Leave out `deviceId` to use the only device owned by the person the session acts for. The session fails if that person has none or has several. You can also pass `pairing` with an approved pairing code instead of an ID.
+
+The definition chooses the device, and starting a session doesn't override it. If the device is paused or offline, the session fails instead of moving to the cloud. Commands run as the machine's operating system account with all of its access, so keep `permissionMode` on `ask` until you trust the agent.
+
 ## Computer options
 
 `computer()` and `computerSetupGuide()` both accept these options:
