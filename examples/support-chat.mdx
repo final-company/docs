@@ -395,7 +395,7 @@ export default function SupportPage() {
     Save the [`upload-draft.ts` script](/operate/publishing#publish-code-that-uses-secrets) beside `agent/`, then upload the initial default-branch draft with your project API key:
 
     ```bash
-    node upload-draft.ts order-support agent.ts instructions.md lib/store-api.ts tools/lookup_order.ts tools/cancel_order.ts
+    node --env-file=.env.local upload-draft.ts order-support agent.ts instructions.md lib/store-api.ts tools/lookup_order.ts tools/cancel_order.ts
     ```
 
     Resolve any reported compile errors or missing secrets. Have that admin review the uploaded files in the agent's **Code** view in Final and choose **Save and publish**. Uploading or compiling does not publish it. After publication, later source edits also use that admin's Code view; the API key cannot make those updates through CI.

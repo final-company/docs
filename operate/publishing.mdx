@@ -66,7 +66,7 @@ Publishing makes the agent's repository match your local directory, and deletes 
 
 An organization admin **with Editor access to the agent's project** must publish code that declares secrets, including secrets used by MCP connections, webhooks, custom channels, and phone channels, or requests installed application credentials from an authored channel. An API key does not inherit that admin authority. A local build and a read-only draft compilation are allowed; publishing or making a test revision is a separate approval.
 
-For a new agent, register its initial definition with your project API key first. The same upload flow also applies to a previously published agent that has no approved secret or authored-channel application credential declarations yet. Upload its first secret-using draft using the script below. List only source files, with paths relative to `agent/`; never include secret values, `.env` files, or generated output.
+For a new agent, register its initial definition with your project API key first. The same upload flow also applies to a previously published agent that has no approved secret or authored-channel application credential declarations yet. Upload its first secret-using draft using the script below. List only source files, with paths relative to `agent/`; never include secret values, `.env` files, or generated output. The script only writes the listed files; it does not remove existing files. Delete obsolete files in the agent's **Code** view before publishing.
 
 ```ts upload-draft.ts
 import { readFile } from 'node:fs/promises';
@@ -168,7 +168,7 @@ jobs:
 
 ## Test a revision before publishing
 
-A test revision compiles a branch of the agent's repository without making it current. For a secret-using agent, sign in to Final as an organization admin with project edit access, review and save the candidate draft, then open the agent's **More agent actions → Run draft test…**. Enter a prompt in **Test draft** and choose **Run test**. This creates a test revision and session without activating schedules or channels.
+A test revision compiles a branch of the agent's repository without making it current. For a secret-using agent, sign in to Final as an organization admin with project edit access, review the candidate draft, then open the agent's **More agent actions → Run draft test…**. Enter a prompt in **Test draft** and choose **Run test**. This creates a test revision and session without activating schedules or channels.
 
 The project API key cannot create a secret-using test revision. For agents without privileged declarations, the API-key client can create a test revision and start a session like this:
 
