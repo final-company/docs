@@ -48,6 +48,36 @@ export default defineAgent({
 
 The installation must be available to the agent's project and match the channel's provider. Publishing checks this selection; compiling locally does not contact the provider.
 
+To configure a project-owned binding directly, use the same API key with `agents:write` and project Editor access. This example configures the GitHub mention trigger; choose the matching installed application and copy the returned route URLs:
+
+```ts configure-channel.ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+try {
+  const binding = await client.channelBindings.create({
+    projectId: 'prj_your_project',
+    connectorInstallId: 'app_your_github_install',
+    channel: { kind: 'package', specifier: '@finalai/final-agent-provider/channels/github' },
+    config: { mention: 'your-app-bot[bot]' },
+  });
+  console.log(binding);
+} finally {
+  client.close();
+}
+```
+
+Save this as `configure-channel.ts`, replace the two IDs and bot login, then run it with Node.js 26 or later:
+
+```bash
+node configure-channel.ts
+```
+
+Creating a binding configures the channel; connecting a provider place to a chat still uses your signed-in Final person session.
+
 ## Provider setup
 
 Create or select your application in the Final project's connected applications. Store bot credentials, OAuth client secrets, and signing material there, never in channel source. Publishing an agent or installing a shared channel prints the binding and its public routes. Copy the full URLs instead of composing them from binding identifiers. Copy the exact webhook URL shown in the application settings when Final forwards provider events. For direct delivery, copy the POST route's `alias:` URL ending in `/b/<raw-binding-id>/webhook`; if no alias is printed, copy the route URL itself.
@@ -68,6 +98,8 @@ Slack and Discord read no ambient history by default. Set `history: 'linked-memb
 **Link** proves control of a provider account while you are signed in to Final. Slack uses OpenID; Discord, GitHub, and Linear use user OAuth. A link belongs to the app installation or channel binding. Another application cannot reuse it. Unlinking, deactivation, or provider revocation ends that authority.
 
 **Connect** selects the Final chat for a provider place, such as a Slack thread or GitHub pull request. Only someone who can manage the chat can connect it. A **Shared chat** is a group conversation. [Create it in Final](#create-a-shared-chat-in-final) inside the channel's project before connecting, with the published agent as its default participant so outside inputs reach it. The Connect page selects an existing chat; it does not create one. Shared places connect to Shared chats. Linked direct messages can use your own chat with the agent. **Disconnect** ends a route; **Unlink** ends account proof. **Follow** subscribes a chat to changes in an external resource without making it that resource's conversation.
+
+Linear is an exception to this first-use setup: after a linked member first addresses the agent in an issue or agent session, the Linear factory automatically creates a Shared chat in the channel's Final project. You do not need to prepare a separate chat or use a Connect page for that automatic route.
 
 | Policy | Values |
 | --- | --- |
@@ -228,7 +260,7 @@ Send a JSON start frame before binary microphone frames:
 
 Use the verified OAuth userinfo values, not another person's IDs. Input and output audio are mono, little-endian PCM16 at 16 kHz, carried as binary frames. JSON `transcript` frames report recognized text; `speech.start` tells the client to clear queued playback for barge-in. Send `{"type":"cancel"}` to interrupt or `{"type":"stop"}` to finish microphone input. Continue playing received audio until `speech.end` has `final: true`; per-turn ends are not terminal. Errors arrive as JSON `error` frames. A frame with `recoverable: true` is an advisory: show the message and keep capture and playback open. Other error frames are terminal. On `linked`, stop capture and show its `message`. If `linkUrl` is present, offer the account-link flow and reconnect after it completes; blocked or no-access accounts may have no link. This refusal closes with code `1008` and has no terminal drain frame. A start principal that does not match the authenticated account also closes with `1008`, without a preceding frame; handle that close as an identity refusal. `recording.notice` supplies the recording disclosure, and `trace` supplies timing data. Ignore unknown frame types for forward compatibility. A `notice` frame ends microphone capture: stop sending audio and show its message, while continuing to play the spoken explanation until `speech.end` has `final: true`. The server may end a call this way without a client `stop` frame. Post no separate dictation message: the channel posts final utterances itself.
 
-For Twilio, use an SMS-capable Twilio number; member callers must also be able to receive SMS. Create the project secret `twilio-auth-token` with the account's Auth Token, configure an SMS-capable calling number, and add:
+For Twilio, use an SMS-capable Twilio number; member callers must also be able to receive SMS. Before sending to US numbers, complete [A2P 10DLC registration](https://www.twilio.com/docs/messaging/compliance/a2p-10dlc/quickstart) for a US long-code sender, or [toll-free verification](https://www.twilio.com/docs/messaging/compliance/toll-free/console-onboarding) for a toll-free sender. An SMS-capable number alone does not guarantee delivery; check Twilio's messaging logs when a link or code does not arrive. Create the project secret `twilio-auth-token` with the account's Auth Token, configure an SMS-capable calling number, and add:
 
 ```ts agent/channels/phone.ts
 import { phoneChannel } from '@finalai/final-agent-provider/channels/phone';
@@ -239,7 +271,7 @@ Set the number's incoming Voice webhook to the published phone `/webhook` route,
 
 With `audience: 'anyone'`, each call creates its own agent-only Shared chat, keyed by the call. No human participant is added automatically, and calls do not collect in one fixed inbox. The transcript and recording are saved in that per-call chat. Project viewers can read it; an editor's first post joins them to it.
 
-Ordinary web and mobile inboxes list chats you participate in, so these chats are not automatically shown there. An operator must list the installation's project explicitly. In an existing signed-in Final client this is `client.conversations.list({ projectId })`; Project API keys have no person inbox; listing returns an empty list rather than these call chats.
+Ordinary web and mobile inboxes list chats you participate in, so these chats are not automatically shown there. An operator must list the installation's project explicitly. In the [existing signed-in person client used by Final's apps](/client/conversations), this is `client.conversations.list({ projectId })`; Project API keys have no person inbox; listing returns an empty list rather than these call chats.
 
 To inspect them from the Final web app, open your project's page on the canonical `https://final.ai` web origin while signed in (even if you arrived through another Final URL), then run this in that tab's browser developer console with the project's `prj_…` ID:
 

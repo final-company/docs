@@ -9,6 +9,8 @@ Every weekday at 9 a.m., this agent reads your repository's pull requests and po
 
 **What it shows:** a [schedule](/build/schedules) written in Markdown, an MCP [connection](/build/connections) to GitHub limited to read-only tools with an annotation selector, and triggering a schedule from a script with [`runNow`](/build/schedules#run-a-schedule-now).
 
+Use your personal **My Work** project for this version: the default `owner-direct` schedule target posts to that project's owner's chat. Create the API key for My Work and register the agent there. For a Shared project, use the `bound-conversation` option below; a Shared project has no personal owner for `owner-direct`.
+
 ## Files
 
 <Tree>
@@ -98,7 +100,7 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
     ```
   </Step>
   <Step title="Add a GitHub token">
-    Create a fine-grained personal access token in GitHub with read access to the repository's **Pull requests**, **Commit statuses**, and **Contents**. In the Final dashboard, add it under **Developer** > **Secrets** with the name `github-token`.
+    Create a fine-grained personal access token in GitHub with read access to the repository's **Pull requests**, **Commit statuses**, and **Contents**. In the same My Work project in Final, add it under **Developer** > **Secrets** with the name `github-token`.
   </Step>
   <Step title="Compile it">
     ```bash
@@ -130,43 +132,30 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
 
 ## Try it
 
-You don't have to wait for 9 a.m. This script triggers the schedule now, waits for the agent to finish writing, and prints the digest:
+You don't have to wait for 9 a.m. This script requests one run and prints its receipt. Read the finished digest in your direct chat with **PR Digest** in Final; the publishing API key does not provide person-owned conversation history or events.
 
 ```ts run-now.ts
-import { AgentRealtimeKind, ParticipantKind, createClient } from '@finalai/agents/client';
+import { createClient } from '@finalai/agents/client';
 
 const client = createClient({
   host: 'https://agent-session.final.ai/api',
   auth: { apiKey: process.env.FINAL_API_KEY! },
 });
 
-const run = await client.schedules.runNow({ agent: 'pr-digest', key: 'morning-digest' });
-if (!run.conversationId) throw new Error('The schedule did not post to a conversation');
-
-const conversation = client.conversations.get(run.conversationId);
-for await (const event of conversation.events()) {
-  if (
-    event.kind !== AgentRealtimeKind.MessageCreated &&
-    event.kind !== AgentRealtimeKind.MessageUpdated
-  ) {
-    continue;
-  }
-  // The agent's message updates as it writes. `streaming` is null once it's done.
-  const { author, body, streaming } = event.message;
-  if (author.kind === ParticipantKind.Agent && streaming === null && body) {
-    console.log(body);
-    break;
-  }
+try {
+  const run = await client.schedules.runNow({ agent: 'pr-digest', key: 'morning-digest' });
+  console.log(JSON.stringify(run, null, 2));
+  console.log('Open your direct chat with PR Digest in Final to read the result.');
+} finally {
+  client.close();
 }
-
-client.close();
 ```
 
 ```bash
 npx tsx run-now.ts
 ```
 
-After a minute or so, you see something like:
+After a minute or so, open Final to read a digest like:
 
 ```text
 Merged
@@ -184,5 +173,5 @@ The digest also appears in your direct conversation with the agent, where the sc
 
 ## Make it yours
 
-- **Post it in a Shared chat.** Add a provider channel, publish it, and connect its place to the intended Shared chat as described in [channels](/build/channels#link-a-person-and-connect-a-place). Then set `target: bound-conversation` in the schedule. All active chat routes for that agent must select the same chat; observe routes do not choose the schedule target.
+- **Post it in a Shared chat.** Add a provider channel, publish it, and connect its place to the intended Shared chat as described in [channels](/build/channels#link-a-person-and-connect-a-place). Then set `target: bound-conversation` in the schedule and publish the agent again to activate that change. All active chat routes for that agent must select the same chat; observe routes do not choose the schedule target.
 - **Cover more repositories.** List them in `instructions.md`, and give the token read access to each one.

@@ -12,6 +12,9 @@ A linked repository collaborator mentions your bot on a public pull request. The
 Use Node.js 26 or later:
 
 ```bash
+mkdir pr-reviewer && cd pr-reviewer
+git init
+printf 'node_modules/\n.final/\n.env*\n' > .gitignore
 pnpm add @finalai/agents @finalai/final-agent-provider zod
 mkdir -p agent/channels agent/tools
 ```

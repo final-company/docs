@@ -12,6 +12,9 @@ This agent explains deployment events and log excerpts supplied by CI. It posts 
 Use Node.js 26 or later and install:
 
 ```bash
+mkdir deployment-watcher && cd deployment-watcher
+git init
+printf 'node_modules/\n.final/\n.env*\n' > .gitignore
 pnpm add @finalai/agents @finalai/final-agent-provider zod
 mkdir -p agent/channels
 ```
