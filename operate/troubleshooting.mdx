@@ -72,8 +72,8 @@ Find the symptom that matches what you're seeing. Each entry explains the cause,
   <Accordion title="My local webhook returns 202, but the agent never replies">
     `final-agents dev` only runs your route code. It logs what the agent would receive, but doesn't start the agent. Publish, then send the event to the route's public URL.
   </Accordion>
-  <Accordion title="A published webhook fails with 'attached to no conversation'">
-    The route uses `target: { kind: 'bound-conversation' }`, but the channel isn't attached to a conversation yet. [Attach one](/build/channels#connect-it-to-a-conversation), or use `owner-direct`.
+  <Accordion title="A channel refuses an unconnected place">
+    Connect the provider place to a chat you can manage, using the returned Connect link or the chat's Connected section. A shared place needs a Shared chat. See [Link and Connect](/build/channels#link-a-person-and-connect-a-place).
   </Accordion>
   <Accordion title="A schedule doesn't run">
     Schedules only run for the published revision. Publish, then check `nextRunAt` with `client.schedules.list({ agent })`. Use `runNow` to test it right away. See [schedules](/build/schedules#run-a-schedule-now).

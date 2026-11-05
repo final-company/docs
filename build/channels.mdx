@@ -87,6 +87,10 @@ Routes receive the channel context plus `request` and `receive`. Verify the prov
 
 Semantic handlers include `message.delta`, `message.completed`, `tool.started`, `tool.completed`, `plan.updated`, `decision.created`, `decision.resolved`, and `turn.completed`. Origin-bearing edits, removals, and reactions return to their provider. `message.posted` supports `replies: 'all'`. Keep delivery receipts in `store`: completion events may be delivered more than once.
 
+## Test it locally
+
+Run `npx final-agents dev ./agent` to preview HTTP and WebSocket routes. Set declared local secret values with `AGENT_LOCAL_SECRETS_JSON`. The preview verifies and parses requests, then logs what `receive` would accept; it does not run an agent or grant member, chat, application, or media capabilities. Publish and connect a real place to test replies and identity proof.
+
 ## Voice
 
 `voiceChannel()` combines live transcription, member messages, the conversation's turn stream, and streaming synthesis. It authenticates through Final OAuth with PKCE; another voice client uses the same OAuth and WebSocket protocol. `phoneChannel()` wraps that core in Twilio signed call webhooks and 8 kHz mu-law Media Streams. A phone number proves control with an SMS challenge, or an explicitly configured `anyone` line accepts captioned input.
