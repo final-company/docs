@@ -27,7 +27,8 @@ icon: "book"
 | --- | --- |
 | `sessions` | Start a session, or `attach` to one by ID. A session handle sends messages, streams events, lists and answers decisions, and cancels or closes. See [sessions](/client/sessions). |
 | `conversations` | Open direct and group chats, send and read messages, stream events, and list open decisions. See [conversations](/client/conversations). |
-| `definitions` | Register agents, test and publish revisions, compare revisions, and attach channels. See [publishing](/operate/publishing). |
+| `channelBindings` | Install a project-owned shared channel against an existing connector installation. See [channels](/build/channels). |
+| `definitions` | Register agents, test and publish revisions, and compare revisions. See [publishing](/operate/publishing). |
 | `schedules` | List, update, and run schedules. See [schedules](/build/schedules). |
 | `agents` | List the agents your key can use. |
 | `people` | List your organization's members, for adding people to conversations. |
@@ -82,6 +83,16 @@ npx final-agents publish ./agent --agent release-assistant --note 'Add release_s
 <ParamField path="--ref" type="string">
   For agents backed by GitHub only: the branch, tag, or commit to publish. Defaults to the repository's default branch.
 </ParamField>
+
+### `channel install <package>`
+
+Install a shared channel in a project using an existing connector installation:
+
+```bash
+npx final-agents channel install @finalai/slack-channel --project proj_your_project --install cinst_your_install
+```
+
+The Slack, Discord, GitHub, and Linear names are aliases for the corresponding factories exported by `@finalai/final-agent-provider/channels/*`. The command checks project and installation access through the API. It does not create provider credentials.
 
 ### Options for `build` and `publish`
 

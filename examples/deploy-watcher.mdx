@@ -1,249 +1,38 @@
 ---
-title: "Deploy watcher"
-description: "Post every deploy to your team's room, flag failures as they happen, and send a weekly summary."
+title: "Deployment watcher"
+sidebarTitle: "Deployment watcher"
+description: "Send authenticated deployment events to a shared Final chat."
 icon: "rocket"
 ---
 
-This agent lives in your team's deploys room. Your deploy pipeline sends it each result through a webhook, and it posts a one-line update for each success and a short alert for each failure. Every Friday afternoon, it summarizes the week. Use it when deploy notifications are noisy or scattered and you want one place that says what shipped and what needs attention.
+A deployment watcher connects CI events to a chat where your team can follow the result. The event is nonhuman input, so it does not impersonate the person who installed the integration.
 
-**What it shows:** a [channel](/build/channels) with a webhook route, a [schedule](/build/schedules) that posts to the same room, a group [conversation](/client/conversations#create-a-group-conversation) that the channel is [attached to](/build/channels#connect-it-to-a-conversation), and testing the route locally with `final-agents dev`.
-
-## Files
-
-<Tree>
-
-- deploy-watcher/
-  - package.json
-  - .gitignore
-  - attach-room.ts
-  - agent/
-    - agent.ts
-    - instructions.md
-    - channels/
-      - deploys.ts
-    - schedules/
-      - weekly-summary.md
-
-</Tree>
-
-```ts agent/agent.ts
-import { credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
-
-export default defineAgent({
-  name: 'Deploy Watcher',
-  description: 'Posts deploy results to the team room and summarizes them every Friday.',
-  secrets: ['deploy-webhook-token'],
-  harness: serverlessFinal({
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
-    }),
-    permissionMode: 'auto',
-  }),
-});
-```
-
-```markdown agent/instructions.md
-You watch deploys for the acme-web team and post short updates in the team's room.
-For a successful deploy, reply with one line: the service, the version, and a checkmark.
-For a failed deploy, say which service and version failed, link the logs, and ask the release owner to take a look.
-If the same service fails twice in a row, say so, and suggest pausing deploys for it.
-```
-
-The route checks a shared token, validates the body, and hands each event to the agent. `bound-conversation` sends it to whichever conversation the channel is attached to, and `deliveryId` means a retried webhook reaches the agent once. `turnPolicy: 'queue'` handles deploys that land back to back: the agent finishes one update before it starts the next.
+## Add the channel
 
 ```ts agent/channels/deploys.ts
-import { defineChannel, POST } from '@finalai/agents/channels';
-import { z } from 'zod';
-
-const deployEvent = z.object({
-  id: z.string(),
-  service: z.string(),
-  version: z.string(),
-  status: z.enum(['succeeded', 'failed']),
-  logUrl: z.url(),
-});
-
-export default defineChannel({
-  turnPolicy: 'queue',
-  routes: [
-    POST('/events', async ({ request, secrets, receive }) => {
-      const token = await secrets.get('deploy-webhook-token');
-      if (!token || request.headers.get('authorization') !== `Bearer ${token}`) {
-        return new Response('unauthorized', { status: 401 });
-      }
-
-      const event = deployEvent.safeParse(await request.json().catch(() => null));
-      if (!event.success) return new Response('invalid payload', { status: 400 });
-
-      const { id, service, version, status, logUrl } = event.data;
-      await receive({
-        target: { kind: 'bound-conversation' },
-        deliveryId: id,
-        content: [{ type: 'text', text: `Deploy ${status}: ${service} ${version}. Logs: ${logUrl}` }],
-      });
-      return new Response(null, { status: 202 });
-    }),
-  ],
-});
+import { webhookChannel } from '@finalai/final-agent-provider/channels/webhook';
+export default webhookChannel({ secret: 'deploy-webhook-secret' });
 ```
 
-The weekly summary uses `target: bound-conversation` too, so it lands in the same room as the deploy updates:
+Set that secret in your project and publish the agent. In the chat's Connected section, connect the channel's `webhook` place `production-deploys`. The place connects to a Shared chat whose policy asks before writes.
 
-```markdown agent/schedules/weekly-summary.md
----
-cron: '0 16 * * 5'
-timezone: America/New_York
-target: bound-conversation
----
+## Send a deployment event
 
-Summarize this week's deploys in this conversation: how many shipped, which failed and why, and anything still unresolved.
+Have CI POST the standard envelope to the binding's `/webhook` route:
+
+```json
+{
+  "place": { "kind": "webhook", "id": "production-deploys", "title": "Production deploys" },
+  "label": "Deployment 1042",
+  "content": [{ "type": "text", "text": "web 1.2.0 failed deployment. Logs: https://ci.example.com/runs/1042" }],
+  "idempotencyKey": "deploy:1042"
+}
 ```
 
-## Build and publish it
+Sign the exact body with HMAC-SHA256 and send `X-Final-Signature: sha256=<hex digest>`. Keep the same idempotency key on retries. See [authenticated webhooks](/build/channels#add-an-authenticated-webhook).
 
-<Steps>
-  <Step title="Set up the project">
-    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+## Configure the agent
 
-    ```bash
-    mkdir deploy-watcher && cd deploy-watcher
-    git init
-    npm init -y && npm pkg set type=module
-    npm install @finalai/agents zod
-    npm install --save-dev typescript tsx @types/node
-    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
-    ```
-  </Step>
-  <Step title="Test the route locally">
-    `final-agents dev` serves the channel's routes on your machine, with local values for its secrets:
+Give the agent tools for reading deployment logs and service status. Mark read-only tools accordingly, and keep remediation writes behind approval. Tell the agent to report what failed, link the logs, distinguish its diagnosis from evidence, and ask before attempting a rollback.
 
-    ```bash
-    AGENT_LOCAL_SECRETS_JSON='{"deploy-webhook-token":"local-test-token"}' \
-      npx final-agents dev ./agent
-    ```
-
-    In another terminal, send it a deploy:
-
-    ```bash
-    curl -i http://localhost:3000/deploys/events \
-      -H 'Authorization: Bearer local-test-token' \
-      -H 'Content-Type: application/json' \
-      -d '{"id":"dep_1042","service":"acme-web","version":"1.2.0","status":"failed","logUrl":"https://ci.acme.dev/runs/1042"}'
-    ```
-
-    You get `HTTP/1.1 202 Accepted`, and the dev server logs the message the agent would receive:
-
-    ```text
-    receive (deploys): {"target":{"kind":"bound-conversation"},"deliveryId":"dep_1042","content":[{"type":"text","text":"Deploy failed: acme-web 1.2.0. Logs: https://ci.acme.dev/runs/1042"}]}
-    ```
-
-    A wrong token gets `401`. The dev server only runs your route code, so the agent's reply comes after you publish.
-  </Step>
-  <Step title="Compile it">
-    ```bash
-    npx final-agents build ./agent
-    ```
-
-    The summary lists the channel and the schedule:
-
-    ```text
-    agent: Deploy Watcher
-    description: Posts deploy results to the team room and summarizes them every Friday.
-    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
-    ...
-    channels: deploys, final
-    schedules: weekly-summary (0 16 * * 5, America/New_York)
-    secrets: deploy-webhook-token
-    ...
-    wrote /Users/you/deploy-watcher/agent/.final/compile
-    ```
-
-    `final` is a built-in channel that every agent has.
-  </Step>
-  <Step title="Add the webhook token">
-    Generate a long random token, for example with `openssl rand -hex 32`. In the Final dashboard, add it under **Developer** > **Secrets** with the name `deploy-webhook-token`, and save the same value in your CI system's secrets.
-  </Step>
-  <Step title="Register and publish it">
-    Register the `deploy-watcher` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
-
-    ```bash
-    npx final-agents publish ./agent --agent deploy-watcher
-    ```
-
-    The CLI prints the route's public URL:
-
-    ```text
-    channel deploys (chbind_5Tn2...):
-      POST https://agents.final.ai/acme/deploy-watcher/deploys/events
-    ```
-  </Step>
-  <Step title="Create the room and attach the channel">
-    This script creates a group conversation with the agent, then attaches the `deploys` channel to it, so webhook events and the Friday summary land there:
-
-    ```ts attach-room.ts
-    import { createClient } from '@finalai/agents/client';
-
-    const client = createClient({
-      host: 'https://agent-session.final.ai/api',
-      auth: { apiKey: process.env.FINAL_API_KEY! },
-    });
-
-    const room = await client.conversations.create({
-      kind: 'group',
-      title: 'Deploys',
-      participants: [{ agent: 'deploy-watcher' }],
-    });
-
-    const channels = await client.definitions.channels({ definition: 'deploy-watcher' });
-    const deploys = channels.find((channel) => channel.key === 'deploys');
-    if (!deploys) throw new Error('Publish the agent first');
-
-    await client.definitions.attachChannel({
-      definition: 'deploy-watcher',
-      bindingId: deploys.bindingId,
-      conversationId: room.conversation.id,
-    });
-    console.log(`Attached deploys to ${room.conversation.id}`);
-
-    client.close();
-    ```
-
-    ```bash
-    npx tsx attach-room.ts
-    ```
-
-    ```text
-    Attached deploys to conv_8Kd1...
-    ```
-
-    To add teammates, call `room.addParticipant({ user: userId })` with IDs from `client.people.all()`.
-  </Step>
-</Steps>
-
-## Try it
-
-Add a step at the end of your deploy pipeline that sends the result to the route's URL:
-
-```bash
-curl -X POST "$DEPLOY_WEBHOOK_URL" \
-  -H "Authorization: Bearer $DEPLOY_WEBHOOK_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d "{\"id\":\"$DEPLOY_ID\",\"service\":\"acme-web\",\"version\":\"$VERSION\",\"status\":\"$STATUS\",\"logUrl\":\"$LOG_URL\"}"
-```
-
-After the next deploy, the room shows the agent's update:
-
-```text
-Deploy Watcher: acme-web 1.2.1 is live ✓
-Deploy Watcher: acme-web 1.2.2 failed. Logs: https://ci.acme.dev/runs/1044
-  Can the release owner take a look?
-```
-
-To see the Friday summary without waiting, run `client.schedules.runNow({ agent: 'deploy-watcher', key: 'weekly-summary' })`.
-
-## Make it yours
-
-- **Watch more than deploys.** Add routes to the same channel for incidents or feature-flag changes, like `POST('/incidents', ...)`. They share the room and the agent's context.
-- **Correct course mid-turn.** If your pipeline can cancel a deploy, send the cancellation to a second channel with `turnPolicy: 'steer'`, so it reaches the agent even while it's still writing about that deploy.
+The reply appears in the connected chat with the deployment caption. Disconnect the place to stop delivery. Choose `replies: all` only if every message in that chat should also be mirrored to the outside surface.

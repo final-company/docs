@@ -1,158 +1,96 @@
 ---
-title: "Channels and webhooks"
+title: "Channels: people, places, and events"
 sidebarTitle: "Channels"
-description: "Turn webhooks and other HTTP requests into messages for your agent."
+description: "Talk to an agent from Slack, Discord, GitHub, Linear, webhooks, or voice."
 ---
 
-A channel gives your agent its own HTTP endpoints. When another system calls one, like your deploy pipeline, GitHub, or a monitoring alert, your route code turns the request into a message for the agent. Use a channel when outside events should wake the agent up. To have the agent call out to another service instead, use a [connection](/build/connections).
+A channel connects an outside surface to a Final chat. It identifies a **person**, resolves a **place**, and translates **events** in both directions. The agent is whoever participates in that chat. A channel never chooses a Final member by email or supplies a raw member ID.
 
-## Add a webhook route
+## Use a provider channel
 
-Add a file to `agent/channels/`. The file name becomes part of the URL. This route accepts deploy events from your CI system and tells the agent about each one:
+For a bot dedicated to one agent, add the provider factory to that agent's directory:
+
+```ts agent/channels/slack.ts
+import { slackChannel } from '@finalai/final-agent-provider/channels/slack';
+export default slackChannel();
+```
+
+The Discord, GitHub, and Linear factories live at the corresponding `channels/discord`, `channels/github`, and `channels/linear` exports. Connect your own provider application in the agent's project. Your application's credentials and provider verification run through the same package code as an official Final application.
+
+For a shared application that serves several chats and agents, install a project-scoped channel against an existing connector installation:
+
+```bash
+npx final-agents channel install @finalai/slack-channel \
+  --project proj_your_project --install cinst_your_install
+```
+
+`@finalai/slack-channel`, `@finalai/discord-channel`, `@finalai/github-channel`, and `@finalai/linear-channel` are CLI aliases for the matching factories in `@finalai/final-agent-provider/channels/*`. They do not identify separate npm packages. The existing `final-agents` executable provides this command.
+
+## Link a person and connect a place
+
+**Link** proves control of your provider account while you are signed in to Final. Slack uses its OpenID flow; Discord, GitHub, and Linear use user OAuth. A link belongs to the application's installation or channel binding. A different application cannot reuse it. Unlinking, leaving the workspace, or a provider revocation ends that authority.
+
+**Connect** selects the Final chat for a provider place, such as a Slack thread or GitHub pull request. Only someone who can manage the chat can connect it. A shared place connects to a Shared chat. Linked direct messages can use your own chat with the agent. **Disconnect** ends a route; **Unlink** ends your account proof. **Follow** subscribes a chat to changes in an external resource without making it that resource's conversation.
+
+A place has two visible policies:
+
+| Policy | Values |
+| --- | --- |
+| Replies | `origin` sends replies to the place that started the turn. `all` mirrors every message in the connected chat. |
+| Audience | `members` requires linked Final members. `anyone` also accepts captioned input from unlinked people. |
+
+Shared provider bots default to `members`. Unlinked input does not impersonate a member or use personal credentials. Slack and Discord read no thread history by default. Set `history: 'linked-members'` to include only messages whose authors are currently linked members.
+
+## Add an authenticated webhook
+
+`webhookChannel()` accepts a standard event envelope and verifies its HMAC signature:
 
 ```ts agent/channels/deploys.ts
-import { defineChannel, POST } from '@finalai/agents/channels';
-import { z } from 'zod';
-
-const deployEvent = z.object({
-  id: z.string(),
-  service: z.string(),
-  version: z.string(),
-  status: z.enum(['succeeded', 'failed']),
-});
-
-export default defineChannel({
-  routes: [
-    POST('/events', async ({ request, secrets, receive }) => {
-      const token = await secrets.get('deploy-webhook-token');
-      if (!token || request.headers.get('authorization') !== `Bearer ${token}`) {
-        return new Response('unauthorized', { status: 401 });
-      }
-
-      const event = deployEvent.safeParse(await request.json().catch(() => null));
-      if (!event.success) return new Response('invalid payload', { status: 400 });
-
-      const { id, service, version, status } = event.data;
-      await receive({
-        target: { kind: 'bound-conversation' },
-        deliveryId: id,
-        content: [{ type: 'text', text: `Deploy ${status}: ${service} ${version}` }],
-      });
-      return new Response(null, { status: 202 });
-    }),
-  ],
-});
+import { webhookChannel } from '@finalai/final-agent-provider/channels/webhook';
+export default webhookChannel({ secret: 'deploy-webhook-secret' });
 ```
 
-The route checks a shared token, validates the body, and hands the event to the agent with `receive`. `target` says which conversation the message goes to; [connect it to a conversation](#connect-it-to-a-conversation) below. `deliveryId` makes retries safe: if your CI sends the same event twice, the agent sees it once.
+Connect a `webhook` place, such as `production-deploys`, to a chat. Then POST this envelope to the binding's `/webhook` route:
 
-Add the token's name to `secrets` in `agent.ts`, and set its value under **Developer** > **Secrets** in the dashboard:
-
-```ts agent/agent.ts
-secrets: ['deploy-webhook-token'],
+```json
+{
+  "place": { "kind": "webhook", "id": "production-deploys" },
+  "label": "Production deployment",
+  "content": [{ "type": "text", "text": "web 1.2.0 deployed successfully" }],
+  "idempotencyKey": "deploy:1042"
+}
 ```
 
-## Test it locally
+Set `X-Final-Signature` to `sha256=` followed by the hexadecimal HMAC-SHA256 of the exact request body, using `deploy-webhook-secret`. Reuse the idempotency key when retrying the same event. Invalid signatures return `401`; malformed envelopes return `400`. The published route is `/b/<bindingId>/webhook`.
 
-`final-agents dev` serves your routes on your machine and reloads when you edit them. Pass local secret values as JSON:
+## Write a custom channel
 
-```bash
-AGENT_LOCAL_SECRETS_JSON='{"deploy-webhook-token":"local-test-token"}' \
-  npx final-agents dev ./agent
-```
-
-```text
-serving /Users/you/release-assistant/agent at http://localhost:3000
-  POST http://localhost:3000/deploys/events
-```
-
-In another terminal, send it an event:
-
-```bash
-curl -i http://localhost:3000/deploys/events \
-  -H 'Authorization: Bearer local-test-token' \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"dep_1042","service":"acme-web","version":"1.2.0","status":"succeeded"}'
-```
-
-You get `HTTP/1.1 202 Accepted`, and the dev server logs what the agent would receive:
-
-```text
-receive (deploys): {"target":{"kind":"bound-conversation"},"deliveryId":"dep_1042","content":[{"type":"text","text":"Deploy succeeded: acme-web 1.2.0"}]}
-```
-
-Try a wrong token or an empty body to check that you get `401` and `400`. The dev server only runs your route code. It doesn't start the agent, so test the agent's reply after you publish.
-
-## Publish and get the URL
-
-When you [publish](/operate/publishing), the CLI prints each route's public URL:
-
-```text
-channel deploys (chbind_5Tn2...):
-  POST https://agents.final.ai/acme/release-assistant/deploys/events
-    alias: https://agents.final.ai/b/chbind_5Tn2.../events
-```
-
-Point your sender at that URL with the real token. Both URLs reach the same route.
-
-## Connect it to a conversation
-
-A `bound-conversation` target sends events to the conversation you attach to the channel, such as a team room where people can read the agent's replies. Look up the channel's ID, which the API calls `bindingId`, then attach a [conversation](/client/conversations) that both you and the agent are in:
+Use `defineChannel` when you need a different provider or transport. Resolve people and places through the context, then post through the returned handles:
 
 ```ts
-const room = await client.conversations.create({
-  kind: 'group',
-  title: 'Deploys',
-  participants: [{ agent: 'release-assistant' }],
-});
+import { defineChannel } from '@finalai/agents/channels';
 
-const channels = await client.definitions.channels({ definition: 'release-assistant' });
-const deploys = channels.find((channel) => channel.key === 'deploys');
-if (!deploys) throw new Error('Publish the agent first');
-
-await client.definitions.attachChannel({
-  definition: 'release-assistant',
-  bindingId: deploys.bindingId,
-  conversationId: room.conversation.id,
-});
-```
-
-To send events to the agent owner's direct conversation instead, use `target: { kind: 'owner-direct' }` and skip this step.
-
-## Handle events that arrive mid-turn
-
-If an event arrives while the agent is still working on the previous one, `turnPolicy` decides what happens:
-
-```ts
 export default defineChannel({
-  turnPolicy: 'queue',
-  routes: [/* ... */],
+  name: 'your-provider',
+  credentials: { app: null },
+  identity: { kind: 'none' },
+  places: { kinds: ['topic'] },
+  receive: async (_input, _ctx) => ({ ignored: true, reason: 'no-event-mapping' }),
 });
 ```
 
-`queue` waits for the current turn to finish. `steer` adds the event to the running turn, so the agent can change course, which suits events like "deploy cancelled."
+Add a `redirect` proof or `challenge` proof before posting as members. `people.resolve` returns a member handle, a link URL, or a refusal. `places.resolve` returns a conversation handle or a connect URL. Handles are opaque and scoped to the current invocation; retain provider references in `store`, then resolve fresh handles later.
 
-<Accordion title="Verify a GitHub webhook signature">
-  Providers like GitHub sign the raw request body instead of sending a token. Read the body as text, verify it, then parse it:
+Use `conversation(handle).post` for a linked person's real message. Use `input` for a nonhuman event, or include `principal` for an unlinked person's captioned input on an `anyone` place. `attach` records content without starting a turn. `edit`, `remove`, and `react` target the original external key. `decisions.resolve` answers only options the pending decision actually offers, under the responding person's authority.
 
-  ```ts agent/lib/verify-github.ts
-  const encoder = new TextEncoder();
+Routes receive the channel context plus `request` and `receive`. Verify the provider signature before calling `receive`. HTTP and binary WebSocket routes mount at `/b/<bindingId><path>`. A listener receives the same context plus an abort signal and can maintain an outbound provider connection.
 
-  export async function isValidGitHubSignature(request: Request, body: string, secret: string | null) {
-    const signature = request.headers.get('x-hub-signature-256')?.replace(/^sha256=/, '');
-    if (!secret || !signature) return false;
+Semantic handlers include `message.delta`, `message.completed`, `tool.started`, `tool.completed`, `plan.updated`, `decision.created`, `decision.resolved`, and `turn.completed`. Origin-bearing edits, removals, and reactions return to their provider. `message.posted` supports `replies: 'all'`. Keep delivery receipts in `store`: completion events may be delivered more than once.
 
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify'],
-    );
-    const bytes = Uint8Array.from(signature.match(/../g) ?? [], (hex) => parseInt(hex, 16));
-    return crypto.subtle.verify('HMAC', key, bytes, encoder.encode(body));
-  }
-  ```
+## Voice
 
-  In the route, call `const body = await request.text()`, check `isValidGitHubSignature(request, body, await secrets.get('github-webhook-secret'))`, and only then `JSON.parse(body)`. Use GitHub's `X-GitHub-Delivery` header as the `deliveryId`.
-</Accordion>
+`voiceChannel()` combines live transcription, member messages, the conversation's turn stream, and streaming synthesis. It authenticates through Final OAuth with PKCE; another voice client uses the same OAuth and WebSocket protocol. `phoneChannel()` wraps that core in Twilio signed call webhooks and 8 kHz mu-law Media Streams. A phone number proves control with an SMS challenge, or an explicitly configured `anyone` line accepts captioned input.
+
+Voice posts final utterances only. New speech interrupts playback and cancels the active turn. Spoken yes/no can answer a matching once-only permission or a simple confirmation; forms remain in Final. A recording is attached without starting another turn when the call ends. The recording buffer is bounded to 10 MiB.
+
+The Final room file remains `channels/final.ts`, configured with `finalChannel({ onMessage, renderer, events })`. It customizes Final's own chat surface and is separate from an external channel binding.
