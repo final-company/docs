@@ -93,8 +93,8 @@ Run `npx final-agents dev ./agent` to preview HTTP and WebSocket routes. Set dec
 
 ## Voice
 
-`voiceChannel()` combines live transcription, member messages, the conversation's turn stream, and streaming synthesis. It authenticates through Final OAuth with PKCE; another voice client uses the same OAuth and WebSocket protocol. `phoneChannel()` wraps that core in Twilio signed call webhooks and 8 kHz mu-law Media Streams. A phone number proves control with an SMS challenge, or an explicitly configured `anyone` line accepts captioned input.
+`voiceChannel()` combines live transcription, member messages, the conversation's turn stream, and streaming synthesis. It authenticates through Final OAuth with PKCE; another voice client uses the same OAuth and WebSocket protocol. `phoneChannel()` wraps that core in Twilio signed call webhooks and 8 kHz mu-law Media Streams. Link a phone number through an SMS challenge. Each linked call also requires a fresh SMS code entered on the call before it can act as that member. An explicitly configured `anyone` line accepts captioned input without member authority.
 
-Voice posts final utterances only. New speech interrupts playback and cancels the active turn. Spoken yes/no can answer a matching once-only permission or a simple confirmation; forms remain in Final. A recording is attached without starting another turn when the call ends. The recording buffer is bounded to 10 MiB.
+Voice posts final utterances only. New speech interrupts playback and cancels the active turn. Spoken yes/no can answer a matching once-only permission or a simple confirmation; forms remain in Final. Browser clients enable recording in the `start` frame only after displaying a recording notice. Phone calls announce recording before audio starts. Enabled recordings are attached without starting another turn, in segments of at most 10 MiB, with the last segment saved when the call ends.
 
 The Final room file remains `channels/final.ts`, configured with `finalChannel({ onMessage, renderer, events })`. It customizes Final's own chat surface and is separate from an external channel binding.
