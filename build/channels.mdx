@@ -32,7 +32,7 @@ npx final-agents channel install @finalai/slack-channel \
   --project prj_your_project --install app_your_install
 ```
 
-Set your [Final API key](/api-keys) as `FINAL_API_KEY` first. It needs `agents:write` scope and Editor access to the target project. Copy the `prj_…` project ID and `app_…` application installation ID from the corresponding Final project and application URLs. The command checks access and prints the binding and exact public route URLs; it does not create provider credentials. It uses factory defaults. Configure a per-agent factory for authored channel options. To create a project-owned binding with options such as `history`, `mention`, or `botId`, use `client.channelBindings.create` as shown below. Supply the application's public key through its connected application settings, not this API's `config`. The Slack, Discord, GitHub, and Linear CLI names are aliases for the matching `@finalai/final-agent-provider/channels/*` factories, not separate npm packages.
+Set your [Final API key](/api-keys) as `FINAL_API_KEY` first. It needs `agents:write` scope and Editor access to the target project. Copy the `prj_…` project ID and `app_…` application installation ID from the corresponding Final project and application URLs. The command checks access and prints the binding and exact public route URLs; it does not create provider credentials. It uses factory defaults. For options such as `history`, `mention`, or `botId`, configure a per-agent factory and publish the agent. Supply the application's public key through its connected application settings, not this API's `config`. The Slack, Discord, GitHub, and Linear CLI names are aliases for the matching `@finalai/final-agent-provider/channels/*` factories, not separate npm packages.
 
 If several matching apps are installed, select one explicitly in `agent.ts` instead of also creating `channels/slack.ts`:
 
@@ -50,7 +50,7 @@ The installation must be available to the agent's project and match the channel'
 
 To create a project-owned binding directly, use the same API key with `agents:write` and project Editor access. The package factory must declare an installed application, and the selected installation must match it. Slack, Discord, GitHub, and Linear support this flow. The factory validates `config`; unknown options, installation selectors, callback URL overrides, OAuth overrides, and application public keys are rejected.
 
-This example sets the GitHub mention trigger when creating a new binding. Choose the matching installed application and copy the returned route URLs:
+Connecting an application in Final automatically creates a binding with factory defaults. This example reuses that GitHub binding with the same empty configuration as the CLI command. Choose the matching installed application and copy the returned route URLs:
 
 ```ts configure-channel.ts
 import { createClient } from '@finalai/agents/client';
@@ -64,7 +64,7 @@ try {
     projectId: 'prj_your_project',
     connectorInstallId: 'app_your_github_install',
     channel: { kind: 'package', specifier: '@finalai/final-agent-provider/channels/github' },
-    config: { mention: 'your-app-bot' },
+    config: {},
   });
   console.log(binding);
 } finally {
@@ -72,13 +72,13 @@ try {
 }
 ```
 
-Save this as `configure-channel.ts`, replace the two IDs and App mention slug, then run it with Node.js 26 or later:
+Save this as `configure-channel.ts`, replace the two IDs, then run it with Node.js 26 or later:
 
 ```bash
 node configure-channel.ts
 ```
 
-Creation accepts an exact replay of the existing binding, but cannot change its configuration or restore an archived binding. An installation may already have an automatically created binding with factory defaults; this call cannot reconfigure it. For editable channel options, use a per-agent factory and publish the agent. Connecting a provider place to a chat still uses your signed-in Final person session.
+Creation accepts an exact replay of the existing binding, but cannot change its configuration or restore an archived binding. Factory options in `config` are accepted only when creating a new binding; they cannot change the default binding already created by Final. For editable channel options, use a per-agent factory and publish the agent. Connecting a provider place to a chat still uses your signed-in Final person session.
 
 ## Provider setup
 
