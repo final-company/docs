@@ -86,7 +86,7 @@ pnpm exec final-agents build ./agent
 node upload-draft.ts deployment-watcher agent.ts instructions.md channels/deploys.ts
 ```
 
-Ask that admin to review the uploaded draft in the agent's **Code** view in Final and choose **Publish** (or **Save and publish** after edits). The API key can upload this initial draft and compile it, but cannot approve a secret-using revision or edit it after publication. Later edits also use that admin's Code view.
+Ask that admin to review the uploaded draft in the agent's **Code** view in Final and choose **Save and publish**. The API key can upload this initial draft and compile it, but cannot approve a secret-using revision or edit it after publication. Later edits also use that admin's Code view.
 
 After publication, use the same guide's `show-routes.ts` script:
 

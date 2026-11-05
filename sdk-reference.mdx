@@ -64,7 +64,7 @@ npx final-agents dev ./agent --port 3000
 
 ### `publish [dir]`
 
-Uploads and compiles the agent directory, then makes it the agent's current revision. See [publishing](/operate/publishing#publish).
+Uploads and compiles the agent directory, then makes it the agent's current revision. See [publishing](/operate/publishing#publish). The API-key CLI cannot approve secret declarations or installed application credential access requested by an authored channel. Use [the admin review flow](/operate/publishing#publish-code-that-uses-secrets) for those agents; later source edits also use the admin's Code view.
 
 ```bash
 npx final-agents publish ./agent --agent release-assistant --note 'Add release_status tool'

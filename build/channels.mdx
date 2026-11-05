@@ -62,7 +62,7 @@ try {
     projectId: 'prj_your_project',
     connectorInstallId: 'app_your_github_install',
     channel: { kind: 'package', specifier: '@finalai/final-agent-provider/channels/github' },
-    config: { mention: 'your-app-bot[bot]' },
+    config: { mention: 'your-app-bot' },
   });
   console.log(binding);
 } finally {
@@ -70,7 +70,7 @@ try {
 }
 ```
 
-Save this as `configure-channel.ts`, replace the two IDs and bot login, then run it with Node.js 26 or later:
+Save this as `configure-channel.ts`, replace the two IDs and App mention slug, then run it with Node.js 26 or later:
 
 ```bash
 node configure-channel.ts
@@ -88,7 +88,7 @@ For identity linking, register the channel's `alias:` URL ending in `/b/<raw-bin
 | --- | --- |
 | Slack | Use workspace bot OAuth and a signing secret. Subscribe to `app_mention`, `message.im`, `message.channels`, `message.groups`, `reaction_added`, `reaction_removed`, `user_change`, `tokens_revoked`, and `app_uninstalled`. Point Events, Interactivity, and `/final` Slash Commands at the signed webhook. The template requests `app_mentions:read`, `chat:write`, `commands`, `channels:history`, `channels:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `users:read`, `reactions:read`, `reactions:write`, `files:read`, and `files:write` for enabled attachments. Enable separate Sign in with Slack using `openid profile` for linking people. Workspace installations within Enterprise Grid are supported; organization-wide installations without a workspace claim and group DMs are not. |
 | Discord | Supply the Bot token, application public key, and separate OAuth client ID/secret for `identify` proof. Set the Interactions Endpoint to the signed webhook and register `/final` with `connect`, `disconnect`, `unlink`, and `status`. Install with the bot and application-command permissions your enabled features need, including reading/sending messages, history, reactions, attachments, and threads. The Gateway uses guild/DM message and reaction events without the privileged Message Content intent. You may pass `publicKey` or `botId` to `discordChannel` explicitly; otherwise they come from the installed app and bot API. |
-| GitHub | Use a GitHub App with its App ID, private key, selected installation, signing secret, and OAuth client material for user proof. Give the installation access to the repositories and issue/pull-request read/write permissions needed to read context, comment, and react. Subscribe to `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, and `installation`. Human identity proof requests `read:user` through user OAuth; it does not replace the app's installation token. `githubChannel({ mention: 'your-bot-name' })` changes the default `@final` trigger. |
+| GitHub | Use a GitHub App with its App ID, private key, selected installation, signing secret, and OAuth client material for user proof. Give the installation access to the repositories and issue/pull-request read/write permissions needed to read context, comment, and react. Subscribe to `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, and `installation`. Human identity proof requests `read:user` through user OAuth; it does not replace the app's installation token. `githubChannel({ mention: 'your-app-bot' })` changes the default `@final` trigger. Use the App's mention slug without `[bot]`; it accepts both `@your-app-bot` and `@your-app-bot[bot]` comments. |
 | Linear | Enable agent capabilities on an OAuth application. Install as `actor=app` with `read,write,app:mentionable,app:assignable`. Link people separately with `actor=user` and `read`. Subscribe to `AgentSessionEvent`, `Comment`, `Reaction`, and `OAuthApp` revocation events, and supply the signing secret. |
 
 Slack and Discord read no ambient history by default. Set `history: 'linked-members'` to include only messages whose authors are currently linked members. Discord can include only content available under the app's permissions; empty or redacted history is omitted.

@@ -37,7 +37,7 @@ npx tsc
 
 ## Publish
 
-Code that declares secrets needs an organization admin who can edit the project to approve publication. Use [the draft-and-review flow below](#publish-code-that-uses-secrets) for those agents. An API key can publish an agent that does not declare secrets.
+Code that declares secrets, or an authored channel that requests installed application credentials, needs an organization admin who can edit the project to approve publication. Use [the draft-and-review flow below](#publish-code-that-uses-secrets) for those agents. An API key can publish an agent without those declarations.
 
 ```bash
 npx final-agents publish ./agent --agent release-assistant --note 'Add release_status tool'
@@ -64,9 +64,9 @@ Publishing makes the agent's repository match your local directory, and deletes 
 
 ### Publish code that uses secrets
 
-An organization admin **with Editor access to the agent's project** must publish code that declares secrets, including secrets used by MCP connections, webhooks, custom channels, and phone channels. An API key does not inherit that admin authority. A local build and a read-only draft compilation are allowed; publishing or making a test revision is a separate approval.
+An organization admin **with Editor access to the agent's project** must publish code that declares secrets, including secrets used by MCP connections, webhooks, custom channels, and phone channels, or requests installed application credentials from an authored channel. An API key does not inherit that admin authority. A local build and a read-only draft compilation are allowed; publishing or making a test revision is a separate approval.
 
-For a new agent, register its initial definition with your project API key first. Then upload the initial draft using the script below. List only source files, with paths relative to `agent/`; never include secret values, `.env` files, or generated output.
+For a new agent, register its initial definition with your project API key first. The same upload flow also applies to a previously published agent that has no approved secret or authored-channel application credential declarations yet. Upload its first secret-using draft using the script below. List only source files, with paths relative to `agent/`; never include secret values, `.env` files, or generated output.
 
 ```ts upload-draft.ts
 import { readFile } from 'node:fs/promises';
@@ -97,7 +97,11 @@ try {
   if (head.commitSha != null) request.parentSha = head.commitSha;
   const committed = await client.definitions.commit(request);
   const compiled = await client.definitions.compile({ definition, ref: committed.commitSha });
-  console.log(JSON.stringify({ commitSha: committed.commitSha, diagnostics: compiled.diagnostics }, null, 2));
+  console.log(JSON.stringify({
+    commitSha: committed.commitSha, ok: compiled.ok,
+    missingSecrets: compiled.missingSecrets, diagnostics: compiled.diagnostics,
+  }, null, 2));
+  if (!compiled.ok || compiled.missingSecrets.length > 0) process.exitCode = 1;
 } finally {
   client.close();
 }
@@ -109,7 +113,7 @@ For the deployment watcher, save that script beside `agent/` and run:
 node upload-draft.ts deployment-watcher agent.ts instructions.md channels/deploys.ts
 ```
 
-Resolve any compile errors, then ask the organization admin to open that agent's **Code** view in Final, review the uploaded files, and choose **Publish**. The button says **Save and publish** if they edit the draft first. Publication must use the reviewed draft; uploading or compiling alone does not activate it. After a secret-using revision is published, further source edits and publication also use that admin's Code view; the API key cannot update that published secret-using agent through CI.
+Require `ok: true` and an empty `missingSecrets` list before continuing; otherwise fix the code or create the named secrets in the correct project. Then ask the organization admin to open that agent's **Code** view in Final, review the uploaded files, and choose **Save and publish**. Publication must use the reviewed draft; uploading or compiling alone does not activate it. After a secret-using revision is published, further source edits and publication also use that admin's Code view; the API key cannot update that published secret-using agent through CI.
 
 To read the resulting channel URLs with the API key's `agents:read` permission, save this alongside the upload script:
 
@@ -137,7 +141,7 @@ Each channel's `routes` lists `method`, `path`, `url`, and `aliasUrl`. Prefer th
 
 ### Publish from CI
 
-Use this workflow for agents that do not declare secrets. Secret-using agents use the [admin review flow](#publish-code-that-uses-secrets) instead.
+Use this workflow for agents that do not declare secrets or request installed application credentials from authored channels. Secret-using agents use the [admin review flow](#publish-code-that-uses-secrets) instead.
 
 Publish from your CI pipeline to release every change merged to `main`. In GitHub Actions, store your key as a repository secret named `FINAL_API_KEY`:
 
@@ -164,7 +168,9 @@ jobs:
 
 ## Test a revision before publishing
 
-A test revision compiles a branch of the agent's repository without making it current. Code that declares secrets requires the same organization-admin approval as publication; the project API key cannot create that test revision. Start a session on it to try the change while everyone else keeps using the published revision:
+A test revision compiles a branch of the agent's repository without making it current. For a secret-using agent, sign in to Final as an organization admin with project edit access, review and save the candidate draft, then open the agent's **More agent actions → Run draft test…**. Enter a prompt in **Test draft** and choose **Run test**. This creates a test revision and session without activating schedules or channels.
+
+The project API key cannot create a secret-using test revision. For agents without privileged declarations, the API-key client can create a test revision and start a session like this:
 
 ```ts
 const revision = await client.definitions.testRevision({
@@ -189,7 +195,11 @@ Before you publish a change, try a normal request, a request that makes a tool f
 
 ## Agents backed by GitHub
 
-If you created the agent from a connected GitHub repository in the dashboard, Final reads its source from GitHub instead of your upload. Push your changes, then publish a branch, tag, or commit:
+If you created the agent from a connected GitHub repository in the dashboard, Final reads its source from GitHub instead of your upload. The `upload-draft.ts` flow above is for agents whose source Final hosts; do not use it to upload over a GitHub-backed agent.
+
+For a secret-using GitHub agent, push the reviewed source to the connected repository's default branch. An organization admin with project edit access then opens the agent's **Code** view in Final, reviews that source, and chooses **Save and publish**. Use the signed-in admin test flow above to try a saved draft; the API key cannot approve its secret access.
+
+For an agent without privileged declarations, push your changes and use the CLI to publish a branch, tag, or commit:
 
 ```bash
 npx final-agents publish ./agent --agent release-assistant --ref main

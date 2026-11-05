@@ -128,15 +128,19 @@ description: Turn a bug report into a Linear issue with an owner and a severity.
     ...
     secrets: linear-api-key
     ...
-    wrote /Users/you/issue-triage/agent/.final/compile
+    wrote agent/.final/compile
     ```
   </Step>
   <Step title="Register and publish it">
-    Register the `issue-triage` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
+    Register the `issue-triage` slug once in the same project as your key and secret, following the [quickstart](/quickstart#register-the-agent) with that slug and the name **Issue Triage**. This agent declares a secret, so publication requires an organization admin with project edit access.
+
+    Save the [`upload-draft.ts` script](/operate/publishing#publish-code-that-uses-secrets) beside `agent/`, then upload the initial default-branch draft with your project API key:
 
     ```bash
-    npx final-agents publish ./agent --agent issue-triage
+    node upload-draft.ts issue-triage agent.ts connections/linear.ts instructions.md skills/triage/SKILL.md skills/triage/owners.md
     ```
+
+    Resolve any reported compile errors or missing secrets. Have that admin review the uploaded files in the agent's **Code** view in Final and choose **Save and publish**. Uploading or compiling does not publish it. After publication, later source edits also use that admin's Code view; the API key cannot make those updates through CI.
   </Step>
 </Steps>
 

@@ -25,6 +25,8 @@ export default defineMcpClientConnection({
 
 `auth` names a [secret](/operate/authentication#use-secrets-in-your-code) that holds the server's token. Create it under **Developer** > **Secrets** in the dashboard. Final sends it as `Authorization: Bearer <token>` on every request, and the token never reaches the model or the harness. Set `headerName` to send it in a different header instead.
 
+A connection that declares `secretKey` also declares that agent secret. Its publication and later source changes require an organization admin with project edit access. A project API key can upload and compile the initial draft, but cannot approve it; follow [draft upload and admin publication](/operate/publishing#publish-code-that-uses-secrets).
+
 Connections reach MCP servers over HTTP. Servers that only run locally over stdio aren't supported.
 
 ## Choose which tools the agent gets
