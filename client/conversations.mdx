@@ -14,6 +14,8 @@ A conversation is a chat that Final stores for you. People and agents are its pa
 
 Under the hood, each agent in a conversation works in its own session. When you send a message, Final routes it to the right agents, and each one replies in a turn of its session.
 
+These examples assume an existing **signed-in Final person client**. The project API key used in the sessions guide does not create a person-owned conversation, and its conversation list is empty. Use [sessions](/client/sessions) for API-key applications. To create a Shared chat for a channel, use the [signed-in Final web steps](/build/channels#create-a-shared-chat-in-final); selecting a project there avoids accidentally creating it in your personal project.
+
 ## Send a message
 
 `conversations.direct` opens your one-to-one chat with an agent, creating it the first time. `send` posts a message and returns its **deliveries**: one per agent the message was routed to, with the session and turn that's handling it. Use them to wait for the reply:
@@ -69,7 +71,7 @@ if (last) await chat.markRead({ throughSeq: last.seq });
 
 ## Create a group conversation
 
-A group conversation can have several people and agents. Each agent's **routing mode** decides which messages it answers:
+A signed-in person with Editor access can create a group conversation in a selected project. Pass `projectId` explicitly; omitting it creates the chat in their personal project. A group conversation can have several people and agents. Each agent's **routing mode** decides which messages it answers:
 
 | Routing mode | The agent... |
 | --- | --- |
@@ -81,6 +83,7 @@ This room has a person and the release assistant, then adds a reviewer agent tha
 
 ```ts
 const room = await client.conversations.create({
+  projectId: 'prj_your_project',
   kind: 'group',
   title: 'Release 1.2.0',
   participants: [

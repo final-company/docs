@@ -32,7 +32,7 @@ npx final-agents channel install @finalai/slack-channel \
   --project prj_your_project --install app_your_install
 ```
 
-Set your [Final API key](/api-keys) as `FINAL_API_KEY` first. Copy the `prj_…` project ID and `app_…` application installation ID from the corresponding Final project and application URLs. The command checks access and prints the binding and exact public route URLs; it does not create provider credentials. It uses factory defaults. For options such as `history`, `mention`, `publicKey`, or `botId`, configure a per-agent factory, or use `client.channelBindings.create` with its `config` argument. The Slack, Discord, GitHub, and Linear CLI names are aliases for the matching `@finalai/final-agent-provider/channels/*` factories, not separate npm packages.
+Set your [Final API key](/api-keys) as `FINAL_API_KEY` first. It needs `agents:write` scope and Editor access to the target project. Copy the `prj_…` project ID and `app_…` application installation ID from the corresponding Final project and application URLs. The command checks access and prints the binding and exact public route URLs; it does not create provider credentials. It uses factory defaults. For options such as `history`, `mention`, `publicKey`, or `botId`, configure a per-agent factory, or use `client.channelBindings.create` with its `config` argument. The Slack, Discord, GitHub, and Linear CLI names are aliases for the matching `@finalai/final-agent-provider/channels/*` factories, not separate npm packages.
 
 If several matching apps are installed, select one explicitly in `agent.ts` instead of also creating `channels/slack.ts`:
 
@@ -216,7 +216,7 @@ Start an authorization-code request with that `client_id`, your exact `redirect_
 
 For another host, use its advertised issuer/resource and configure matching `oauthAuthorizeUrl`, `oauthTokenUrl`, `oauthUserInfoUrl`, and `oauthResource` on `voiceChannel`. Hosted Final supplies these values; the SDK's standalone defaults use the production values above.
 
-Open the channel's printed `/stream` URL with the bearer token, or an `access_token` query parameter when the WebSocket API cannot set headers. Do not log token-bearing URLs.
+Convert the printed `/stream` URL from `https:` to `wss:` (or `http:` to `ws:`) before opening a WebSocket. Open it with the bearer token, or an `access_token` query parameter when the WebSocket API cannot set headers. Do not log token-bearing URLs.
 
 Send a JSON start frame before binary microphone frames:
 
@@ -226,22 +226,22 @@ Send a JSON start frame before binary microphone frames:
   "recording": false }
 ```
 
-Use the verified OAuth userinfo values, not another person's IDs. Input and output audio are mono, little-endian PCM16 at 16 kHz, carried as binary frames. JSON `transcript` frames report recognized text; `speech.start` tells the client to clear queued playback for barge-in. Send `{"type":"cancel"}` to interrupt or `{"type":"stop"}` to finish microphone input. Continue playing received audio until `speech.end` has `final: true`; per-turn ends are not terminal. Errors arrive as JSON `error` frames. A frame with `recoverable: true` is an advisory: show the message and keep capture and playback open. Other error frames are terminal. On `linked`, stop capture and show its `message` and `linkUrl`; the caller must complete that account-link flow and reconnect. This first-use refusal closes with code `1008` and has no terminal drain frame. `recording.notice` supplies the recording disclosure, and `trace` supplies timing data. Ignore unknown frame types for forward compatibility. A `notice` frame ends microphone capture: stop sending audio and show its message, while continuing to play the spoken explanation until `speech.end` has `final: true`. The server may end a call this way without a client `stop` frame. Post no separate dictation message: the channel posts final utterances itself.
+Use the verified OAuth userinfo values, not another person's IDs. Input and output audio are mono, little-endian PCM16 at 16 kHz, carried as binary frames. JSON `transcript` frames report recognized text; `speech.start` tells the client to clear queued playback for barge-in. Send `{"type":"cancel"}` to interrupt or `{"type":"stop"}` to finish microphone input. Continue playing received audio until `speech.end` has `final: true`; per-turn ends are not terminal. Errors arrive as JSON `error` frames. A frame with `recoverable: true` is an advisory: show the message and keep capture and playback open. Other error frames are terminal. On `linked`, stop capture and show its `message`. If `linkUrl` is present, offer the account-link flow and reconnect after it completes; blocked or no-access accounts may have no link. This refusal closes with code `1008` and has no terminal drain frame. A start principal that does not match the authenticated account also closes with `1008`, without a preceding frame; handle that close as an identity refusal. `recording.notice` supplies the recording disclosure, and `trace` supplies timing data. Ignore unknown frame types for forward compatibility. A `notice` frame ends microphone capture: stop sending audio and show its message, while continuing to play the spoken explanation until `speech.end` has `final: true`. The server may end a call this way without a client `stop` frame. Post no separate dictation message: the channel posts final utterances itself.
 
-For Twilio, create the project secret `twilio-auth-token` with the account's Auth Token, configure an SMS-capable calling number, and add:
+For Twilio, use an SMS-capable Twilio number; member callers must also be able to receive SMS. Create the project secret `twilio-auth-token` with the account's Auth Token, configure an SMS-capable calling number, and add:
 
 ```ts agent/channels/phone.ts
 import { phoneChannel } from '@finalai/final-agent-provider/channels/phone';
 export default phoneChannel({ accountSid: 'AC_your_account', fromNumber: '+15550000000' });
 ```
 
-Set the number's incoming Voice webhook to the published phone `/webhook` route, using POST and its `/b/` alias when one is printed. The channel supplies its `/verify` callback and `/stream` WebSocket URL. Link the phone number through an SMS challenge in Final. Every member call also needs a fresh SMS code entered on the call. An explicitly configured `audience: 'anyone'` accepts captioned anonymous input without member authority.
+Set the number's incoming Voice webhook to the published phone `/webhook` route, using POST and its `/b/` alias when one is printed. The channel supplies its `/verify` callback and `/stream` WebSocket URL. On the first unlinked member call, the channel sends the caller an SMS containing the Final account-link URL and ends the call. Open that link, sign in to Final, and complete its SMS challenge to link the number. Call again afterward. Every member call still needs a fresh, call-specific SMS code entered on the call; the account link and caller ID alone do not authorize it. Link requests are rate-limited. If the SMS cannot be sent, the caller hears a retry instruction instead of entering audio. An explicitly configured `audience: 'anyone'` accepts captioned anonymous input without member authority.
 
 With `audience: 'anyone'`, each call creates its own agent-only Shared chat, keyed by the call. No human participant is added automatically, and calls do not collect in one fixed inbox. The transcript and recording are saved in that per-call chat. Project viewers can read it; an editor's first post joins them to it.
 
-Ordinary web and mobile inboxes list chats you participate in, so these chats are not automatically shown there. An operator must list the installation's project explicitly. In an existing signed-in Final client this is `client.conversations.list({ projectId })`; API-key scripts cannot inspect these person-visible chats.
+Ordinary web and mobile inboxes list chats you participate in, so these chats are not automatically shown there. An operator must list the installation's project explicitly. In an existing signed-in Final client this is `client.conversations.list({ projectId })`; Project API keys have no person inbox; listing returns an empty list rather than these call chats.
 
-To inspect them from the Final web app, open your project's page on `https://final.ai` while signed in, then run this in that tab's browser developer console with the project's `prj_…` ID:
+To inspect them from the Final web app, open your project's page on the canonical `https://final.ai` web origin while signed in (even if you arrived through another Final URL), then run this in that tab's browser developer console with the project's `prj_…` ID:
 
 ```js
 await (async () => {
@@ -269,4 +269,4 @@ Final utterances become prompts. New speech interrupts playback and cancels the 
 
 Browser recording is opt-in through the `start` frame after you show a notice. **Phone audio streams always record**, and announce that before audio starts. Recordings are saved to the chat as PCM16 WAV segments of at most 10 MiB including serialization; the last segment is saved when the call ends.
 
-The Final room file remains `channels/final.ts`, configured with `finalChannel({ onMessage, renderer, events })`. It customizes Final's own chat surface separately from external channel bindings.
+The Final room file remains `channels/final.ts`. Import `finalChannel` from `@finalai/agents/channels/final` and configure `finalChannel({ onMessage, renderer, events })`. It customizes Final's own chat surface separately from external channel bindings.

@@ -18,6 +18,7 @@ icon: "book"
 | `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineHook` |
 | `@finalai/agents/channels` | [Channel routes](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS` |
 | `@finalai/final-agent-provider/channels/*` | Ready-made external channels | `slackChannel`, `discordChannel`, `githubChannel`, `linearChannel`, `webhookChannel`, `voiceChannel`, `phoneChannel` from their matching subpaths |
+| `@finalai/agents/channels/final` | Customize Final's own chat surface | `finalChannel` with room `onMessage`, `renderer`, and `events` |
 | `@finalai/agents/client` | Calling agents from your app | `createClient`, `sessionUpdateOf`, `textOf`, `isClientError`, and the API's types and enums |
 
 ## Client
@@ -27,7 +28,7 @@ icon: "book"
 | Property | What it does |
 | --- | --- |
 | `sessions` | Start a session, or `attach` to one by ID. A session handle sends messages, streams events, lists and answers decisions, and cancels or closes. See [sessions](/client/sessions). |
-| `conversations` | Open direct and group chats, send and read messages, stream events, and list open decisions. See [conversations](/client/conversations). |
+| `conversations` | Signed-in people open direct and group chats, send and read messages, stream events, and list open decisions. See [conversations](/client/conversations). |
 | `channelBindings` | `create` installs a project-owned channel with a project API key. `places`, `routes`, `connect`, and `disconnect` require signed-in person authority; use Final's Connected UI for this management. See [channels](/build/channels). |
 | `definitions` | Register agents, test and publish revisions, and compare revisions. See [publishing](/operate/publishing). |
 | `schedules` | List, update, and run schedules. See [schedules](/build/schedules). |
