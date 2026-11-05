@@ -28,6 +28,9 @@ Find the symptom that matches what you're seeing. Each entry explains the cause,
   <Accordion title="Publish says the directory isn't inside a Git checkout">
     The CLI uses Git to decide which files to upload. Run `git init` in your project, or publish from inside an existing repository.
   </Accordion>
+  <Accordion title="Publishing code with secrets requires an organization admin">
+    The API key does not grant organization-admin authority. For a new secret-using agent, upload the initial draft and compile it without publishing, then have an organization admin with project edit access approve it in Final's Code view. Later edits to that secret-using agent also use the admin's Code view. See [the complete draft-and-review flow](/operate/publishing#publish-code-that-uses-secrets).
+  </Accordion>
   <Accordion title="Publish can't find the agent">
     The agent hasn't been registered, or `--agent` has a typo. [Register it](/quickstart#register-the-agent) once, then pass its slug or ID to `--agent`. Check that your API key belongs to the same project.
   </Accordion>
@@ -74,6 +77,9 @@ Find the symptom that matches what you're seeing. Each entry explains the cause,
   </Accordion>
   <Accordion title="A channel refuses an unconnected place">
     Connect the provider place to a chat you can manage, using the returned Connect link or the chat's Connected section. A shared place needs a Shared chat. See [Link and Connect](/build/channels#link-a-person-and-connect-a-place).
+  </Accordion>
+  <Accordion title="Publish refuses an owner-directed schedule in a Shared project">
+    The default `owner-direct` target needs a personal My Work project. A Shared project has no personal owner, so set `target: bound-conversation` in the schedule before publishing, then connect a provider place to the intended Shared chat. Publish again if you changed an already-published schedule. Runs remain refused until exactly one distinct chat is connected. See [schedule targets](/build/schedules#schedule-options).
   </Accordion>
   <Accordion title="A schedule doesn't run">
     Schedules only run for the published revision. Publish, then check `nextRunAt` with `client.schedules.list({ agent })`. Use `runNow` to test it right away. See [schedules](/build/schedules#run-a-schedule-now).

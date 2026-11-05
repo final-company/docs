@@ -33,11 +33,10 @@ The [MCP gateway](/mcp-gateway/quickstart) and [Final CI Runners](/ci-runners/qu
 | To use | Select |
 | --- | --- |
 | The [agent quickstart](/quickstart) | `agents:read`, `agents:write`, `agents:execute` |
-| [Conversations](/client/conversations) | The agent permissions, plus `conversations:read` and `conversations:write` |
 | [Final Cloud Apps](/cloud-apps/quickstart) | `apps:read` to inspect apps; add `apps:write` to create, deploy, and run jobs |
 | [Final VMs](/vm-platform/quickstart) | The VM permissions for the operations you need |
 
-The dialog lists every permission available to your organization.
+The dialog lists every permission available to your organization. The [conversation APIs](/client/conversations) use Final's existing signed-in person client. Adding `conversations:read` or `conversations:write` does not make an API key a chat participant or give it a person inbox; its conversation list remains empty. Use [sessions](/client/sessions) for an API-key application.
 
 ## Use the key
 

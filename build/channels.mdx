@@ -128,7 +128,7 @@ import { webhookChannel } from '@finalai/final-agent-provider/channels/webhook';
 export default webhookChannel({ secret: 'deploy-webhook-secret' });
 ```
 
-Publish the agent and copy the POST route's `alias:` URL ending in `/b/<raw-binding-id>/webhook` (or the route itself if no alias is printed). [Create a Shared chat in Final](#create-a-shared-chat-in-final) in the same project with the published agent and `default` routing. Send the first event to discover the place:
+Publish this secret-using agent through the [draft-and-admin-review flow](/operate/publishing#publish-code-that-uses-secrets), including `channels/deploys.ts` in the upload. The organization admin must also have project edit access. After approval, use that guide's `show-routes.ts` to copy the POST route's `aliasUrl` ending in `/b/<raw-binding-id>/webhook`. [Create a Shared chat in Final](#create-a-shared-chat-in-final) in the same project with the published agent and `default` routing. Send the first event to discover the place:
 
 ```json
 {
@@ -145,7 +145,7 @@ The webhook factory is inbound-only. Replies appear in Final; setting `replies: 
 
 ## Write a custom channel
 
-This complete channel accepts signed topic events and resolves the place before adding nonhuman input. Create the project secret `topic-hook-secret` first.
+This complete channel accepts signed topic events and resolves the place before adding nonhuman input. Create the project secret `topic-hook-secret` first. Publish through the same [admin review flow](/operate/publishing#publish-code-that-uses-secrets), uploading `channels/topics.ts` with your agent and instructions. A local build does not approve secret access.
 
 ```ts agent/channels/topics.ts
 import { defineChannel, POST } from '@finalai/agents/channels';
@@ -267,11 +267,13 @@ import { phoneChannel } from '@finalai/final-agent-provider/channels/phone';
 export default phoneChannel({ accountSid: 'AC_your_account', fromNumber: '+15550000000' });
 ```
 
+The phone channel declares `twilio-auth-token`, so include `channels/phone.ts` in the [draft upload](/operate/publishing#publish-code-that-uses-secrets) and have an organization admin with project edit access publish it from Final's Code view. Use the guide's `show-routes.ts` after approval to read the route URLs.
+
 Set the number's incoming Voice webhook to the published phone `/webhook` route, using POST and its `/b/` alias when one is printed. The channel supplies its `/verify` callback and `/stream` WebSocket URL. On the first unlinked member call, the channel sends the caller an SMS containing the Final account-link URL and ends the call. Open that link, sign in to Final, and complete its SMS challenge to link the number. Call again afterward. Every member call still needs a fresh, call-specific SMS code entered on the call; the account link and caller ID alone do not authorize it. Link requests are rate-limited. If the SMS cannot be sent, the caller hears a retry instruction instead of entering audio. An explicitly configured `audience: 'anyone'` accepts captioned anonymous input without member authority.
 
 With `audience: 'anyone'`, each call creates its own agent-only Shared chat, keyed by the call. No human participant is added automatically, and calls do not collect in one fixed inbox. The transcript and recording are saved in that per-call chat. Project viewers can read it; an editor's first post joins them to it.
 
-Ordinary web and mobile inboxes list chats you participate in, so these chats are not automatically shown there. An operator must list the installation's project explicitly. In the [existing signed-in person client used by Final's apps](/client/conversations), this is `client.conversations.list({ projectId })`; Project API keys have no person inbox; listing returns an empty list rather than these call chats.
+Ordinary web and mobile inboxes list chats you participate in, so these chats are not automatically shown there. An operator must list the installation's project explicitly. In the [existing signed-in person client used by Final's apps](/client/conversations), this is `client.conversations.list({ projectId })`; Project API keys have no person inbox; even with `conversations:read`, listing returns an empty list rather than these call chats.
 
 To inspect them from the Final web app, open your project's page on the canonical `https://final.ai` web origin while signed in (even if you arrived through another Final URL), then run this in that tab's browser developer console with the project's `prj_…` ID:
 

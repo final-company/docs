@@ -37,6 +37,8 @@ npx tsc
 
 ## Publish
 
+Code that declares secrets needs an organization admin who can edit the project to approve publication. Use [the draft-and-review flow below](#publish-code-that-uses-secrets) for those agents. An API key can publish an agent that does not declare secrets.
+
 ```bash
 npx final-agents publish ./agent --agent release-assistant --note 'Add release_status tool'
 ```
@@ -60,7 +62,82 @@ Publishing makes the agent's repository match your local directory, and deletes 
 
 `--note` labels the revision in its history. `--message` sets the commit message.
 
+### Publish code that uses secrets
+
+An organization admin **with Editor access to the agent's project** must publish code that declares secrets, including secrets used by MCP connections, webhooks, custom channels, and phone channels. An API key does not inherit that admin authority. A local build and a read-only draft compilation are allowed; publishing or making a test revision is a separate approval.
+
+For a new agent, register its initial definition with your project API key first. Then upload the initial draft using the script below. List only source files, with paths relative to `agent/`; never include secret values, `.env` files, or generated output.
+
+```ts upload-draft.ts
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createClient } from '@finalai/agents/client';
+
+const [definition, ...paths] = process.argv.slice(2);
+if (definition == null || paths.length === 0)
+  throw new Error('Usage: node upload-draft.ts <agent-slug> <source-path> ...');
+if (paths.some((path) => isAbsolute(path) || path.split(/[\\/]/).some((part) =>
+  part === '..' || part === '.final' || part === 'node_modules' || part.startsWith('.env'))))
+  throw new Error('Pass source paths inside agent/, without credentials or build output.');
+const directory = fileURLToPath(new URL('./agent/', import.meta.url));
+const files = await Promise.all(paths.map(async (path) => ({
+  path,
+  content: await readFile(join(directory, path), 'utf8'),
+})));
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+try {
+  const head = await client.definitions.files({ definition });
+  const request: Parameters<typeof client.definitions.commit>[0] = {
+    definition, files, message: 'Upload draft for review',
+  };
+  if (head.commitSha != null) request.parentSha = head.commitSha;
+  const committed = await client.definitions.commit(request);
+  const compiled = await client.definitions.compile({ definition, ref: committed.commitSha });
+  console.log(JSON.stringify({ commitSha: committed.commitSha, diagnostics: compiled.diagnostics }, null, 2));
+} finally {
+  client.close();
+}
+```
+
+For the deployment watcher, save that script beside `agent/` and run:
+
+```bash
+node upload-draft.ts deployment-watcher agent.ts instructions.md channels/deploys.ts
+```
+
+Resolve any compile errors, then ask the organization admin to open that agent's **Code** view in Final, review the uploaded files, and choose **Publish**. The button says **Save and publish** if they edit the draft first. Publication must use the reviewed draft; uploading or compiling alone does not activate it. After a secret-using revision is published, further source edits and publication also use that admin's Code view; the API key cannot update that published secret-using agent through CI.
+
+To read the resulting channel URLs with the API key's `agents:read` permission, save this alongside the upload script:
+
+```ts show-routes.ts
+import { createClient } from '@finalai/agents/client';
+
+const definition = process.argv[2];
+if (definition == null) throw new Error('Usage: node show-routes.ts <agent-slug>');
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+try {
+  console.log(JSON.stringify(await client.definitions.channels({ definition }), null, 2));
+} finally {
+  client.close();
+}
+```
+
+```bash
+node show-routes.ts deployment-watcher
+```
+
+Each channel's `routes` lists `method`, `path`, `url`, and `aliasUrl`. Prefer the `aliasUrl` for provider webhooks and OAuth callbacks. Reading URLs neither edits nor republishes the agent.
+
 ### Publish from CI
+
+Use this workflow for agents that do not declare secrets. Secret-using agents use the [admin review flow](#publish-code-that-uses-secrets) instead.
 
 Publish from your CI pipeline to release every change merged to `main`. In GitHub Actions, store your key as a repository secret named `FINAL_API_KEY`:
 
@@ -87,7 +164,7 @@ jobs:
 
 ## Test a revision before publishing
 
-A test revision compiles a branch of the agent's repository without making it current. Start a session on it to try the change while everyone else keeps using the published revision:
+A test revision compiles a branch of the agent's repository without making it current. Code that declares secrets requires the same organization-admin approval as publication; the project API key cannot create that test revision. Start a session on it to try the change while everyone else keeps using the published revision:
 
 ```ts
 const revision = await client.definitions.testRevision({

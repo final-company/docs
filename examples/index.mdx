@@ -62,4 +62,4 @@ Each example is a complete project: every file of the agent, the commands to bui
 
 ## Before you start
 
-Every example needs Node.js 26 or later, Git, and a [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions, exported as `FINAL_API_KEY`. Examples that call other services, like Linear, GitHub, or Stripe, say which token to store as a [secret](/operate/authentication#use-secrets-in-your-code) and what access it needs.
+Every example needs Node.js 26 or later, Git, and a [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions, exported as `FINAL_API_KEY`. Examples that call other services, like Linear, GitHub, or Stripe, say which token to store as a [secret](/operate/authentication#use-secrets-in-your-code) and what access it needs. Code that declares secrets also needs an organization admin with project edit access to [review and publish it](/operate/publishing#publish-code-that-uses-secrets); an API key can prepare the new agent's initial draft, but does not grant that approval.

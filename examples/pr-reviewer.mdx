@@ -14,6 +14,7 @@ Use Node.js 26 or later:
 ```bash
 mkdir pr-reviewer && cd pr-reviewer
 git init
+pnpm init --init-type module --no-init-package-manager
 printf 'node_modules/\n.final/\n.env*\n' > .gitignore
 pnpm add @finalai/agents @finalai/final-agent-provider zod
 mkdir -p agent/channels agent/tools
@@ -84,7 +85,32 @@ Create a GitHub App and connect its installation in the agent's Final project. F
 
 Set `mention` in `channels/github.ts` to your GitHub App's actual bot login instead of the example `your-review-app[bot]`. Do this before building and publishing. Use the same login in the test comment below; changing it later requires rebuilding and republishing.
 
-[Register the agent](/quickstart#register-the-agent), export your [API key](/api-keys) as `FINAL_API_KEY`, and use its slug:
+Export your [API key](/api-keys) as `FINAL_API_KEY`. Register this agent once in the same project as the key and connected application. Save the following as `register.ts`, replacing `prj_your_project` with that project's ID:
+
+```ts register.ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+try {
+  const definition = await client.definitions.create({
+    slug: 'pull-request-reviewer',
+    name: 'Pull request reviewer',
+    projectId: 'prj_your_project',
+  });
+  console.log(`Registered ${definition.slug} (${definition.id})`);
+} finally {
+  client.close();
+}
+```
+
+```bash
+node register.ts
+```
+
+Then build and publish with that slug:
 
 ```bash
 pnpm exec final-agents build ./agent

@@ -9,7 +9,7 @@ Every weekday at 9 a.m., this agent reads your repository's pull requests and po
 
 **What it shows:** a [schedule](/build/schedules) written in Markdown, an MCP [connection](/build/connections) to GitHub limited to read-only tools with an annotation selector, and triggering a schedule from a script with [`runNow`](/build/schedules#run-a-schedule-now).
 
-Use your personal **My Work** project for this version: the default `owner-direct` schedule target posts to that project's owner's chat. Create the API key for My Work and register the agent there. For a Shared project, use the `bound-conversation` option below; a Shared project has no personal owner for `owner-direct`.
+Use your personal **My Work** project for this version and sign in as its owner with an **organization admin** role: the GitHub connection declares a secret, so you must approve publication. The default `owner-direct` schedule target posts to your direct chat. Create the API key for My Work and register the agent there. If you are not an organization admin, use a Shared project with the `bound-conversation` option below and have an organization admin with project edit access publish it; a Shared project has no personal owner for `owner-direct`.
 
 ## Files
 
@@ -122,11 +122,15 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
     ```
   </Step>
   <Step title="Register and publish it">
-    Register the `pr-digest` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish. The schedule starts running as soon as the agent is published:
+    Register the `pr-digest` slug once in My Work, as in the [quickstart](/quickstart#register-the-agent), substituting that slug and the name **PR Digest**. Its GitHub connection declares a secret, so publication needs an organization admin who can edit this project.
+
+    Save the [`upload-draft.ts` script](/operate/publishing#publish-code-that-uses-secrets) beside `agent/`, then upload this initial draft with your project API key:
 
     ```bash
-    npx final-agents publish ./agent --agent pr-digest
+    node upload-draft.ts pr-digest agent.ts instructions.md connections/github.ts schedules/morning-digest.md
     ```
+
+    Ask that admin to review the uploaded files in the agent's **Code** view in Final and choose **Publish** (or **Save and publish** after edits). Uploading and compiling do not activate the schedule; it starts when published. Future source changes also use that admin's Code view, rather than API-key CI publishing.
   </Step>
 </Steps>
 
@@ -169,9 +173,7 @@ Failing checks
 - #1293 Bump the payments SDK to 4.2 (@renovate): e2e / checkout failed
 ```
 
-The digest also appears in your direct conversation with the agent, where the scheduled runs post each morning.
-
 ## Make it yours
 
-- **Post it in a Shared chat.** Add a provider channel, publish it, and connect its place to the intended Shared chat as described in [channels](/build/channels#link-a-person-and-connect-a-place). Then set `target: bound-conversation` in the schedule and publish the agent again to activate that change. All active chat routes for that agent must select the same chat; observe routes do not choose the schedule target.
+- **Post it in a Shared chat.** Add a provider channel and set `target: bound-conversation` in the schedule **before publishing**, especially if the agent belongs to a Shared project. Publish, then connect the provider place to the intended Shared chat as described in [channels](/build/channels#link-a-person-and-connect-a-place). Runs are refused until exactly one chat is connected. If the agent is already published, publish again to activate the target change. All active chat routes for that agent must select the same chat; observe routes do not choose the schedule target.
 - **Cover more repositories.** List them in `instructions.md`, and give the token read access to each one.
