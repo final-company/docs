@@ -57,7 +57,9 @@ pnpm exec final-agents build ./agent
 pnpm exec final-agents publish ./agent --agent deployment-watcher
 ```
 
-Publishing prints the binding ID and POST route for `deploys`. Copy that complete URL, ending in `/b/<bindingId>/webhook`, to CI as `CHANNEL_WEBHOOK_URL`. New webhook channels use your project secret; publishing does not generate a different key.
+Publishing prints the binding ID and POST route for `deploys`. Copy its `alias:` URL ending in `/b/<raw-binding-id>/webhook` to CI as `CHANNEL_WEBHOOK_URL`; if no alias is printed, copy the route URL itself. New webhook channels use your project secret; publishing does not generate a different key.
+
+Create a [group conversation](/client/conversations#create-a-group-conversation) in the same Final project. This is the Shared chat for deployment events. Add the published `deployment-watcher` agent with `default` routing before connecting; a chat without this agent cannot run the example.
 
 The place is discovered by the first event, so it is not listed in **Connected** yet. Send the event below once. On `403`, the sender prints a response containing `refusal.connectUrl`. Open it while signed in, connect `production-deploys` to a Shared chat you can manage, and run the sender again with the same idempotency key. The discovered place is now available in **Connected**.
 

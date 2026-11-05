@@ -50,9 +50,9 @@ The installation must be available to the agent's project and match the channel'
 
 ## Provider setup
 
-Create or select your application in the Final project's connected applications. Store bot credentials, OAuth client secrets, and signing material there, never in channel source. Publishing an agent or installing a shared channel prints the binding and its public routes. Copy the full URLs instead of composing them from binding identifiers. Copy the exact webhook URL shown in the application settings when Final forwards provider events; for a direct package route use the published `/b/<bindingId>/webhook` URL.
+Create or select your application in the Final project's connected applications. Store bot credentials, OAuth client secrets, and signing material there, never in channel source. Publishing an agent or installing a shared channel prints the binding and its public routes. Copy the full URLs instead of composing them from binding identifiers. Copy the exact webhook URL shown in the application settings when Final forwards provider events. For direct delivery, copy the POST route's `alias:` URL ending in `/b/<raw-binding-id>/webhook`; if no alias is printed, copy the route URL itself.
 
-Register the exact `/oauth/callback` URL printed for the channel as its identity callback. This proves the responding person's identity. It is separate from the redirect URI shown by Final when you install or authorize the application itself; configure both in the provider where applicable.
+For identity linking, register the channel's `alias:` URL ending in `/b/<raw-binding-id>/oauth/callback`, not the friendly organization/agent URL printed above it. `channel install` prints this `/b/` URL directly. This proves the responding person's identity. It is separate from the redirect URI shown by Final when you install or authorize the application itself; configure both in the provider where applicable.
 
 | Provider | Application setup |
 | --- | --- |
@@ -67,14 +67,14 @@ Slack and Discord read no ambient history by default. Set `history: 'linked-memb
 
 **Link** proves control of a provider account while you are signed in to Final. Slack uses OpenID; Discord, GitHub, and Linear use user OAuth. A link belongs to the app installation or channel binding. Another application cannot reuse it. Unlinking, deactivation, or provider revocation ends that authority.
 
-**Connect** selects the Final chat for a provider place, such as a Slack thread or GitHub pull request. Only someone who can manage the chat can connect it. Shared places connect to Shared chats. Linked direct messages can use your own chat with the agent. **Disconnect** ends a route; **Unlink** ends account proof. **Follow** subscribes a chat to changes in an external resource without making it that resource's conversation.
+**Connect** selects the Final chat for a provider place, such as a Slack thread or GitHub pull request. Only someone who can manage the chat can connect it. A **Shared chat** is a [group conversation](/client/conversations#create-a-group-conversation). Create one in the channel's project before connecting, add the published agent as a participant, and give it `default` routing so outside inputs reach it. The Connect page selects an existing chat; it does not create one. Shared places connect to Shared chats. Linked direct messages can use your own chat with the agent. **Disconnect** ends a route; **Unlink** ends account proof. **Follow** subscribes a chat to changes in an external resource without making it that resource's conversation.
 
 | Policy | Values |
 | --- | --- |
 | Replies | `origin` sends replies to the place that started the turn. Where the provider supports it, `all` mirrors new messages in the connected chat. |
 | Audience | `members` requires linked members. `anyone` also accepts captioned input from unlinked people, without member authority or personal credentials. |
 
-Provider bots default to `members`. GitHub review threads inherit a connected parent pull request unless you connect a more specific route. An unlinked or unconnected GitHub mention can receive a public Link or Connect notice; opening it still requires the proper Final account and permissions.
+Set a connection's `policy` through `client.channels.connect`; the **Connected** and first-use Connect pages use `origin` replies and `members` audience. The shipped Slack, Discord, GitHub, Linear, and browser voice factories require `members`; they do not expose an `anyone` override. `phoneChannel({ audience: 'anyone' })` explicitly opts in to anonymous input. A custom channel can allow it through its `places.defaults`. The host rejects `anyone` when the channel has not opted in. GitHub review threads inherit a connected parent pull request unless you connect a more specific route. An unlinked or unconnected GitHub mention can receive a public Link or Connect notice; opening it still requires the proper Final account and permissions.
 
 ## Add an authenticated webhook
 
@@ -85,7 +85,7 @@ import { webhookChannel } from '@finalai/final-agent-provider/channels/webhook';
 export default webhookChannel({ secret: 'deploy-webhook-secret' });
 ```
 
-Publish the agent and copy the printed POST route ending in `/b/<raw-binding-id>/webhook`. Send the first event to discover the place:
+Publish the agent and copy the POST route's `alias:` URL ending in `/b/<raw-binding-id>/webhook` (or the route itself if no alias is printed). Create a Shared chat in the same project with the published agent and `default` routing. Send the first event to discover the place:
 
 ```json
 {
@@ -152,7 +152,7 @@ export default defineChannel({
 });
 ```
 
-This example has no human proof and therefore uses `input`. To post as a member, add a redirect or challenge identity mechanism, resolve the provider principal with `people.resolve`, and pass its returned member handle to `conversation(handle).post`. Handles are scoped to the invocation; store provider references and resolve fresh handles later.
+This example has no human proof and therefore uses `input`. To post as a member, add a redirect or challenge identity mechanism, resolve the provider principal with `people.resolve`, and pass its returned member handle as `post({ from: person, ... })` on `conversation(route.conversation)`. Handles are scoped to the invocation; store provider references and resolve fresh handles later.
 
 `attach` saves content without starting a turn. `edit`, `remove`, and `react` target an external key. `decisions.resolve` checks the responding person's authority. Never choose between multiple pending approvals from an ambiguous yes/no.
 
@@ -178,7 +178,34 @@ import { voiceChannel } from '@finalai/final-agent-provider/channels/voice';
 export default voiceChannel();
 ```
 
-Voice uses Final OAuth with PKCE and the WebSocket `/stream` route printed after publishing. Use an end user's authorization-code OAuth grant with PKCE and your registered client. Request `offline_access` and include your host's configured OAuth resource in both authorization and token requests, matching the channel's `oauthResource` configuration. Final exposes authorize/token endpoints under `/oauth2`; fetch `/oauth2/userinfo` with the bearer token to obtain `sub` and `organizationId`. Follow your host's advertised OAuth endpoints when using another issuer. A custom client first obtains a Final OAuth access token and the corresponding userinfo principal, then opens that route with the bearer token (or `access_token` query parameter when the WebSocket API cannot set headers). Do not log token-bearing URLs.
+Voice uses Final OAuth with PKCE and the WebSocket `/stream` route printed after publishing. A custom client signs in an end user before opening that socket; a project API key is not a voice identity.
+
+For hosted Final, discover the issuer at [OAuth authorization-server metadata](https://api.final.ai/.well-known/oauth-authorization-server) and the resource at [MCP tools resource metadata](https://api.final.ai/.well-known/oauth-protected-resource/v1/connectors/mcp). The production values are:
+
+| Value | URL |
+| --- | --- |
+| Issuer | `https://api.final.ai` |
+| Authorization | `https://api.final.ai/oauth2/authorize` |
+| Token | `https://api.final.ai/oauth2/token` |
+| Client registration | `https://api.final.ai/oauth2/register` |
+| Userinfo | `https://api.final.ai/oauth2/userinfo` |
+| Resource | `https://api.final.ai/v1/connectors/mcp` |
+
+Register your custom client with a JSON POST to the registration URL:
+
+```json
+{ "client_name": "Your voice client",
+  "redirect_uris": ["https://voice.example.com/oauth/callback"],
+  "token_endpoint_auth_method": "none" }
+```
+
+Use your application's actual sign-in callback instead of the example URL. This callback receives your client's authorization code; it is separate from the channel's `/b/…/oauth/callback` used to link an account. Save the returned URL-shaped `client_id`.
+
+Start an authorization-code request with that `client_id`, your exact `redirect_uri`, a random `state`, `scope=offline_access`, the resource above, and an S256 PKCE challenge. Verify `state` and the advertised issuer on return. Exchange the code at the token endpoint using a form POST with `grant_type=authorization_code`, `code`, the same `client_id`, `redirect_uri`, and `resource`, plus the original `code_verifier`. No client secret is required. Fetch userinfo with the resulting bearer token to obtain `sub` and `organizationId`.
+
+For another host, use its advertised issuer/resource and configure matching `oauthAuthorizeUrl`, `oauthTokenUrl`, `oauthUserInfoUrl`, and `oauthResource` on `voiceChannel`. Hosted Final supplies these values; the SDK's standalone defaults use the production values above.
+
+Open the channel's printed `/stream` URL with the bearer token, or an `access_token` query parameter when the WebSocket API cannot set headers. Do not log token-bearing URLs.
 
 Send a JSON start frame before binary microphone frames:
 
@@ -188,7 +215,7 @@ Send a JSON start frame before binary microphone frames:
   "recording": false }
 ```
 
-Use the verified OAuth userinfo values, not another person's IDs. Input and output audio are mono, little-endian PCM16 at 16 kHz, carried as binary frames. JSON `transcript` frames report recognized text; `speech.start` tells the client to clear queued playback for barge-in. Send `{"type":"cancel"}` to interrupt or `{"type":"stop"}` to finish microphone input. Continue playing received audio until `speech.end` has `final: true`; per-turn ends are not terminal. Errors arrive as JSON `error` frames. A frame with `recoverable: true` is an advisory: show the message and keep capture and playback open. Other error frames are terminal. A `notice` frame ends microphone capture: stop sending audio and show its message, while continuing to play the spoken explanation until `speech.end` has `final: true`. The server may end a call this way without a client `stop` frame. Post no separate dictation message: the channel posts final utterances itself.
+Use the verified OAuth userinfo values, not another person's IDs. Input and output audio are mono, little-endian PCM16 at 16 kHz, carried as binary frames. JSON `transcript` frames report recognized text; `speech.start` tells the client to clear queued playback for barge-in. Send `{"type":"cancel"}` to interrupt or `{"type":"stop"}` to finish microphone input. Continue playing received audio until `speech.end` has `final: true`; per-turn ends are not terminal. Errors arrive as JSON `error` frames. A frame with `recoverable: true` is an advisory: show the message and keep capture and playback open. Other error frames are terminal. On `linked`, stop capture and show its `message` and `linkUrl`; the caller must complete that account-link flow and reconnect. This first-use refusal closes with code `1008` and has no terminal drain frame. `recording.notice` supplies the recording disclosure, and `trace` supplies timing data. Ignore unknown frame types for forward compatibility. A `notice` frame ends microphone capture: stop sending audio and show its message, while continuing to play the spoken explanation until `speech.end` has `final: true`. The server may end a call this way without a client `stop` frame. Post no separate dictation message: the channel posts final utterances itself.
 
 For Twilio, create the project secret `twilio-auth-token` with the account's Auth Token, configure an SMS-capable calling number, and add:
 
@@ -197,7 +224,7 @@ import { phoneChannel } from '@finalai/final-agent-provider/channels/phone';
 export default phoneChannel({ accountSid: 'AC_your_account', fromNumber: '+15550000000' });
 ```
 
-Set the number's incoming Voice webhook to the published phone `/webhook` route, using POST. The channel supplies its `/verify` callback and `/stream` WebSocket URL. Link the phone number through an SMS challenge in Final. Every member call also needs a fresh SMS code entered on the call. An explicitly configured `audience: 'anyone'` accepts captioned anonymous input without member authority.
+Set the number's incoming Voice webhook to the published phone `/webhook` route, using POST and its `/b/` alias when one is printed. The channel supplies its `/verify` callback and `/stream` WebSocket URL. Link the phone number through an SMS challenge in Final. Every member call also needs a fresh SMS code entered on the call. An explicitly configured `audience: 'anyone'` accepts captioned anonymous input without member authority.
 
 Final utterances become prompts. New speech interrupts playback and cancels the caller's eligible turn. Spoken answers can resolve one unambiguous once-only permission; multiple approvals and forms stay in Final.
 
