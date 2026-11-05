@@ -30,7 +30,7 @@ import { credentials, defineAgent } from '@finalai/agents';
 import { serverlessPi } from '@finalai/agents/harnesses';
 export default defineAgent({
   name: 'Deployment watcher',
-  harness: serverlessPi({ credentials: credentials.chain({ payer: 'agent-owner', tryInOrder: [credentials.platform()] }) }),
+  harness: serverlessPi({ credentials: credentials.chain({ payer: 'organization', tryInOrder: [credentials.platform()] }) }),
 });
 ```
 
@@ -50,7 +50,7 @@ export default webhookChannel({ secret: 'deploy-webhook-secret' });
 
 Create a [project secret](/operate/authentication#use-secrets-in-your-code) named `deploy-webhook-secret`, and put the same random value in your CI secret store as `DEPLOY_WEBHOOK_SECRET`. The channel option contains the name; it must never contain the secret value. The factory declares that secret for the channel.
 
-Create an agent in your Final project and use its slug below. Export your [API key](/api-keys) as `FINAL_API_KEY`, then run:
+[Register the agent](/quickstart#register-the-agent) in your Final project and use its slug below. Export your [API key](/api-keys) as `FINAL_API_KEY`, then run:
 
 ```bash
 pnpm exec final-agents build ./agent
@@ -59,7 +59,7 @@ pnpm exec final-agents publish ./agent --agent deployment-watcher
 
 Publishing prints the binding ID and POST route for `deploys`. Copy that complete URL, ending in `/b/<bindingId>/webhook`, to CI as `CHANNEL_WEBHOOK_URL`. New webhook channels use your project secret; publishing does not generate a different key.
 
-In the intended Shared chat's **Connected** section, connect the binding's `webhook` place `production-deploys`. If your first event returns `403`, open its `connectUrl` while signed in, connect the place, and retry the same event.
+The place is discovered by the first event, so it is not listed in **Connected** yet. Send the event below once. On `403`, the sender prints a response containing `refusal.connectUrl`. Open it while signed in, connect `production-deploys` to a Shared chat you can manage, and run the sender again with the same idempotency key. The discovered place is now available in **Connected**.
 
 ## Send an event
 
@@ -83,7 +83,11 @@ const response = await fetch(url, {
   headers: { 'content-type': 'application/json', 'x-final-signature': `sha256=${signature}` },
   body,
 });
-if (response.status !== 202) throw new Error(`Webhook returned ${response.status}`);
+const responseBody = await response.text();
+if (response.status !== 202) {
+  console.error(responseBody); // Includes refusal.connectUrl when the place needs connecting.
+  throw new Error(`Webhook returned ${response.status}`);
+}
 console.log('Deployment event accepted.');
 ```
 
