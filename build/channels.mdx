@@ -23,7 +23,7 @@ export default slackChannel();
 
 The other factories are exported from `channels/discord`, `channels/github`, and `channels/linear`. Connect the matching application in the agent's Final project, then [publish](/operate/publishing) the agent. Your own application and an official Final application use the same channel code.
 
-Leave `baseUrl` unset when using Final. Use the route URLs printed after publishing. If you run the SDK on another host, follow that host's public URL configuration; an explicitly supplied `baseUrl` is preserved. Voice has separate OAuth endpoint overrides.
+Final supplies the public callback origin and voice OAuth endpoints. Leave `baseUrl` and the voice OAuth endpoint options unset, and use the route URLs printed after publishing. If you run the SDK on another host, follow that host's public URL and OAuth configuration; the standalone SDK supports those overrides.
 
 For an app shared across several agents, install a project-owned channel using an existing application installation:
 
@@ -32,7 +32,7 @@ npx final-agents channel install @finalai/slack-channel \
   --project prj_your_project --install app_your_install
 ```
 
-Set your [Final API key](/api-keys) as `FINAL_API_KEY` first. It needs `agents:write` scope and Editor access to the target project. Copy the `prj_…` project ID and `app_…` application installation ID from the corresponding Final project and application URLs. The command checks access and prints the binding and exact public route URLs; it does not create provider credentials. It uses factory defaults. For options such as `history`, `mention`, `publicKey`, or `botId`, configure a per-agent factory, or use `client.channelBindings.create` with its `config` argument. The Slack, Discord, GitHub, and Linear CLI names are aliases for the matching `@finalai/final-agent-provider/channels/*` factories, not separate npm packages.
+Set your [Final API key](/api-keys) as `FINAL_API_KEY` first. It needs `agents:write` scope and Editor access to the target project. Copy the `prj_…` project ID and `app_…` application installation ID from the corresponding Final project and application URLs. The command checks access and prints the binding and exact public route URLs; it does not create provider credentials. It uses factory defaults. Configure a per-agent factory for authored channel options. To create a project-owned binding with options such as `history`, `mention`, or `botId`, use `client.channelBindings.create` as shown below. Supply the application's public key through its connected application settings, not this API's `config`. The Slack, Discord, GitHub, and Linear CLI names are aliases for the matching `@finalai/final-agent-provider/channels/*` factories, not separate npm packages.
 
 If several matching apps are installed, select one explicitly in `agent.ts` instead of also creating `channels/slack.ts`:
 
@@ -48,7 +48,9 @@ export default defineAgent({
 
 The installation must be available to the agent's project and match the channel's provider. Publishing checks this selection; compiling locally does not contact the provider.
 
-To configure a project-owned binding directly, use the same API key with `agents:write` and project Editor access. This example configures the GitHub mention trigger; choose the matching installed application and copy the returned route URLs:
+To create a project-owned binding directly, use the same API key with `agents:write` and project Editor access. The package factory must declare an installed application, and the selected installation must match it. Slack, Discord, GitHub, and Linear support this flow. The factory validates `config`; unknown options, installation selectors, callback URL overrides, OAuth overrides, and application public keys are rejected.
+
+This example sets the GitHub mention trigger when creating a new binding. Choose the matching installed application and copy the returned route URLs:
 
 ```ts configure-channel.ts
 import { createClient } from '@finalai/agents/client';
@@ -76,7 +78,7 @@ Save this as `configure-channel.ts`, replace the two IDs and App mention slug, t
 node configure-channel.ts
 ```
 
-Creating a binding configures the channel; connecting a provider place to a chat still uses your signed-in Final person session.
+Creation accepts an exact replay of the existing binding, but cannot change its configuration or restore an archived binding. An installation may already have an automatically created binding with factory defaults; this call cannot reconfigure it. For editable channel options, use a per-agent factory and publish the agent. Connecting a provider place to a chat still uses your signed-in Final person session.
 
 ## Provider setup
 
@@ -106,7 +108,7 @@ Linear is an exception to this first-use setup: after a linked member first addr
 | Replies | `origin` sends replies to the place that started the turn. Where the provider supports it, `all` mirrors new messages in the connected chat. |
 | Audience | `members` requires linked members. `anyone` also accepts captioned input from unlinked people, without member authority or personal credentials. |
 
-Manage connections as a signed-in person in Final's **Connected** section or through a first-use Connect link. Project API keys can install channels, but cannot connect places or list person-owned chat routes. The SDK methods for this signed-in management are `channelBindings.places`, `routes`, `connect`, and `disconnect`; `connect` requires a `policy`. Under **Messages to share**, choose **Replies from this place** for the default `origin` policy or explicitly choose **All chat messages** for `all`. The latter shares every future chat message with people in that external place; review the sharing notice before connecting. This choice is available on the first-use Connect page and in chat info's **Connected** section on web and mobile. The shipped Slack, Discord, GitHub, Linear, and browser voice factories require `members`; they do not expose an `anyone` override. `phoneChannel({ audience: 'anyone' })` explicitly opts in to anonymous input. A custom channel can allow it through its `places.defaults`. The host rejects `anyone` when the channel has not opted in. GitHub review threads inherit a connected parent pull request unless you connect a more specific route. An unlinked or unconnected GitHub mention can receive a public Link or Connect notice; opening it still requires the proper Final account and permissions.
+Manage connections as a signed-in person in Final's **Connected** section or through a first-use Connect link. Project API keys can install channels, but cannot connect places or list person-owned chat routes. The SDK methods for this signed-in management are `channelBindings.places`, `routes`, `connect`, and `disconnect`; `connect` requires a `policy`. You can connect only places the channel has already reported. Final uses their recorded titles and parent places; a Connect request cannot create a place or change those details. Under **Messages to share**, choose **Replies from this place** for the default `origin` policy or explicitly choose **All chat messages** for `all`. The latter shares every future chat message with people in that external place; review the sharing notice before connecting. This choice is available on the first-use Connect page and in chat info's **Connected** section on web and mobile. The shipped Slack, Discord, GitHub, Linear, and browser voice factories require `members`; they do not expose an `anyone` override. `phoneChannel({ audience: 'anyone' })` explicitly opts in to anonymous input. A custom channel can allow it through its `places.defaults`. The host rejects `anyone` when the channel has not opted in. GitHub review threads inherit a connected parent pull request unless you connect a more specific route. An unlinked or unconnected GitHub mention can receive a public Link or Connect notice; opening it still requires the proper Final account and permissions.
 
 ## Create a Shared chat in Final
 
