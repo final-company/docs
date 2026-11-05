@@ -33,12 +33,12 @@ Each example is a complete project: every file of the agent, the commands to bui
     **Shows:** sandbox from a setup guide, shell and file tools, permission prompts.
   </Card>
   <Card title="Pull request reviewer" icon="code-pull-request" href="/examples/pr-reviewer">
-    Checks out each new pull request, runs lint and tests, and posts a review.
-    **Shows:** GitHub webhook channel, sandbox with a repository, Git from a tool.
+    Reads a public pull request diff on a linked collaborator’s mention and posts a review.
+    **Shows:** GitHub channel, a read-only diff tool, identity proof, and a Shared chat.
   </Card>
-  <Card title="Deploy watcher" icon="rocket" href="/examples/deploy-watcher">
-    Posts each deploy to your team's room and summarizes the week on Fridays.
-    **Shows:** webhook channel, schedule, group conversation, local testing.
+  <Card title="Deployment watcher" icon="rocket" href="/examples/deploy-watcher">
+    Explains signed CI deployment events and log excerpts in a Shared chat.
+    **Shows:** authenticated webhook, project secret, idempotency, local preview.
   </Card>
   <Card title="Audit log for agent actions" icon="list-check" href="/examples/audit-log">
     Records every tool call, approval, and turn to Datadog.
@@ -54,12 +54,12 @@ Each example is a complete project: every file of the agent, the commands to bui
 | [Tools](/build/tools) | [Billing support](/examples/billing-support), [support chat](/examples/support-chat), [test runner](/examples/test-runner), [pull request reviewer](/examples/pr-reviewer) |
 | [Approvals](/build/tools#ask-before-a-tool-runs) | [Issue triage](/examples/issue-triage), [billing support](/examples/billing-support), [support chat](/examples/support-chat), [test runner](/examples/test-runner) |
 | [Connections](/build/connections) | [Issue triage](/examples/issue-triage), [pull request digest](/examples/pr-digest), [audit log](/examples/audit-log) |
-| [Sandboxes](/build/sandboxes) | [Test runner](/examples/test-runner), [pull request reviewer](/examples/pr-reviewer) |
-| [Schedules](/build/schedules) | [Pull request digest](/examples/pr-digest), [deploy watcher](/examples/deploy-watcher) |
-| [Channels](/build/channels) | [Pull request reviewer](/examples/pr-reviewer), [deploy watcher](/examples/deploy-watcher) |
+| [Sandboxes](/build/sandboxes) | [Test runner](/examples/test-runner) |
+| [Schedules](/build/schedules) | [Pull request digest](/examples/pr-digest) |
+| [Channels](/build/channels) | [Pull request reviewer](/examples/pr-reviewer), [deployment watcher](/examples/deploy-watcher) |
 | [Hooks](/build/hooks) | [Audit log](/examples/audit-log) |
 | [Sessions and streaming](/client/sessions) | [Support chat](/examples/support-chat), [billing support](/examples/billing-support) |
-| [Conversations](/client/conversations) | [Deploy watcher](/examples/deploy-watcher), [pull request digest](/examples/pr-digest) |
+| [Conversations](/client/conversations) | [Deployment watcher](/examples/deploy-watcher), [pull request digest](/examples/pr-digest) |
 
 ## Before you start
 

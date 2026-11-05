@@ -5,34 +5,105 @@ description: "Send authenticated deployment events to a shared Final chat."
 icon: "rocket"
 ---
 
-A deployment watcher connects CI events to a chat where your team can follow the result. The event is nonhuman input, so it does not impersonate the person who installed the integration.
+This agent explains deployment events and log excerpts supplied by CI. It posts its answer in Final and suggests a next check. It has no rollback tool, so it cannot change your deployment.
 
-## Add the channel
+## Create the project
+
+Use Node.js 26 or later and install:
+
+```bash
+pnpm add @finalai/agents @finalai/final-agent-provider zod
+mkdir -p agent/channels
+```
+
+The agent has three files:
+
+```text
+agent/
+  agent.ts
+  instructions.md
+  channels/deploys.ts
+```
+
+```ts agent/agent.ts
+import { credentials, defineAgent } from '@finalai/agents';
+import { serverlessPi } from '@finalai/agents/harnesses';
+export default defineAgent({
+  name: 'Deployment watcher',
+  harness: serverlessPi({ credentials: credentials.chain({ payer: 'agent-owner', tryInOrder: [credentials.platform()] }) }),
+});
+```
+
+```markdown agent/instructions.md
+Explain the deployment event and supplied log excerpt.
+Separate facts from hypotheses. Include the supplied run link and suggest the
+next read-only check. Never claim you fetched logs or ran validation yourself.
+Do not attempt a rollback or other change.
+```
 
 ```ts agent/channels/deploys.ts
 import { webhookChannel } from '@finalai/final-agent-provider/channels/webhook';
 export default webhookChannel({ secret: 'deploy-webhook-secret' });
 ```
 
-Set that secret in your project and publish the agent. In the chat's Connected section, connect the channel's `webhook` place `production-deploys`. The place connects to a Shared chat whose policy asks before writes.
+## Configure and publish
 
-## Send a deployment event
+Create a [project secret](/operate/authentication#use-secrets-in-your-code) named `deploy-webhook-secret`, and put the same random value in your CI secret store as `DEPLOY_WEBHOOK_SECRET`. The channel option contains the name; it must never contain the secret value. The factory declares that secret for the channel.
 
-Have CI POST the standard envelope to the binding's `/webhook` route:
+Create an agent in your Final project and use its slug below. Export your [API key](/api-keys) as `FINAL_API_KEY`, then run:
 
-```json
-{
-  "place": { "kind": "webhook", "id": "production-deploys", "title": "Production deploys" },
-  "label": "Deployment 1042",
-  "content": [{ "type": "text", "text": "web 1.2.0 failed deployment. Logs: https://ci.example.com/runs/1042" }],
-  "idempotencyKey": "deploy:1042"
-}
+```bash
+pnpm exec final-agents build ./agent
+pnpm exec final-agents publish ./agent --agent deployment-watcher
 ```
 
-Sign the exact body with HMAC-SHA256 and send `X-Final-Signature: sha256=<hex digest>`. Keep the same idempotency key on retries. See [authenticated webhooks](/build/channels#add-an-authenticated-webhook).
+Publishing prints the binding ID and POST route for `deploys`. Copy that complete URL, ending in `/b/<bindingId>/webhook`, to CI as `CHANNEL_WEBHOOK_URL`. New webhook channels use your project secret; publishing does not generate a different key.
 
-## Configure the agent
+In the intended Shared chat's **Connected** section, connect the binding's `webhook` place `production-deploys`. If your first event returns `403`, open its `connectUrl` while signed in, connect the place, and retry the same event.
 
-Give the agent tools for reading deployment logs and service status. Mark read-only tools accordingly, and keep remediation writes behind approval. Tell the agent to report what failed, link the logs, distinguish its diagnosis from evidence, and ask before attempting a rollback.
+## Send an event
 
-The reply appears in the connected chat with the deployment caption. Disconnect the place to stop delivery. Choose `replies: all` only if every message in that chat should also be mirrored to the outside surface.
+Save this as `send-deploy.mjs` and run it in CI with the two environment values configured above:
+
+```js send-deploy.mjs
+import { createHmac } from 'node:crypto';
+
+const url = process.env.CHANNEL_WEBHOOK_URL;
+const secret = process.env.DEPLOY_WEBHOOK_SECRET;
+if (url == null || secret == null) throw new Error('Configure the webhook URL and CI secret.');
+const body = JSON.stringify({
+  place: { kind: 'webhook', id: 'production-deploys', title: 'Production deploys' },
+  label: 'Deployment 1042',
+  content: [{ type: 'text', text: 'web 1.2.0 failed. Log excerpt: readiness check returned 503 after 60 seconds. Run: https://ci.example.com/runs/1042' }],
+  idempotencyKey: 'deploy:1042',
+});
+const signature = createHmac('sha256', secret).update(body).digest('hex');
+const response = await fetch(url, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', 'x-final-signature': `sha256=${signature}` },
+  body,
+});
+if (response.status !== 202) throw new Error(`Webhook returned ${response.status}`);
+console.log('Deployment event accepted.');
+```
+
+```bash
+node send-deploy.mjs
+```
+
+Use the real CI run ID in `idempotencyKey`; keep it unchanged when retrying that event. `401` means the signature or stored secret differs; `400` means the envelope is malformed. See [webhook setup](/build/channels#add-an-authenticated-webhook).
+
+The chat receives a captioned deployment input and the agent's answer. For example, it can identify the failing readiness check and suggest checking the new version's health endpoint, while noting that the excerpt alone does not establish the root cause. The event is nonhuman input, not a message impersonating the installer.
+
+## Try the route locally
+
+```bash
+AGENT_LOCAL_SECRETS_JSON='{"deploy-webhook-secret":"local-test-value"}' \
+  pnpm exec final-agents dev ./agent
+```
+
+For this preview, set `CHANNEL_WEBHOOK_URL` to `http://localhost:3000/deploys/webhook` and `DEPLOY_WEBHOOK_SECRET` to `local-test-value`, then run the same sender. Local preview logs the verified event without running the agent. Use the published URL to test a real turn.
+
+## Extend it
+
+Add read-only tools for deployment logs or service status, then give the agent instructions for using them. Keep remediation tools behind [approval](/build/tools#ask-before-a-tool-runs). Disconnect the place to stop delivery. This factory is inbound-only; it does not mirror chat replies to CI.

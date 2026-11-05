@@ -4,7 +4,7 @@ description: "Imports, client methods, CLI commands, and environment variables i
 icon: "book"
 ---
 
-`@finalai/agents` contains three things: helpers for writing agents, a client for calling them, and the `final-agents` CLI. Install it with `npm install @finalai/agents zod`. It requires Node.js 26 or later. Full signatures are in the package's TypeScript declarations.
+`@finalai/agents` contains three things: helpers for writing agents, a client for calling them, and the `final-agents` CLI. Install it with `pnpm add @finalai/agents zod`. Add `@finalai/final-agent-provider` when importing provider channel factories. It requires Node.js 26 or later. Full signatures are in the package's TypeScript declarations.
 
 ## Imports
 
@@ -17,6 +17,7 @@ icon: "book"
 | `@finalai/agents/tools` | Tools and their results | `defineTool`, `toolResultFrom` |
 | `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineHook` |
 | `@finalai/agents/channels` | [Channel routes](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS` |
+| `@finalai/final-agent-provider/channels/*` | Ready-made external channels | `slackChannel`, `discordChannel`, `githubChannel`, `linearChannel`, `webhookChannel`, `voiceChannel`, `phoneChannel` from their matching subpaths |
 | `@finalai/agents/client` | Calling agents from your app | `createClient`, `sessionUpdateOf`, `textOf`, `isClientError`, and the API's types and enums |
 
 ## Client
@@ -27,7 +28,7 @@ icon: "book"
 | --- | --- |
 | `sessions` | Start a session, or `attach` to one by ID. A session handle sends messages, streams events, lists and answers decisions, and cancels or closes. See [sessions](/client/sessions). |
 | `conversations` | Open direct and group chats, send and read messages, stream events, and list open decisions. See [conversations](/client/conversations). |
-| `channelBindings` | Install a project-owned shared channel against an existing connector installation. See [channels](/build/channels). |
+| `channelBindings` | Create a project-owned channel, list seen `places` and chat `routes`, and `connect` or `disconnect` a place. See [channels](/build/channels). |
 | `definitions` | Register agents, test and publish revisions, and compare revisions. See [publishing](/operate/publishing). |
 | `schedules` | List, update, and run schedules. See [schedules](/build/schedules). |
 | `agents` | List the agents your key can use. |
@@ -89,10 +90,10 @@ npx final-agents publish ./agent --agent release-assistant --note 'Add release_s
 Install a shared channel in a project using an existing connector installation:
 
 ```bash
-npx final-agents channel install @finalai/slack-channel --project proj_your_project --install cinst_your_install
+npx final-agents channel install @finalai/slack-channel --project prj_your_project --install app_your_install
 ```
 
-The Slack, Discord, GitHub, and Linear names are aliases for the corresponding factories exported by `@finalai/final-agent-provider/channels/*`. The command checks project and installation access through the API. It does not create provider credentials.
+The Slack, Discord, GitHub, and Linear names are aliases for the corresponding factories exported by `@finalai/final-agent-provider/channels/*`. Set `FINAL_API_KEY` first. Copy the `prj_…` and `app_…` IDs from the corresponding project and application URLs in Final. The command checks access; it does not create provider credentials.
 
 ### Options for `build` and `publish`
 
@@ -104,9 +105,10 @@ The Slack, Discord, GitHub, and Linear names are aliases for the corresponding f
 
 | Variable | Used by | What it does |
 | --- | --- | --- |
-| `FINAL_API_KEY` | `build`, `publish` | Your [API key](/api-keys). Required to publish. |
-| `FINAL_API_HOST` | `build`, `publish` | The Final API to use, if not the default. |
-| `AGENT_LOCAL_SECRETS_JSON` | `dev` | Secret values for local routes, as a JSON object, like `{"deploy-webhook-token":"local-test-token"}`. Only secrets listed in `agent.ts` are available. |
+| `FINAL_API_KEY` | `build`, `publish`, `channel install` | Your [API key](/api-keys). Required for publishing and channel installation. |
+| `FINAL_API_HOST` | `build`, `publish`, `channel install` | The Final API to use, if not the default. |
+| `AGENT_LOCAL_SECRETS_JSON` | `dev` | Secret values for local routes, as a JSON object, like `{"deploy-webhook-secret":"local-test-value"}`. Only names declared by the agent, its channels, or its connections are available. |
+| `AGENT_LOCAL_APP_INFO_JSON` | `dev` | App metadata keyed by the channel's declared app name, such as `{"slack":{"clientId":"local-client","clientSecret":"local-test-value","signingSecret":"local-signing-value"}}`. No access tokens; only the declared app is exposed. |
 
 The client doesn't read environment variables. Pass the host and key to `createClient`.
 

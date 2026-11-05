@@ -4,55 +4,88 @@ sidebarTitle: "Channels"
 description: "Talk to an agent from Slack, Discord, GitHub, Linear, webhooks, or voice."
 ---
 
-A channel connects an outside surface to a Final chat. It identifies a **person**, resolves a **place**, and translates **events** in both directions. The agent is whoever participates in that chat. A channel never chooses a Final member by email or supplies a raw member ID.
+A channel connects an outside surface to a Final chat. It identifies a **person**, resolves a **place**, and translates **events** in both directions. The agent is whoever participates in that chat. Channels prove provider identity; they never match a member by email.
 
 ## Use a provider channel
 
-For a bot dedicated to one agent, add the provider factory to that agent's directory:
+Install the authoring SDK and provider factories in your project:
+
+```bash
+pnpm add @finalai/agents @finalai/final-agent-provider zod
+```
+
+For an app dedicated to one agent, add its factory to the agent directory:
 
 ```ts agent/channels/slack.ts
 import { slackChannel } from '@finalai/final-agent-provider/channels/slack';
 export default slackChannel();
 ```
 
-Omit `baseUrl` to use the deployment’s public ingress; an explicit value is preserved for a custom proxy. Voice OAuth endpoint overrides follow the same rule.
+The other factories are exported from `channels/discord`, `channels/github`, and `channels/linear`. Connect the matching application in the agent's Final project, then [publish](/operate/publishing) the agent. Your own application and an official Final application use the same channel code.
 
-The Discord, GitHub, and Linear factories live at the corresponding `channels/discord`, `channels/github`, and `channels/linear` exports. Connect your own provider application in the agent's project. Your application's credentials and provider verification run through the same package code as an official Final application.
+Leave `baseUrl` unset when using Final. Use the route URLs printed after publishing. If you run the SDK on another host, follow that host's public URL configuration; an explicitly supplied `baseUrl` is preserved. Voice has separate OAuth endpoint overrides.
 
-For a shared application that serves several chats and agents, install a project-scoped channel against an existing connector installation:
+For an app shared across several agents, install a project-owned channel using an existing application installation:
 
 ```bash
 npx final-agents channel install @finalai/slack-channel \
-  --project proj_your_project --install cinst_your_install
+  --project prj_your_project --install app_your_install
 ```
 
-`@finalai/slack-channel`, `@finalai/discord-channel`, `@finalai/github-channel`, and `@finalai/linear-channel` are CLI aliases for the matching factories in `@finalai/final-agent-provider/channels/*`. They do not identify separate npm packages. The existing `final-agents` executable provides this command.
+Set your [Final API key](/api-keys) as `FINAL_API_KEY` first. Copy the `prj_…` project ID and `app_…` application installation ID from the corresponding Final project and application URLs. The command checks access; it does not create provider credentials. The Slack, Discord, GitHub, and Linear CLI names are aliases for the matching `@finalai/final-agent-provider/channels/*` factories, not separate npm packages.
+
+If several matching apps are installed, select one explicitly in `agent.ts` instead of also creating `channels/slack.ts`:
+
+```ts agent/agent.ts
+import { credentials, defineAgent } from '@finalai/agents';
+import { serverlessPi } from '@finalai/agents/harnesses';
+import { slackChannel } from '@finalai/final-agent-provider/channels/slack';
+export default defineAgent({
+  harness: serverlessPi({ credentials: credentials.chain({ payer: 'agent-owner', tryInOrder: [credentials.platform()] }) }),
+  channels: [{ ...slackChannel(), key: 'slack', install: 'app_your_install' }],
+});
+```
+
+The installation must be available to the agent's project and match the channel's provider. Publishing checks this selection; compiling locally does not contact the provider.
+
+## Provider setup
+
+Create or select your application in the Final project's connected applications. Store bot credentials, OAuth client secrets, and signing material there, never in channel source. Publishing prints the channel's binding ID and public routes. Copy the exact webhook URL shown in the application settings when Final forwards provider events; for a direct package route use the published `/b/<bindingId>/webhook` URL.
+
+Register the channel identity callback as `<published-channel-base>/b/<bindingId>/oauth/callback`. This proves the responding person's identity. It is separate from the redirect URI shown by Final when you install or authorize the application itself; configure both in the provider where applicable.
+
+| Provider | Application setup |
+| --- | --- |
+| Slack | Use workspace bot OAuth and a signing secret. Subscribe to `app_mention`, `message.im`, `message.channels`, `message.groups`, `reaction_added`, `reaction_removed`, `user_change`, `tokens_revoked`, and `app_uninstalled`. Point Events, Interactivity, and `/final` Slash Commands at the signed webhook. The template requests `app_mentions:read`, `chat:write`, `commands`, `channels:history`, `channels:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `users:read`, `reactions:read`, `reactions:write`, `files:read`, and `files:write` for enabled attachments. Enable separate Sign in with Slack using `openid profile` for linking people. Workspace installations within Enterprise Grid are supported; organization-wide installations without a workspace claim and group DMs are not. |
+| Discord | Supply the Bot token, application public key, and separate OAuth client ID/secret for `identify` proof. Set the Interactions Endpoint to the signed webhook and register `/final` with `connect`, `disconnect`, `unlink`, and `status`. Install with the bot and application-command permissions your enabled features need, including reading/sending messages, history, reactions, attachments, and threads. The Gateway uses guild/DM message and reaction events without the privileged Message Content intent. You may pass `publicKey` or `botId` to `discordChannel` explicitly; otherwise they come from the installed app and bot API. |
+| GitHub | Use a GitHub App with its App ID, private key, selected installation, signing secret, and OAuth client material for user proof. Give the installation access to the repositories and issue/pull-request read/write permissions needed to read context, comment, and react. Subscribe to `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, and `installation`. Human identity proof requests `read:user` through user OAuth; it does not replace the app's installation token. `githubChannel({ mention: 'your-bot-name' })` changes the default `@final` trigger. |
+| Linear | Enable agent capabilities on an OAuth application. Install as `actor=app` with `read,write,app:mentionable,app:assignable`. Link people separately with `actor=user` and `read`. Subscribe to `AgentSessionEvent`, `Comment`, `Reaction`, and `OAuthApp` revocation events, and supply the signing secret. |
+
+Slack and Discord read no ambient history by default. Set `history: 'linked-members'` to include only messages whose authors are currently linked members. Discord can include only content available under the app's permissions; empty or redacted history is omitted.
 
 ## Link a person and connect a place
 
-**Link** proves control of your provider account while you are signed in to Final. Slack uses its OpenID flow; Discord, GitHub, and Linear use user OAuth. A link belongs to the application's installation or channel binding. A different application cannot reuse it. Unlinking, leaving the workspace, or a provider revocation ends that authority.
+**Link** proves control of a provider account while you are signed in to Final. Slack uses OpenID; Discord, GitHub, and Linear use user OAuth. A link belongs to the app installation or channel binding. Another application cannot reuse it. Unlinking, deactivation, or provider revocation ends that authority.
 
-**Connect** selects the Final chat for a provider place, such as a Slack thread or GitHub pull request. Only someone who can manage the chat can connect it. A shared place connects to a Shared chat. Linked direct messages can use your own chat with the agent. **Disconnect** ends a route; **Unlink** ends your account proof. **Follow** subscribes a chat to changes in an external resource without making it that resource's conversation.
-
-A place has two visible policies:
+**Connect** selects the Final chat for a provider place, such as a Slack thread or GitHub pull request. Only someone who can manage the chat can connect it. Shared places connect to Shared chats. Linked direct messages can use your own chat with the agent. **Disconnect** ends a route; **Unlink** ends account proof. **Follow** subscribes a chat to changes in an external resource without making it that resource's conversation.
 
 | Policy | Values |
 | --- | --- |
-| Replies | `origin` sends replies to the place that started the turn. `all` mirrors every message in the connected chat. |
-| Audience | `members` requires linked Final members. `anyone` also accepts captioned input from unlinked people. |
+| Replies | `origin` sends replies to the place that started the turn. Where the provider supports it, `all` mirrors new messages in the connected chat. |
+| Audience | `members` requires linked members. `anyone` also accepts captioned input from unlinked people, without member authority or personal credentials. |
 
-Shared provider bots default to `members`. Unlinked input does not impersonate a member or use personal credentials. Slack and Discord read no thread history by default. Set `history: 'linked-members'` to include only messages whose authors are currently linked members.
+Provider bots default to `members`. GitHub review threads inherit a connected parent pull request unless you connect a more specific route. An unlinked or unconnected GitHub mention can receive a public Link or Connect notice; opening it still requires the proper Final account and permissions.
 
 ## Add an authenticated webhook
 
-`webhookChannel()` accepts a standard event envelope and verifies its HMAC signature:
+The `secret` option is the **name of a project secret**, never its value. [Create a secret](/operate/authentication#use-secrets-in-your-code) named `deploy-webhook-secret` and store the same random value in your event producer's secret store. The factory declares the name for you.
 
 ```ts agent/channels/deploys.ts
 import { webhookChannel } from '@finalai/final-agent-provider/channels/webhook';
 export default webhookChannel({ secret: 'deploy-webhook-secret' });
 ```
 
-Connect a `webhook` place, such as `production-deploys`, to a chat. Then POST this envelope to the binding's `/webhook` route:
+Publish the agent and copy the printed POST route ending in `/b/<bindingId>/webhook`. In the chat's **Connected** section, connect its `webhook` place `production-deploys` to the intended chat. Then POST:
 
 ```json
 {
@@ -63,40 +96,100 @@ Connect a `webhook` place, such as `production-deploys`, to a chat. Then POST th
 }
 ```
 
-Set `X-Final-Signature` to `sha256=` followed by the hexadecimal HMAC-SHA256 of the exact request body, using `deploy-webhook-secret`. Reuse the idempotency key when retrying the same event. Invalid signatures return `401`; malformed envelopes return `400`. The published route is `/b/<bindingId>/webhook`.
+Set `X-Final-Signature` to `sha256=` plus the hexadecimal HMAC-SHA256 of the exact body, using the **stored secret value**. Reuse the idempotency key for the same event. Success returns `202`; bad signatures return `401`, malformed envelopes `400`, and an unconnected place `403` with a `connectUrl`. Open that link while signed in to connect the place, then retry. New webhook channels use your declared project secret; they do not generate a replacement secret during publishing.
+
+The webhook factory is inbound-only. Replies appear in Final; setting `replies: all` does not create an outbound webhook destination. See the complete [deployment watcher](/examples/deploy-watcher).
 
 ## Write a custom channel
 
-Use `defineChannel` when you need a different provider or transport. Resolve people and places through the context, then post through the returned handles:
+This complete channel accepts signed topic events and resolves the place before adding nonhuman input. Create the project secret `topic-hook-secret` first.
 
-```ts
-import { defineChannel } from '@finalai/agents/channels';
+```ts agent/channels/topics.ts
+import { defineChannel, POST } from '@finalai/agents/channels';
+import { z } from 'zod';
+
+const eventSchema = z.object({ id: z.string(), topic: z.string(), text: z.string() });
 
 export default defineChannel({
-  name: 'your-provider',
-  credentials: { app: null },
+  name: 'topics',
+  credentials: { app: null, secrets: ['topic-hook-secret'] },
   identity: { kind: 'none' },
   places: { kinds: ['topic'] },
-  receive: async (_input, _ctx) => ({ ignored: true, reason: 'no-event-mapping' }),
+  routes: [POST('/events', async (ctx) => {
+    const body = await ctx.request.text();
+    const secret = await ctx.credentials.secret('topic-hook-secret');
+    const signature = ctx.request.headers.get('x-topic-signature') ?? '';
+    if (secret == null || !/^[a-f0-9]{64}$/i.test(signature))
+      return new Response('Invalid signature', { status: 401 });
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    const bytes = new Uint8Array(Array.from({ length: 32 }, (_, i) =>
+      Number.parseInt(signature.slice(i * 2, i * 2 + 2), 16)));
+    if (!(await crypto.subtle.verify('HMAC', key, bytes, new TextEncoder().encode(body))))
+      return new Response('Invalid signature', { status: 401 });
+    let event: z.infer<typeof eventSchema>;
+    try { event = eventSchema.parse(JSON.parse(body)); }
+    catch { return new Response('Invalid event', { status: 400 }); }
+    return Response.json(await ctx.receive(event));
+  })],
+  receive: async (input, ctx) => {
+    const event = eventSchema.parse(input);
+    const place = { kind: 'topic', id: event.topic };
+    const route = await ctx.places.resolve(place);
+    if (route.kind !== 'connected')
+      return { accepted: false, refusal: { refused: 'unconnected',
+        message: 'Connect this topic to a chat.', connectUrl: route.connectUrl } };
+    const result = await ctx.conversation(route.conversation).input({
+      label: 'Topic event', content: [{ type: 'text', text: event.text }],
+      origin: { place }, idempotencyKey: event.id,
+    });
+    return 'refused' in result ? { accepted: false, refusal: result } : { accepted: true };
+  },
+  events: {
+    'turn.completed': async (event, ctx) => { ctx.log('Topic turn completed', { turnId: event.turnId }); },
+  },
 });
 ```
 
-Add a `redirect` proof or `challenge` proof before posting as members. `people.resolve` returns a member handle, a link URL, or a refusal. `places.resolve` returns a conversation handle or a connect URL. Handles are opaque and scoped to the current invocation; retain provider references in `store`, then resolve fresh handles later.
+This example has no human proof and therefore uses `input`. To post as a member, add a redirect or challenge identity mechanism, resolve the provider principal with `people.resolve`, and pass its returned member handle to `conversation(handle).post`. Handles are scoped to the invocation; store provider references and resolve fresh handles later.
 
-Use `conversation(handle).post` for a linked person's real message. Use `input` for a nonhuman event, or include `principal` for an unlinked person's captioned input on an `anyone` place. `attach` records content without starting a turn. `edit`, `remove`, and `react` target the original external key. `decisions.resolve` answers only options the pending decision actually offers, under the responding person's authority.
+`attach` saves content without starting a turn. `edit`, `remove`, and `react` target an external key. `decisions.resolve` checks the responding person's authority. Never choose between multiple pending approvals from an ambiguous yes/no.
 
-Routes receive the channel context plus `request` and `receive`. Verify the provider signature before calling `receive`. HTTP and binary WebSocket routes mount at `/b/<bindingId><path>`. A listener receives the same context plus an abort signal and can maintain an outbound provider connection. Package channels read common OAuth/signing metadata with `credentials.appInfo()` and select tenant API credentials with `credentials.app({tenant})`; metadata never includes an access token.
+HTTP routes and `WS` binary routes mount at `/b/<bindingId><path>`. A listener receives the channel context and an abort signal. Package channels can read installed app metadata with `credentials.appInfo()` and tenant API credentials with `credentials.app({ tenant })`. Authored bundles use declared project secrets and injected `fetch`; raw installed app credentials remain package-only.
 
-Semantic handlers include `message.delta`, `message.completed`, `tool.started`, `tool.completed`, `plan.updated`, `decision.created`, `decision.resolved`, and `turn.completed`. Origin-bearing edits, removals, and reactions return to their provider. `message.posted` supports `replies: 'all'`. Keep delivery receipts in `store`: completion events may be delivered more than once.
+Use the `events` property for `message.delta`, `message.completed`, `tool.started`, `tool.completed`, `plan.updated`, `decision.created`, `decision.resolved`, and `turn.completed`. Origin-bearing edits, removals, and reactions return to their provider where supported. `message.posted` supports outward mirroring. Keep durable delivery receipts in `store`, since completion can arrive more than once.
 
 ## Test it locally
 
-Run `npx final-agents dev ./agent` to preview HTTP and WebSocket routes. Set declared local secret values with `AGENT_LOCAL_SECRETS_JSON`. Provider signature previews also accept `AGENT_LOCAL_APP_INFO_JSON`, keyed by the declared app name, with `clientId`, `clientSecret`, and optional `signingSecret`; this metadata contains no access token. The preview verifies and parses requests, then logs what `receive` would accept; it does not run an agent or grant member, chat, application, or media capabilities. Publish and connect a real place to test replies and identity proof.
+```bash
+AGENT_LOCAL_SECRETS_JSON='{"deploy-webhook-secret":"local-test-value"}' \
+  npx final-agents dev ./agent --port 3000
+```
 
-## Voice
+The file `channels/deploys.ts` mounts locally at `http://localhost:3000/deploys/webhook`, not `/b/<bindingId>/webhook`. Sign with the local test value. The topic example mounts at `/topics/events`.
 
-`voiceChannel()` combines live transcription, member messages, the conversation's turn stream, and streaming synthesis. It authenticates through Final OAuth with PKCE; another voice client uses the same OAuth and WebSocket protocol. `phoneChannel()` wraps that core in Twilio signed call webhooks and 8 kHz mu-law Media Streams. Link a phone number through an SMS challenge. Each linked call also requires a fresh SMS code entered on the call before it can act as that member. An explicitly configured `anyone` line accepts captioned input without member authority.
+Provider signature previews can use `AGENT_LOCAL_APP_INFO_JSON`, keyed by the declared app name such as `slack`, with `clientId`, `clientSecret`, and optional `signingSecret`. This metadata never includes an access token. The preview verifies and parses requests and logs accepted input; it does not run the agent or grant member, chat, app, or media capabilities. Publish and connect a real place to test identity and replies.
 
-Voice posts final utterances only. New speech interrupts playback and cancels the active turn. Spoken yes/no can answer a matching once-only permission or a simple confirmation; forms remain in Final. Browser clients enable recording in the `start` frame only after displaying a recording notice. Phone calls announce recording before audio starts. Enabled recordings are attached without starting another turn, as PCM16 WAV segments of at most 10 MiB including serialization, with the last segment saved when the call ends.
+## Voice and phone
 
-The Final room file remains `channels/final.ts`, configured with `finalChannel({ onMessage, renderer, events })`. It customizes Final's own chat surface and is separate from an external channel binding.
+```ts agent/channels/voice.ts
+import { voiceChannel } from '@finalai/final-agent-provider/channels/voice';
+export default voiceChannel();
+```
+
+Voice uses Final OAuth with PKCE and a binary WebSocket route printed after publishing. Other voice clients use the same OAuth proof and protocol.
+
+For Twilio, create the project secret `twilio-auth-token` with the account's Auth Token, configure an SMS-capable calling number, and add:
+
+```ts agent/channels/phone.ts
+import { phoneChannel } from '@finalai/final-agent-provider/channels/phone';
+export default phoneChannel({ accountSid: 'AC_your_account', fromNumber: '+15550000000' });
+```
+
+Set the number's incoming Voice webhook to the published phone `/webhook` route, using POST. The channel supplies its `/verify` callback and `/stream` WebSocket URL. Link the phone number through an SMS challenge in Final. Every member call also needs a fresh SMS code entered on the call. An explicitly configured `audience: 'anyone'` accepts captioned anonymous input without member authority.
+
+Final utterances become prompts. New speech interrupts playback and cancels the caller's eligible turn. Spoken answers can resolve one unambiguous once-only permission; multiple approvals and forms stay in Final.
+
+Browser recording is opt-in through the `start` frame after you show a notice. **Phone calls always record**, and announce that before audio starts. Recordings are saved to the chat as PCM16 WAV segments of at most 10 MiB including serialization; the last segment is saved when the call ends.
+
+The Final room file remains `channels/final.ts`, configured with `finalChannel({ onMessage, renderer, events })`. It customizes Final's own chat surface separately from external channel bindings.

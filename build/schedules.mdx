@@ -34,7 +34,7 @@ Schedules start running when you [publish](/operate/publishing). Local builds an
 </ParamField>
 
 <ParamField path="target" type="'owner-direct' | 'bound-conversation'" default="'owner-direct'">
-  Where the prompt and reply go. `owner-direct` uses the agent owner's direct conversation with the agent. `bound-conversation` uses the chat selected by the agent's connected channel route, such as a Shared chat. See [connecting a place](/build/channels#link-a-person-and-connect-a-place).
+  Where the prompt and reply go. `owner-direct` uses the agent owner's direct conversation with the agent. `bound-conversation` requires exactly one distinct chat across the agent's active connected chat routes. Multiple places may point to that same chat. With zero or several distinct chats, the run is refused rather than choosing one. Observe routes are excluded. See [connecting a place](/build/channels#link-a-person-and-connect-a-place).
 </ParamField>
 
 If you'd rather write schedules in TypeScript, default-export `defineSchedule(...)` from `agent/schedules/daily-digest.ts` with the same fields and the prompt in `markdown`. Use one file or the other for each schedule, not both:

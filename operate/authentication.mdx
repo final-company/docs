@@ -61,10 +61,10 @@ A secret is a named value, like an API token, that Final stores encrypted and ha
     List every secret your code reads. Reading a secret that isn't listed fails.
 
     ```ts agent/agent.ts
-    secrets: ['release-service-token', 'deploy-webhook-token'],
+    secrets: ['release-service-token'],
     ```
 
-    Secrets that a [connection's](/build/connections) `auth` or a credential chain refers to are added for you.
+    Secrets referenced by a [connection's](/build/connections) `auth`, a credential chain, or a channel's `credentials.secrets` are declared for you. For example, `webhookChannel({ secret: 'deploy-webhook-secret' })` declares that secret name; store its value in the project and your event producer, never in the source option.
   </Step>
   <Step title="Read it">
     `ctx.secrets.get()` returns the value, or `null` if the secret isn't set:
