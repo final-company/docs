@@ -79,6 +79,8 @@ GitHub supports the diff media type on its [pull request endpoint](https://docs.
 
 Create a GitHub App and connect its installation in the agent's Final project. Follow [GitHub provider setup](/build/channels#provider-setup) for installation credentials, user OAuth, signing secret, events, and callbacks. Give the App access to the public repository you will test and permission to comment on pull requests.
 
+Set `mention` in `channels/github.ts` to your GitHub App's actual bot login instead of the example `your-review-app[bot]`. Do this before building and publishing. Use the same login in the test comment below; changing it later requires rebuilding and republishing.
+
 [Register the agent](/quickstart#register-the-agent), export your [API key](/api-keys) as `FINAL_API_KEY`, and use its slug:
 
 ```bash
@@ -90,9 +92,7 @@ Copy the printed GitHub binding's `alias:` URLs ending in `/b/<raw-binding-id>/w
 
 ## Link, connect, and try it
 
-Create a [group conversation](/client/conversations#create-a-group-conversation) in the same Final project, add the published `pull-request-reviewer` agent, and give it `default` routing. This is the Shared chat you will select on the Connect page.
-
-Set `mention` in `channels/github.ts` to your GitHub App's actual bot login instead of the example `your-review-app[bot]`. Use that same name below.
+[Create a Shared chat in the Final web app](/build/channels#create-a-shared-chat-in-final), inside the same project. Use the project's **+ → New Chat** menu, select your own name and the published `pull-request-reviewer`, then **Start chat**. The agent gets `default` routing. This signed-in person step is separate from publishing with an API key; select this chat on the Connect page.
 
 Open a pull request in the public repository where you installed the App, then add this comment using the configured bot mention:
 
