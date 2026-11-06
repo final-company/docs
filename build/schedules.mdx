@@ -21,7 +21,7 @@ List anything blocking the next release, with an owner for each item.
 
 This runs at 9:00 a.m. Los Angeles time, Monday through Friday. The file name is the schedule's key, `daily-digest`, which you use to find or trigger it later.
 
-Schedules start running when you [publish](/operate/publishing). Local builds and test revisions never trigger them.
+Schedules start running when you [publish](/operate/publishing). Local builds and test revisions never trigger them. Use your personal **My Work** project for the default `owner-direct` examples here. For an agent in a Shared project, add `target: bound-conversation` to the schedule before its first publish, then [connect a provider place to a Shared chat](/build/channels#link-a-person-and-connect-a-place). Runs are refused until that connection exists; publishing with an API key cannot assign a personal owner to a Shared-project schedule.
 
 ## Schedule options
 
@@ -34,7 +34,7 @@ Schedules start running when you [publish](/operate/publishing). Local builds an
 </ParamField>
 
 <ParamField path="target" type="'owner-direct' | 'bound-conversation'" default="'owner-direct'">
-  Where the prompt and reply go. `owner-direct` uses the agent owner's direct conversation with the agent. `bound-conversation` uses the conversation you've attached to the agent's [channel](/build/channels#connect-it-to-a-conversation), such as a team room.
+  Where the prompt and reply go. `owner-direct` uses the owner's direct conversation when the agent is in their personal My Work project. A Shared project has no personal owner; set `bound-conversation` before publishing its schedules with an API key. `bound-conversation` requires exactly one distinct chat across the agent's active connected chat routes. Multiple places may point to that same chat. With zero or several distinct chats, the run is refused rather than choosing one. Observe routes are excluded. See [connecting a place](/build/channels#link-a-person-and-connect-a-place).
 </ParamField>
 
 If you'd rather write schedules in TypeScript, default-export `defineSchedule(...)` from `agent/schedules/daily-digest.ts` with the same fields and the prompt in `markdown`. Use one file or the other for each schedule, not both:
@@ -58,7 +58,7 @@ const run = await client.schedules.runNow({ agent: 'release-assistant', key: 'da
 console.log(run.conversationId);
 ```
 
-Read the reply from that [conversation](/client/conversations#load-history-and-mark-it-read) once the agent finishes.
+Open that chat in Final to read the reply once the agent finishes. Programmatic [conversation history](/client/conversations#load-history-and-mark-it-read) requires an existing signed-in person client; the API key used to trigger the schedule does not provide a person inbox.
 
 ## Pause or change a schedule
 

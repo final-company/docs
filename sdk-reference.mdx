@@ -4,7 +4,7 @@ description: "Imports, client methods, CLI commands, and environment variables i
 icon: "book"
 ---
 
-`@finalai/agents` contains three things: helpers for writing agents, a client for calling them, and the `final-agents` CLI. Install it with `npm install @finalai/agents zod`. It requires Node.js 26 or later. Full signatures are in the package's TypeScript declarations.
+`@finalai/agents` contains three things: helpers for writing agents, a client for calling them, and the `final-agents` CLI. Install it with `pnpm add @finalai/agents zod`. It requires Node.js 26 or later. Full signatures are in the package's TypeScript declarations.
 
 ## Imports
 
@@ -17,6 +17,7 @@ icon: "book"
 | `@finalai/agents/tools` | Tools and their results | `defineTool`, `toolResultFrom` |
 | `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineHook` |
 | `@finalai/agents/channels` | [Channel routes](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS` |
+| `@finalai/agents/channels/final` | Customize Final's own chat surface | `finalChannel` with room `onMessage`, `renderer`, and `events` |
 | `@finalai/agents/client` | Calling agents from your app | `createClient`, `sessionUpdateOf`, `textOf`, `isClientError`, and the API's types and enums |
 
 ## Client
@@ -26,8 +27,9 @@ icon: "book"
 | Property | What it does |
 | --- | --- |
 | `sessions` | Start a session, or `attach` to one by ID. A session handle sends messages, streams events, lists and answers decisions, and cancels or closes. See [sessions](/client/sessions). |
-| `conversations` | Open direct and group chats, send and read messages, stream events, and list open decisions. See [conversations](/client/conversations). |
-| `definitions` | Register agents, test and publish revisions, compare revisions, and attach channels. See [publishing](/operate/publishing). |
+| `conversations` | Signed-in people open direct and group chats, send and read messages, stream events, and list open decisions. See [conversations](/client/conversations). |
+| `channelBindings` | `create` installs a project-owned channel with a project API key. `places`, `routes`, `connect`, and `disconnect` require signed-in person authority; use Final's Connected UI for this management. See [channels](/build/channels). |
+| `definitions` | Register agents, test and publish revisions, and compare revisions. See [publishing](/operate/publishing). |
 | `schedules` | List, update, and run schedules. See [schedules](/build/schedules). |
 | `agents` | List the agents your key can use. |
 | `people` | List your organization's members, for adding people to conversations. |
@@ -61,7 +63,7 @@ npx final-agents dev ./agent --port 3000
 
 ### `publish [dir]`
 
-Uploads and compiles the agent directory, then makes it the agent's current revision. See [publishing](/operate/publishing#publish).
+Uploads and compiles the agent directory, then makes it the agent's current revision. See [publishing](/operate/publishing#publish). The API-key CLI cannot approve secret declarations or installed application credential access requested by an authored channel. Use [the admin review flow](/operate/publishing#publish-code-that-uses-secrets) for those agents; later source edits also use the admin's Code view.
 
 ```bash
 npx final-agents publish ./agent --agent release-assistant --note 'Add release_status tool'
@@ -79,9 +81,26 @@ npx final-agents publish ./agent --agent release-assistant --note 'Add release_s
   The commit message for the uploaded files.
 </ParamField>
 
+<ParamField path="--no-activate" type="boolean">
+  Publish an immutable source revision without changing the live agent, routes, listeners, or schedules. The client equivalent is `definitions.publish({ definition, ref, activate: false })`. This does not bypass administrator approval for app or secret declarations; use Code view's **Publish source only** choice for those approvals.
+</ParamField>
+
 <ParamField path="--ref" type="string">
   For agents backed by GitHub only: the branch, tag, or commit to publish. Defaults to the repository's default branch.
 </ParamField>
+
+### `channel install <key>`
+
+Install a channel exported by an immutable published revision, using an existing application installation:
+
+```bash
+npx final-agents channel install support --revision arev_your_revision \
+  --project prj_your_project --install app_your_install
+```
+
+Set `FINAL_API_KEY` first. The source definition must be in the target project or an ancestor project in the same organization. When the channel declares application credentials, the selected installation must match. The command checks project access and prints the public route URLs. It does not create provider credentials or select implementation code from a package name.
+
+Use `--replace` to explicitly update an active binding's revision while retaining its configuration, ID, and base URL. SDK callers can provide `config` to replace settings; omitted configuration preserves current settings, while `{}` resets to the new source defaults. Without it, different settings are rejected; archived bindings cannot be replaced. See [source publication and installation](/build/channels#install-a-published-channel).
 
 ### Options for `build` and `publish`
 
@@ -93,9 +112,9 @@ npx final-agents publish ./agent --agent release-assistant --note 'Add release_s
 
 | Variable | Used by | What it does |
 | --- | --- | --- |
-| `FINAL_API_KEY` | `build`, `publish` | Your [API key](/api-keys). Required to publish. |
-| `FINAL_API_HOST` | `build`, `publish` | The Final API to use, if not the default. |
-| `AGENT_LOCAL_SECRETS_JSON` | `dev` | Secret values for local routes, as a JSON object, like `{"deploy-webhook-token":"local-test-token"}`. Only secrets listed in `agent.ts` are available. |
+| `FINAL_API_KEY` | `build`, `publish`, `channel install` | Your [API key](/api-keys). Required for publishing and channel installation. |
+| `FINAL_API_HOST` | `build`, `publish`, `channel install` | The Final API to use, if not the default. |
+| `AGENT_LOCAL_SECRETS_JSON` | `dev` | Secret values for local routes, as a JSON object, like `{"deploy-webhook-secret":"local-test-value"}`. Only names declared by the agent, its channels, or its connections are available. |
 
 The client doesn't read environment variables. Pass the host and key to `createClient`.
 

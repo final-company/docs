@@ -4,6 +4,6 @@ Look at the project first, then ask me what the agent should do if it isn't obvi
 Create an agent/ directory with agent.ts, instructions.md, and one tool in agent/tools/ that does the agent's core job. Use the serverlessFinal harness with platform credentials paid by the organization.
 Run npx final-agents build ./agent and fix every error before moving on.
 If FINAL_API_KEY isn't set, walk me through creating a key in the Final dashboard and exporting it in my shell. Never write the key to a file tracked by Git.
-Pick a slug, register the agent with client.definitions.create, publish it with npx final-agents publish ./agent --agent followed by the slug, then send it one test message and show me the reply.
+Pick a slug and register the agent with client.definitions.create. If the agent declares secrets or requests installed application credentials from an authored channel, follow [the draft-and-admin-review flow](/operate/publishing#publish-code-that-uses-secrets): upload and compile the initial draft, then have an organization admin with project edit access review and publish it in Final. Otherwise, publish it with npx final-agents publish ./agent --agent followed by the slug. After publication, send it one test message and show me the reply.
 Finish by listing the files you created and how to send the next message.
 </Prompt>

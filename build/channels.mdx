@@ -1,158 +1,163 @@
 ---
-title: "Channels and webhooks"
+title: "Channels: people, places, and events"
 sidebarTitle: "Channels"
-description: "Turn webhooks and other HTTP requests into messages for your agent."
+description: "Build a channel application with identity, routes, provider credentials, and conversation events."
 ---
 
-A channel gives your agent its own HTTP endpoints. When another system calls one, like your deploy pipeline, GitHub, or a monitoring alert, your route code turns the request into a message for the agent. Use a channel when outside events should wake the agent up. To have the agent call out to another service instead, use a [connection](/build/connections).
+A channel application translates an outside surface into people, places, and events. Its source compiles with your agent into an ordinary bundle. The SDK provides the same capabilities for your application regardless of provider. Write the provider integration in your own application source.
 
-## Add a webhook route
+## Write a custom channel
 
-Add a file to `agent/channels/`. The file name becomes part of the URL. This route accepts deploy events from your CI system and tells the agent about each one:
+Install the authoring SDK with `pnpm add @finalai/agents zod`, then add `channels/topics.ts` to your agent directory. This complete example accepts signed topic events. Create the project secret `topic-hook-secret` first and store the same value with the event producer. [Publish through admin review](/operate/publishing#publish-code-that-uses-secrets), including the channel file in the draft.
 
-```ts agent/channels/deploys.ts
+```ts agent/channels/topics.ts
 import { defineChannel, POST } from '@finalai/agents/channels';
 import { z } from 'zod';
 
-const deployEvent = z.object({
-  id: z.string(),
-  service: z.string(),
-  version: z.string(),
-  status: z.enum(['succeeded', 'failed']),
-});
+const eventSchema = z.object({ id: z.string(), topic: z.string(), text: z.string() });
 
 export default defineChannel({
-  routes: [
-    POST('/events', async ({ request, secrets, receive }) => {
-      const token = await secrets.get('deploy-webhook-token');
-      if (!token || request.headers.get('authorization') !== `Bearer ${token}`) {
-        return new Response('unauthorized', { status: 401 });
-      }
-
-      const event = deployEvent.safeParse(await request.json().catch(() => null));
-      if (!event.success) return new Response('invalid payload', { status: 400 });
-
-      const { id, service, version, status } = event.data;
-      await receive({
-        target: { kind: 'bound-conversation' },
-        deliveryId: id,
-        content: [{ type: 'text', text: `Deploy ${status}: ${service} ${version}` }],
-      });
-      return new Response(null, { status: 202 });
-    }),
-  ],
+  name: 'topics',
+  credentials: { app: null, secrets: ['topic-hook-secret'] },
+  identity: { kind: 'none' },
+  places: { kinds: ['topic'] },
+  routes: [POST('/events', async (ctx) => {
+    const body = await ctx.request.text();
+    const secret = await ctx.credentials.secret('topic-hook-secret');
+    const signature = ctx.request.headers.get('x-topic-signature') ?? '';
+    if (secret == null || !/^[a-f0-9]{64}$/i.test(signature))
+      return new Response('Invalid signature', { status: 401 });
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    const bytes = new Uint8Array(Array.from({ length: 32 }, (_, i) =>
+      Number.parseInt(signature.slice(i * 2, i * 2 + 2), 16)));
+    if (!(await crypto.subtle.verify('HMAC', key, bytes, new TextEncoder().encode(body))))
+      return new Response('Invalid signature', { status: 401 });
+    let event: z.infer<typeof eventSchema>;
+    try { event = eventSchema.parse(JSON.parse(body)); }
+    catch { return new Response('Invalid event', { status: 400 }); }
+    const result = await ctx.receive(event);
+    return Response.json(result, { status: 'accepted' in result && !result.accepted ? 403 : 202 });
+  })],
+  receive: async (input, ctx) => {
+    const event = eventSchema.parse(input);
+    const place = { kind: 'topic', id: event.topic };
+    const route = await ctx.places.resolve(place);
+    if (route.kind !== 'connected')
+      return { accepted: false, refusal: { refused: 'unconnected',
+        message: 'Connect this topic to a chat.', connectUrl: route.connectUrl } };
+    const result = await ctx.conversation(route.conversation).input({
+      label: 'Topic event', content: [{ type: 'text', text: event.text }],
+      origin: { place }, idempotencyKey: event.id,
+    });
+    return 'refused' in result ? { accepted: false, refusal: result } : { accepted: true };
+  },
+  events: {
+    'turn.completed': async (event, ctx) => { ctx.log('Topic turn completed', { turnId: event.turnId }); },
+  },
 });
 ```
 
-The route checks a shared token, validates the body, and hands the event to the agent with `receive`. `target` says which conversation the message goes to; [connect it to a conversation](#connect-it-to-a-conversation) below. `deliveryId` makes retries safe: if your CI sends the same event twice, the agent sees it once.
+Send JSON such as `{"id":"event-1042","topic":"deployments","text":"Release deployed"}`. Set `x-topic-signature` to the hexadecimal HMAC-SHA256 of the exact body. A first event discovers the place and returns its Connect link; connect it to a chat, then retry the same event ID. This channel is inbound-only: replies stay in Final. See the complete [deployment watcher](/examples/deploy-watcher).
 
-Add the token's name to `secrets` in `agent.ts`, and set its value under **Developer** > **Secrets** in the dashboard:
+The example uses nonhuman `input`. To post as a member, implement a redirect or challenge identity mechanism, resolve the proven provider principal with `people.resolve`, and pass its returned member handle to `conversation(...).post({ from, ... })`. Never match members by email. Handles are invocation-scoped: store provider references and resolve fresh handles later.
 
-```ts agent/agent.ts
-secrets: ['deploy-webhook-token'],
+## Installed application credentials
+
+Declare `credentials: { app: 'your-application' }` when a channel needs a connected application. Publishing requires normal administrator approval for that grant. An installation selected for a running binding must match the declaration. Installed tokens and client secrets stay outside the bundle.
+
+| Operation | Purpose |
+| --- | --- |
+| `credentials.client()` | Read the public OAuth client ID. |
+| `credentials.verify(...)` | Verify signed bytes with installed signing material. |
+| `credentials.exchange(...)` | Exchange an OAuth grant for a short-lived opaque handle. |
+| `credentials.fetch(url, { credential })` | Make an authorized provider request using an app credential, OAuth handle, or no credential. |
+| `credentials.connect({ url, signal })` | Open a provider socket; inject credentials only into specified JSON leaves when sending. |
+| `credentials.secret(name)` | Read an explicitly declared project secret. |
+
+Events a host receives for an installed app arrive unchanged at your channel's `POST /webhook` route, with their signature headers, so verify them as you would any other request. A provider app you run yourself can point straight at the route URL that `channel install` prints.
+
+`ChannelCredentialKind`, signing algorithms, signature encodings, and OAuth client authentication enums are exported by `@finalai/agents/channels`. Requests are restricted to the application's approved destinations. Opaque OAuth handles are temporary and cannot be reused across invocations. They do not provide persistent person-token storage or automatic refresh. Raw installed tokens, signing secrets, and OAuth client secrets are never returned to application code. Socket handshake-header authentication is not currently exposed; the socket API supports credential injection in JSON frames.
+
+Use `ctx.binding.url` to construct callback URLs, such as `${ctx.binding.url}/oauth/callback`. It is supplied uniformly by the host; do not hardcode a deployment origin in application source.
+
+## Install a published channel
+
+For a reusable application, first [upload its source draft](/operate/publishing#publish-code-that-uses-secrets), including its `channels/<key>.ts` module. A signed-in organization admin with project Editor access chooses **Publish source only** in the agent's Code view. This approves an immutable revision without changing the source agent's current revision, routes, listeners, or schedules. It does not require an application installation or secret values in the source project, because the code is not activated there. App and secret declarations still require approval.
+
+Copy the resulting `arev_…` revision ID. Connect your application and configure any declared project secrets in the target project. That project must be the source definition's project or a descendant of it in the same organization. When the channel declares app credentials, the selected installation must match that declaration.
+
+```bash
+npx final-agents channel install support --revision arev_your_revision \
+  --project prj_your_project --install app_your_install
 ```
+
+Set `FINAL_API_KEY` with `agents:write` and project Editor access. Copy the IDs from Final, and use the exact route URLs printed by the command. This creates a separate binding pinned to that source revision; later source publications do not automatically update it.
+
+To update an active installation, publish a new source revision, then run the command with `--replace` or pass `replace: true` to the client. Without that explicit option, a different revision or configuration is rejected. Omitting `config` preserves the current effective configuration during replacement; explicit `config: {}` resets it to the new source defaults. The CLI omits configuration, so `--replace` keeps existing settings. Replacement keeps the binding ID and base URL. Preserve provider-facing route paths in your code to keep those endpoint URLs usable. An archived binding cannot be replaced.
+
+For a channel running directly on its source agent, use ordinary **Publish** instead. App-credential channels must select an explicit installation: import `bundleRef` from `@finalai/agents` and add `{ channel: bundleRef('channels/support'), install: 'app_your_install' }` to `agent.ts`'s `channels` array. The export names the existing `channels/support.ts` module; the compiler derives its credentials and routes from that module. Optional `key` and `config` select the binding name and configuration.
+
+Save the client equivalent as `configure-channel.ts`, replace the IDs, and run `node configure-channel.ts` with Node.js 26 or later:
+
+```ts configure-channel.ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({
+  host: 'https://agent-session.final.ai/api',
+  auth: { apiKey: process.env.FINAL_API_KEY! },
+});
+try {
+  console.log(await client.channelBindings.create({
+    projectId: 'prj_your_project',
+    connectorInstallId: 'app_your_install',
+    revisionId: 'arev_your_revision',
+    channelKey: 'support',
+    config: {},
+  }));
+} finally {
+  client.close();
+}
+```
+
+## Link a person and connect a place
+
+**Link** proves a provider account while the person is signed in to Final. Each application owns its OAuth or challenge protocol. **Connect** maps a provider place to a chat the person can manage. **Disconnect** removes that route. **Unlink** revokes account proof.
+
+Shared provider places connect to group chats. Direct messages may connect to the linked person's chat. `places.defaults` declares whether the application permits captioned unlinked input (`audience: 'anyone'`) and automatic group creation. Such input never receives member authority or personal credentials.
+
+The `origin` reply policy sends replies to the place that started a turn. An explicit `all` policy shares future chat messages with that place. Applications decide which provider APIs can represent edits, removals, reactions, and streamed replies. Do not promise a mutation when the provider cannot perform it.
+
+**Follow** creates a resource observation without making that resource the chat's conversation. Implement both `resources.resolve({ url, principal }, ctx)` and `resources.authorize({ place, principal }, ctx)`. The first parses a resource into a canonical place; the second checks current provider access using an appropriate provider API. Choose an authorization mechanism your application can revalidate; account linking does not automatically supply a provider user token. The host rechecks authorization for later observation access, including cached handles. Use `places.follow(place, { by, conversation })` and `places.unfollow(...)` with a currently linked person.
+
+## Create a Shared chat in Final
+
+Do this while signed in to the Final web app as a person with edit access to the agent's project:
+
+1. Open the project where you published the agent.
+2. Open the project's **+** menu and choose **New Chat**.
+3. Select **your own name and the published agent**, then choose **Start chat**. Selecting just one agent opens your direct chat instead, so include yourself to create a Shared group chat in this project.
+4. Keep this as the only agent for the examples below. The first selected agent uses `default` routing, so outside events reach it without a separate mention.
+
+You own the new chat and can select it on the Connect page. Create it before following a provider's Connect notice. The project API key used to publish an agent cannot create a person-owned Shared chat; use your signed-in Final session for this step.
+
+## Routes, listeners, and events
+
+HTTP and binary `WS` routes receive `ctx.request` or `ctx.socket`. A `listeners: [{ key, run }]` entry maintains an outside connection for the binding. Close provider work and return when `ctx.signal` aborts. Pass the signal to credential and media operations.
+
+Use `events` for messages, tools, plans, decisions, and turn completion. `message.posted` supports outward mirroring; edit, removal, and reaction events allow an application to update existing provider copies. Save delivery receipts in `ctx.store`, scope them to the actual provider destination, and preserve deletion tombstones to prevent retry resurrection. Acknowledge provider interactions promptly and perform slower work asynchronously when the provider protocol permits it.
+
+`conversation(...).attach` saves content without starting a turn. `edit`, `remove`, and `react` target an external key. `decisions.resolve` checks the responding person's authority. Never select between concurrent approvals using an ambiguous yes/no.
+
+Audio applications own capture, speech-provider connections, synthesis, cancellation, and playback. They connect to an agent through the same channel identity, message, observation, and socket capabilities as other applications; speech credentials remain with the application.
 
 ## Test it locally
 
-`final-agents dev` serves your routes on your machine and reloads when you edit them. Pass local secret values as JSON:
-
 ```bash
-AGENT_LOCAL_SECRETS_JSON='{"deploy-webhook-token":"local-test-token"}' \
-  npx final-agents dev ./agent
+AGENT_LOCAL_SECRETS_JSON='{"topic-hook-secret":"local-test-value"}' \
+  pnpm exec final-agents dev ./agent
 ```
 
-```text
-serving /Users/you/release-assistant/agent at http://localhost:3000
-  POST http://localhost:3000/deploys/events
-```
+The local preview verifies routes and prints what would be received without running the agent. For the example above, post to `http://localhost:3000/topics/events`. Installed application operations require a host-provided opaque credential facade; the CLI does not accept raw installed credential JSON.
 
-In another terminal, send it an event:
-
-```bash
-curl -i http://localhost:3000/deploys/events \
-  -H 'Authorization: Bearer local-test-token' \
-  -H 'Content-Type: application/json' \
-  -d '{"id":"dep_1042","service":"acme-web","version":"1.2.0","status":"succeeded"}'
-```
-
-You get `HTTP/1.1 202 Accepted`, and the dev server logs what the agent would receive:
-
-```text
-receive (deploys): {"target":{"kind":"bound-conversation"},"deliveryId":"dep_1042","content":[{"type":"text","text":"Deploy succeeded: acme-web 1.2.0"}]}
-```
-
-Try a wrong token or an empty body to check that you get `401` and `400`. The dev server only runs your route code. It doesn't start the agent, so test the agent's reply after you publish.
-
-## Publish and get the URL
-
-When you [publish](/operate/publishing), the CLI prints each route's public URL:
-
-```text
-channel deploys (chbind_5Tn2...):
-  POST https://agents.final.ai/acme/release-assistant/deploys/events
-    alias: https://agents.final.ai/b/chbind_5Tn2.../events
-```
-
-Point your sender at that URL with the real token. Both URLs reach the same route.
-
-## Connect it to a conversation
-
-A `bound-conversation` target sends events to the conversation you attach to the channel, such as a team room where people can read the agent's replies. Look up the channel's ID, which the API calls `bindingId`, then attach a [conversation](/client/conversations) that both you and the agent are in:
-
-```ts
-const room = await client.conversations.create({
-  kind: 'group',
-  title: 'Deploys',
-  participants: [{ agent: 'release-assistant' }],
-});
-
-const channels = await client.definitions.channels({ definition: 'release-assistant' });
-const deploys = channels.find((channel) => channel.key === 'deploys');
-if (!deploys) throw new Error('Publish the agent first');
-
-await client.definitions.attachChannel({
-  definition: 'release-assistant',
-  bindingId: deploys.bindingId,
-  conversationId: room.conversation.id,
-});
-```
-
-To send events to the agent owner's direct conversation instead, use `target: { kind: 'owner-direct' }` and skip this step.
-
-## Handle events that arrive mid-turn
-
-If an event arrives while the agent is still working on the previous one, `turnPolicy` decides what happens:
-
-```ts
-export default defineChannel({
-  turnPolicy: 'queue',
-  routes: [/* ... */],
-});
-```
-
-`queue` waits for the current turn to finish. `steer` adds the event to the running turn, so the agent can change course, which suits events like "deploy cancelled."
-
-<Accordion title="Verify a GitHub webhook signature">
-  Providers like GitHub sign the raw request body instead of sending a token. Read the body as text, verify it, then parse it:
-
-  ```ts agent/lib/verify-github.ts
-  const encoder = new TextEncoder();
-
-  export async function isValidGitHubSignature(request: Request, body: string, secret: string | null) {
-    const signature = request.headers.get('x-hub-signature-256')?.replace(/^sha256=/, '');
-    if (!secret || !signature) return false;
-
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify'],
-    );
-    const bytes = Uint8Array.from(signature.match(/../g) ?? [], (hex) => parseInt(hex, 16));
-    return crypto.subtle.verify('HMAC', key, bytes, encoder.encode(body));
-  }
-  ```
-
-  In the route, call `const body = await request.text()`, check `isValidGitHubSignature(request, body, await secrets.get('github-webhook-secret'))`, and only then `JSON.parse(body)`. Use GitHub's `X-GitHub-Delivery` header as the `deliveryId`.
-</Accordion>
+Final's own room renderer is configured separately in `channels/final.ts` with `finalChannel({ onMessage, renderer, events })` from `@finalai/agents/channels/final`.

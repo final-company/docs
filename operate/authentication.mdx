@@ -7,7 +7,7 @@ An agent touches three kinds of credentials, and each is set up in a different p
 
 | Credential | What it's for | Where it lives |
 | --- | --- | --- |
-| **Final API key** | Lets your code and the CLI call Final: publish agents, start sessions. | `FINAL_API_KEY` on your machine or server. |
+| **Final API key** | Lets your code and the CLI publish agents that do not declare secrets, and start sessions. | `FINAL_API_KEY` on your machine or server. |
 | **Model credentials** | Pay for the agent's model calls. | The `credentials` chain in `agent.ts`. |
 | **Secrets** | Let the agent's code call other services, like your release API. | **Developer** > **Secrets** in the dashboard, read with `ctx.secrets`. |
 
@@ -61,10 +61,10 @@ A secret is a named value, like an API token, that Final stores encrypted and ha
     List every secret your code reads. Reading a secret that isn't listed fails.
 
     ```ts agent/agent.ts
-    secrets: ['release-service-token', 'deploy-webhook-token'],
+    secrets: ['release-service-token'],
     ```
 
-    Secrets that a [connection's](/build/connections) `auth` or a credential chain refers to are added for you.
+    Secrets referenced by a [connection's](/build/connections) `auth`, a credential chain, or a channel's `credentials.secrets` are declared for you. For example, a channel with `credentials: { app: null, secrets: ['deploy-webhook-secret'] }` declares that secret name. Store its value in the project and your event producer, never in source.
   </Step>
   <Step title="Read it">
     `ctx.secrets.get()` returns the value, or `null` if the secret isn't set:
@@ -75,6 +75,8 @@ A secret is a named value, like an API token, that Final stores encrypted and ha
     ```
   </Step>
 </Steps>
+
+Publishing code that declares secrets requires an organization admin with project edit access. A project API key can upload a new agent's initial draft and request read-only compilation, but cannot publish or create a secret-using test revision. After that revision is published, later source changes also use the admin's Final Code view. Follow [draft upload and admin publication](/operate/publishing#publish-code-that-uses-secrets).
 
 To test channel routes locally, pass secret values to `final-agents dev` with `AGENT_LOCAL_SECRETS_JSON`; see [test it locally](/build/channels#test-it-locally).
 

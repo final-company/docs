@@ -9,6 +9,8 @@ Every weekday at 9 a.m., this agent reads your repository's pull requests and po
 
 **What it shows:** a [schedule](/build/schedules) written in Markdown, an MCP [connection](/build/connections) to GitHub limited to read-only tools with an annotation selector, and triggering a schedule from a script with [`runNow`](/build/schedules#run-a-schedule-now).
 
+Use your personal **My Work** project for this version and sign in as its owner with an **organization admin** role: the GitHub connection declares a secret, so you must approve publication. The default `owner-direct` schedule target posts to your direct chat. Create the API key for My Work and register the agent there. If you are not an organization admin, use a Shared project with the `bound-conversation` option below and have an organization admin with project edit access publish it; a Shared project has no personal owner for `owner-direct`.
+
 ## Files
 
 <Tree>
@@ -98,7 +100,7 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
     ```
   </Step>
   <Step title="Add a GitHub token">
-    Create a fine-grained personal access token in GitHub with read access to the repository's **Pull requests**, **Commit statuses**, and **Contents**. In the Final dashboard, add it under **Developer** > **Secrets** with the name `github-token`.
+    Create a fine-grained personal access token in GitHub with read access to the repository's **Pull requests**, **Commit statuses**, and **Contents**. In the same My Work project in Final, add it under **Developer** > **Secrets** with the name `github-token`.
   </Step>
   <Step title="Compile it">
     ```bash
@@ -116,57 +118,48 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
     schedules: morning-digest (0 9 * * 1-5, America/New_York)
     secrets: github-token
     ...
-    wrote /Users/you/pr-digest/agent/.final/compile
+    wrote agent/.final/compile
     ```
   </Step>
   <Step title="Register and publish it">
-    Register the `pr-digest` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish. The schedule starts running as soon as the agent is published:
+    Register the `pr-digest` slug once in My Work, as in the [quickstart](/quickstart#register-the-agent), substituting that slug and the name **PR Digest**. Its GitHub connection declares a secret, so publication needs an organization admin who can edit this project.
+
+    Save the [`upload-draft.ts` script](/operate/publishing#publish-code-that-uses-secrets) beside `agent/`, then upload this initial draft with your project API key:
 
     ```bash
-    npx final-agents publish ./agent --agent pr-digest
+    node upload-draft.ts pr-digest agent.ts instructions.md connections/github.ts schedules/morning-digest.md
     ```
+
+    Ask that admin to review the uploaded files in the agent's **Code** view in Final and choose **Save and publish**. Uploading and compiling do not activate the schedule; it starts when published. Future source changes also use that admin's Code view, rather than API-key CI publishing.
   </Step>
 </Steps>
 
 ## Try it
 
-You don't have to wait for 9 a.m. This script triggers the schedule now, waits for the agent to finish writing, and prints the digest:
+You don't have to wait for 9 a.m. This script requests one run and prints its receipt. Read the finished digest in your direct chat with **PR Digest** in Final; the publishing API key does not provide person-owned conversation history or events.
 
 ```ts run-now.ts
-import { AgentRealtimeKind, ParticipantKind, createClient } from '@finalai/agents/client';
+import { createClient } from '@finalai/agents/client';
 
 const client = createClient({
   host: 'https://agent-session.final.ai/api',
   auth: { apiKey: process.env.FINAL_API_KEY! },
 });
 
-const run = await client.schedules.runNow({ agent: 'pr-digest', key: 'morning-digest' });
-if (!run.conversationId) throw new Error('The schedule did not post to a conversation');
-
-const conversation = client.conversations.get(run.conversationId);
-for await (const event of conversation.events()) {
-  if (
-    event.kind !== AgentRealtimeKind.MessageCreated &&
-    event.kind !== AgentRealtimeKind.MessageUpdated
-  ) {
-    continue;
-  }
-  // The agent's message updates as it writes. `streaming` is null once it's done.
-  const { author, body, streaming } = event.message;
-  if (author.kind === ParticipantKind.Agent && streaming === null && body) {
-    console.log(body);
-    break;
-  }
+try {
+  const run = await client.schedules.runNow({ agent: 'pr-digest', key: 'morning-digest' });
+  console.log(JSON.stringify(run, null, 2));
+  console.log('Open your direct chat with PR Digest in Final to read the result.');
+} finally {
+  client.close();
 }
-
-client.close();
 ```
 
 ```bash
 npx tsx run-now.ts
 ```
 
-After a minute or so, you see something like:
+After a minute or so, open Final to read a digest like:
 
 ```text
 Merged
@@ -180,9 +173,7 @@ Failing checks
 - #1293 Bump the payments SDK to 4.2 (@renovate): e2e / checkout failed
 ```
 
-The digest also appears in your direct conversation with the agent, where the scheduled runs post each morning.
-
 ## Make it yours
 
-- **Post it in a team room.** Add `target: bound-conversation` to the schedule's frontmatter, add a [channel](/build/channels), and [attach it](/build/channels#connect-it-to-a-conversation) to a group conversation, as in the [deploy watcher](/examples/deploy-watcher).
+- **Post it in a Shared chat.** Add an authored channel and set `target: bound-conversation` in the schedule **before publishing**, especially if the agent belongs to a Shared project. Publish, then connect the provider place to the intended Shared chat as described in [channels](/build/channels#link-a-person-and-connect-a-place). Runs are refused until exactly one chat is connected. If the agent is already published, publish again to activate the target change. All active chat routes for that agent must select the same chat; observe routes do not choose the schedule target.
 - **Cover more repositories.** List them in `instructions.md`, and give the token read access to each one.

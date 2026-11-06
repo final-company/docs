@@ -3,7 +3,7 @@ title: "Sessions and streaming"
 description: "Start a session from your server, stream the agent's reply into your UI, and let people approve actions."
 ---
 
-A session is one ongoing thread with one agent, like a single chat. You send it a message, the agent works on it, and you watch the work stream in: text as it's written, tool calls as they happen, and requests for approval when the agent needs a person's OK. Use sessions when your app owns the chat UI or runs the agent as a task. If you'd rather have Final store the chat for you, use [conversations](/client/conversations).
+A session is one ongoing thread with one agent, like a single chat. You send it a message, the agent works on it, and you watch the work stream in: text as it's written, tool calls as they happen, and requests for approval when the agent needs a person's OK. Use sessions when your app owns the chat UI or runs the agent as a task. For chats stored in Final's signed-in web and mobile apps, see [conversations](/client/conversations).
 
 These examples use the release assistant from the [quickstart](/quickstart).
 
@@ -164,7 +164,7 @@ In a web app, the person's click arrives in a different request from the stream.
 await client.sessions.attach(sessionId).respond({ decisionId, optionId });
 ```
 
-To build an inbox of everything waiting on someone, `client.conversations.decisions()` lists open decisions across all of the caller's conversations.
+For the session your application owns, use its decision events and `handle.respond` as above. A person-wide inbox through `client.conversations.decisions()` requires the signed-in person client described in [conversations](/client/conversations); the API-key client in this guide has no person-owned conversation inbox.
 
 ## Send follow-ups
 
