@@ -88,7 +88,7 @@ npx final-agents channel install support --revision arev_your_revision \
   --project prj_your_project --install app_your_install
 ```
 
-The selected channel must declare the matching application. Set `FINAL_API_KEY` with `agents:write` and project Editor access. Copy the IDs from Final, and use the exact route URLs printed by the command. The installation selects credentials; it does not replace the authored channel implementation.
+The selected channel must declare the matching application. Set `FINAL_API_KEY` with `agents:write` and project Editor access. Copy the IDs from Final, and use the exact route URLs printed by the command. The installation selects credentials; it does not replace the authored channel implementation. For a definition-owned channel, import `bundleRef` from `@finalai/agents` and add `{ channel: bundleRef('channels/support'), install: 'app_your_install' }` to `agent.ts`'s `channels` array. The export names the existing `channels/support.ts` module; the compiler derives its credentials and routes from that module. Optional `key` and `config` select the binding name and configuration.
 
 Save the client equivalent as `configure-channel.ts`, replace the IDs, and run `node configure-channel.ts` with Node.js 26 or later:
 
