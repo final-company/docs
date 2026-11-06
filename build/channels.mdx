@@ -64,7 +64,7 @@ The example uses nonhuman `input`. To post as a member, implement a redirect or 
 
 ## Installed application credentials
 
-Declare `credentials: { app: 'your-application' }` when a channel needs a connected application. Publishing approves that grant; an installation selected for the binding must match the declaration. Installed tokens and client secrets stay outside the bundle.
+Declare `credentials: { app: 'your-application' }` when a channel needs a connected application. Publishing requires normal administrator approval for that grant. An installation selected for a running binding must match the declaration. Installed tokens and client secrets stay outside the bundle.
 
 | Operation | Purpose |
 | --- | --- |
@@ -81,14 +81,20 @@ Use `ctx.binding.url` to construct callback URLs, such as `${ctx.binding.url}/oa
 
 ## Install a published channel
 
-A channel can belong to an agent definition or be installed separately for a project. A project-owned installation selects the channel from an immutable published revision:
+For a reusable application, first [upload its source draft](/operate/publishing#publish-code-that-uses-secrets), including its `channels/<key>.ts` module. A signed-in organization admin with project Editor access chooses **Publish source only** in the agent's Code view. This approves an immutable revision without changing the source agent's current revision, routes, listeners, or schedules. It does not require an application installation or secret values in the source project, because the code is not activated there. App and secret declarations still require approval.
+
+Copy the resulting `arev_…` revision ID. Connect your application and configure any declared project secrets in the target project. That project must be the source definition's project or a descendant of it in the same organization. When the channel declares app credentials, the selected installation must match that declaration.
 
 ```bash
 npx final-agents channel install support --revision arev_your_revision \
   --project prj_your_project --install app_your_install
 ```
 
-The selected channel must declare the matching application. Set `FINAL_API_KEY` with `agents:write` and project Editor access. Copy the IDs from Final, and use the exact route URLs printed by the command. The installation selects credentials; it does not replace the authored channel implementation. For a definition-owned channel, import `bundleRef` from `@finalai/agents` and add `{ channel: bundleRef('channels/support'), install: 'app_your_install' }` to `agent.ts`'s `channels` array. The export names the existing `channels/support.ts` module; the compiler derives its credentials and routes from that module. Optional `key` and `config` select the binding name and configuration.
+Set `FINAL_API_KEY` with `agents:write` and project Editor access. Copy the IDs from Final, and use the exact route URLs printed by the command. This creates a separate binding pinned to that source revision; later source publications do not automatically update it.
+
+To update an active installation, publish a new source revision, then run the command with `--replace` or pass `replace: true` to the client. Without that explicit option, a different revision or configuration is rejected. Replacement keeps the binding ID and base URL. Preserve provider-facing route paths in your code to keep those endpoint URLs usable. An archived binding cannot be replaced.
+
+For a channel running directly on its source agent, use ordinary **Publish** instead. App-credential channels must select an explicit installation: import `bundleRef` from `@finalai/agents` and add `{ channel: bundleRef('channels/support'), install: 'app_your_install' }` to `agent.ts`'s `channels` array. The export names the existing `channels/support.ts` module; the compiler derives its credentials and routes from that module. Optional `key` and `config` select the binding name and configuration.
 
 Save the client equivalent as `configure-channel.ts`, replace the IDs, and run `node configure-channel.ts` with Node.js 26 or later:
 

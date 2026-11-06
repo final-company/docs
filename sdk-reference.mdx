@@ -81,6 +81,10 @@ npx final-agents publish ./agent --agent release-assistant --note 'Add release_s
   The commit message for the uploaded files.
 </ParamField>
 
+<ParamField path="--no-activate" type="boolean">
+  Publish an immutable source revision without changing the live agent, routes, listeners, or schedules. The client equivalent is `definitions.publish({ definition, ref, activate: false })`. This does not bypass administrator approval for app or secret declarations; use Code view's **Publish source only** choice for those approvals.
+</ParamField>
+
 <ParamField path="--ref" type="string">
   For agents backed by GitHub only: the branch, tag, or commit to publish. Defaults to the repository's default branch.
 </ParamField>
@@ -94,7 +98,9 @@ npx final-agents channel install support --revision arev_your_revision \
   --project prj_your_project --install app_your_install
 ```
 
-Set `FINAL_API_KEY` first. The channel key must exist in that revision, and its declared application must match the selected installation. The command checks project access and prints the public route URLs. It does not create provider credentials or choose implementation code from a package name. See [channels](/build/channels).
+Set `FINAL_API_KEY` first. The source definition must be in the target project or an ancestor project in the same organization. When the channel declares application credentials, the selected installation must match. The command checks project access and prints the public route URLs. It does not create provider credentials or select implementation code from a package name.
+
+Use `--replace` to explicitly update an active binding's revision and configuration while retaining its ID and base URL. Without it, different settings are rejected; archived bindings cannot be replaced. See [source publication and installation](/build/channels#install-a-published-channel).
 
 ### Options for `build` and `publish`
 
