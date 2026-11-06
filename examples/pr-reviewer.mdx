@@ -1,11 +1,11 @@
 ---
 title: "Pull request reviewer"
 sidebarTitle: "Pull request reviewer"
-description: "Review a public GitHub pull request from its own comment thread."
+description: "Review a public GitHub pull request from a Final chat."
 icon: "code-pull-request"
 ---
 
-A linked repository collaborator mentions your bot on a public pull request. The agent reads the diff with one read-only tool and posts a review as the GitHub App. It does not check out code, run tests, or change the repository.
+Ask this agent in Final to review a public pull request. It reads the diff with one read-only tool and replies in the chat. It does not check out code, run tests, or change the repository.
 
 ## Create the project
 
@@ -17,16 +17,15 @@ git init
 pnpm init --init-type module --no-init-package-manager
 printf 'node_modules/\n.final/\n.env*\n' > .gitignore
 pnpm add @finalai/agents @finalai/final-agent-provider zod
-mkdir -p agent/channels agent/tools
+mkdir -p agent/tools
 ```
 
-Create these four files:
+Create these three files:
 
 ```text
 agent/
   agent.ts
   instructions.md
-  channels/github.ts
   tools/read_pull_request.ts
 ```
 
@@ -45,11 +44,6 @@ Report concrete bugs and security problems with file and hunk references.
 Separate confirmed observations from hypotheses. If the diff is truncated,
 say the review is incomplete. Never claim you ran tests or checked out code.
 Keep proposed fixes as suggestions; you have no repository write tools.
-```
-
-```ts agent/channels/github.ts
-import { githubChannel } from '@finalai/final-agent-provider/channels/github';
-export default githubChannel({ mention: 'your-review-app' });
 ```
 
 ```ts agent/tools/read_pull_request.ts
@@ -77,15 +71,11 @@ export default defineTool({
 });
 ```
 
-GitHub supports the diff media type on its [pull request endpoint](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request). Unauthenticated GitHub requests have a low rate limit shared by the egress IP; this example is for trying a public PR, not high-volume review. For authenticated or private repositories, replace this tool with an appropriately authorized [GitHub connection](/build/connections); the channel's installation credentials are not handed to your authored tools.
+GitHub supports the diff media type on its [pull request endpoint](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request). Unauthenticated GitHub requests have a low rate limit shared by the egress IP; this example is for trying a public PR, not high-volume review. For authenticated or private repositories, replace this tool with an appropriately authorized [GitHub connection](/build/connections); channel credentials are not handed to authored tools.
 
 ## Configure and publish
 
-Create a GitHub App and connect its installation in the agent's Final project. Follow [GitHub provider setup](/build/channels#provider-setup) for installation credentials, user OAuth, signing secret, events, and callbacks. Give the App access to the public repository you will test and permission to comment on pull requests.
-
-Set `mention` in `channels/github.ts` to your GitHub App's mention slug, replacing `your-review-app` and omitting the `[bot]` suffix. Do this before building and publishing. Use the same slug in the test comment below; changing it later requires rebuilding and republishing.
-
-Export your [API key](/api-keys) as `FINAL_API_KEY`. Register this agent once in the same project as the key and connected application. Save the following as `register.ts`, replacing `prj_your_project` with that project's ID:
+Export your [API key](/api-keys) as `FINAL_API_KEY`. Register this agent once in the same project as the key. Save the following as `register.ts`, replacing `prj_your_project` with that project's ID:
 
 ```ts register.ts
 import { createClient } from '@finalai/agents/client';
@@ -117,26 +107,14 @@ pnpm exec final-agents build ./agent
 pnpm exec final-agents publish ./agent --agent pull-request-reviewer
 ```
 
-Copy the printed GitHub binding's `alias:` URLs ending in `/b/<raw-binding-id>/webhook` and `/b/<raw-binding-id>/oauth/callback` into the provider setup. Use the `/b/` OAuth callback, not the friendly organization/agent URL printed above it; if no alias is shown, use the route itself. If Final displays a forwarded webhook URL for the connected installation, use that exact URL for provider delivery instead. For one shared app serving multiple agents, [install a project-owned channel](/build/channels#use-a-provider-channel) instead of adding the per-agent factory.
+## Try it
 
-## Link, connect, and try it
-
-[Create a Shared chat in the Final web app](/build/channels#create-a-shared-chat-in-final), inside the same project. Use the project's **+ → New Chat** menu, select your own name and the published `pull-request-reviewer`, then **Start chat**. The agent gets `default` routing. This signed-in person step is separate from publishing with an API key; select this chat on the Connect page.
-
-Open a pull request in the public repository where you installed the App, then add this comment using the configured bot mention:
+Open a chat with the published agent in Final and send:
 
 ```text
-@your-review-app review this change, including authorization checks and test coverage. Read the diff for OWNER/REPO pull request NUMBER.
+Review OWNER/REPO pull request NUMBER, including authorization checks and test coverage.
 ```
 
-Replace `@your-review-app`, `OWNER`, `REPO`, and `NUMBER` with your app mention and pull request. On a first use:
+Replace `OWNER`, `REPO`, and `NUMBER` with a public pull request. A useful answer names a concrete hunk and explains a failure case, or says no concrete issue was found. It must not claim to have run validation.
 
-1. Follow the public **Link** notice, sign in to Final, and prove your GitHub identity through user OAuth.
-2. Add a **new comment** with the request. Follow its **Connect** notice and choose a Shared chat you can manage.
-3. Add another **new comment** to start the review. Editing a refused comment does not replay it. Already linked or connected places skip the corresponding step.
-
-The package checks repository write access before accepting a mention. Public Link and Connect notices still require the proper Final account and permissions. Once linked and connected, the App acknowledges your comment and posts the answer once. A useful answer names a concrete hunk and explains a failure case, or says no concrete issue was found. It must not claim to have run validation. Long answers direct readers to Final.
-
-Inline review threads inherit the connected pull request unless a more specific route overrides it. Editing or deleting an accepted request comment updates its Final message without starting a fresh turn. Edits to the agent's Final reply update the App's GitHub comment. Permission requests show a Waiting notice; answer them in Final.
-
-Use **Follow** when another chat should receive PR status and review events without becoming its conversation. GitHub does not provide an inbound reaction webhook; reactions from Final can still be sent outward.
+To receive provider events or post reviews back to an outside thread, write a [channel application](/build/channels) with its own signature verification, identity proof, and provider API calls. Those capabilities are available through the same SDK used for custom integrations.

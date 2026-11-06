@@ -4,7 +4,7 @@ description: "Imports, client methods, CLI commands, and environment variables i
 icon: "book"
 ---
 
-`@finalai/agents` contains three things: helpers for writing agents, a client for calling them, and the `final-agents` CLI. Install it with `pnpm add @finalai/agents zod`. Add `@finalai/final-agent-provider` when importing provider channel factories. It requires Node.js 26 or later. Full signatures are in the package's TypeScript declarations.
+`@finalai/agents` contains three things: helpers for writing agents, a client for calling them, and the `final-agents` CLI. Install it with `pnpm add @finalai/agents zod`. It requires Node.js 26 or later. Full signatures are in the package's TypeScript declarations.
 
 ## Imports
 
@@ -17,7 +17,6 @@ icon: "book"
 | `@finalai/agents/tools` | Tools and their results | `defineTool`, `toolResultFrom` |
 | `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineHook` |
 | `@finalai/agents/channels` | [Channel routes](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS` |
-| `@finalai/final-agent-provider/channels/*` | Ready-made external channels | `slackChannel`, `discordChannel`, `githubChannel`, `linearChannel`, `webhookChannel`, `voiceChannel`, `phoneChannel` from their matching subpaths |
 | `@finalai/agents/channels/final` | Customize Final's own chat surface | `finalChannel` with room `onMessage`, `renderer`, and `events` |
 | `@finalai/agents/client` | Calling agents from your app | `createClient`, `sessionUpdateOf`, `textOf`, `isClientError`, and the API's types and enums |
 
@@ -86,15 +85,16 @@ npx final-agents publish ./agent --agent release-assistant --note 'Add release_s
   For agents backed by GitHub only: the branch, tag, or commit to publish. Defaults to the repository's default branch.
 </ParamField>
 
-### `channel install <package>`
+### `channel install <key>`
 
-Install a shared channel in a project using an existing connector installation:
+Install a channel exported by an immutable published revision, using an existing application installation:
 
 ```bash
-npx final-agents channel install @finalai/slack-channel --project prj_your_project --install app_your_install
+npx final-agents channel install support --revision arev_your_revision \
+  --project prj_your_project --install app_your_install
 ```
 
-The Slack, Discord, GitHub, and Linear names are aliases for the corresponding factories exported by `@finalai/final-agent-provider/channels/*`. Set `FINAL_API_KEY` first. Copy the `prj_…` and `app_…` IDs from the corresponding project and application URLs in Final. The command checks access; it does not create provider credentials.
+Set `FINAL_API_KEY` first. The channel key must exist in that revision, and its declared application must match the selected installation. The command checks project access and prints the public route URLs. It does not create provider credentials or choose implementation code from a package name. See [channels](/build/channels).
 
 ### Options for `build` and `publish`
 
@@ -109,7 +109,6 @@ The Slack, Discord, GitHub, and Linear names are aliases for the corresponding f
 | `FINAL_API_KEY` | `build`, `publish`, `channel install` | Your [API key](/api-keys). Required for publishing and channel installation. |
 | `FINAL_API_HOST` | `build`, `publish`, `channel install` | The Final API to use, if not the default. |
 | `AGENT_LOCAL_SECRETS_JSON` | `dev` | Secret values for local routes, as a JSON object, like `{"deploy-webhook-secret":"local-test-value"}`. Only names declared by the agent, its channels, or its connections are available. |
-| `AGENT_LOCAL_APP_INFO_JSON` | `dev` | App metadata keyed by the channel's declared app name, such as `{"slack":{"clientId":"local-client","clientSecret":"local-test-value","signingSecret":"local-signing-value"}}`. No access tokens; only the declared app is exposed. |
 
 The client doesn't read environment variables. Pass the host and key to `createClient`.
 

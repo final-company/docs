@@ -46,13 +46,60 @@ Do not attempt a rollback or other change.
 ```
 
 ```ts agent/channels/deploys.ts
-import { webhookChannel } from '@finalai/final-agent-provider/channels/webhook';
-export default webhookChannel({ secret: 'deploy-webhook-secret' });
+import { defineChannel, POST } from '@finalai/agents/channels';
+import { z } from 'zod';
+
+const eventSchema = z.object({
+  place: z.object({ kind: z.literal('webhook'), id: z.string(), title: z.string().optional() }),
+  label: z.string(), content: z.array(z.object({ type: z.literal('text'), text: z.string() })),
+  idempotencyKey: z.string(),
+});
+
+export default defineChannel({
+  name: 'deploys',
+  credentials: { app: null, secrets: ['deploy-webhook-secret'] },
+  identity: { kind: 'none' },
+  places: { kinds: ['webhook'] },
+  routes: [POST('/webhook', async (ctx) => {
+    const body = await ctx.request.text();
+    const secret = await ctx.credentials.secret('deploy-webhook-secret');
+    const signature = (ctx.request.headers.get('x-final-signature') ?? '').replace(/^sha256=/, '');
+    if (secret == null || !/^[a-f0-9]{64}$/i.test(signature))
+      return new Response('Invalid signature', { status: 401 });
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    const bytes = new Uint8Array(Array.from({ length: 32 }, (_, i) =>
+      Number.parseInt(signature.slice(i * 2, i * 2 + 2), 16)));
+    if (!(await crypto.subtle.verify('HMAC', key, bytes, new TextEncoder().encode(body))))
+      return new Response('Invalid signature', { status: 401 });
+    let event: z.infer<typeof eventSchema>;
+    try { event = eventSchema.parse(JSON.parse(body)); }
+    catch { return new Response('Invalid event', { status: 400 }); }
+    const result = await ctx.receive(event);
+    return Response.json(result, { status: 'accepted' in result && !result.accepted ? 403 : 202 });
+  })],
+  receive: async (input, ctx) => {
+    const event = eventSchema.parse(input);
+    const place = event.place;
+    const route = await ctx.places.resolve(place);
+    if (route.kind !== 'connected')
+      return { accepted: false, refusal: { refused: 'unconnected',
+        message: 'Connect this deployment feed to a chat.', connectUrl: route.connectUrl } };
+    const result = await ctx.conversation(route.conversation).input({
+      label: event.label, content: event.content,
+      origin: { place }, idempotencyKey: event.idempotencyKey,
+    });
+    return 'refused' in result ? { accepted: false, refusal: result } : { accepted: true };
+  },
+  events: {
+    'turn.completed': async (event, ctx) => { ctx.log('Deployment turn completed', { turnId: event.turnId }); },
+  },
+});
 ```
 
 ## Configure and publish
 
-Create a [project secret](/operate/authentication#use-secrets-in-your-code) named `deploy-webhook-secret`, and put the same random value in your CI secret store as `DEPLOY_WEBHOOK_SECRET`. The channel option contains the name; it must never contain the secret value. The factory declares that secret for the channel.
+Create a [project secret](/operate/authentication#use-secrets-in-your-code) named `deploy-webhook-secret`, and put the same random value in your CI secret store as `DEPLOY_WEBHOOK_SECRET`. The channel declares the secret name; never put its value in source.
 
 Export your [API key](/api-keys) as `FINAL_API_KEY`. Register this agent once in the same project as the key and webhook secret. Save the following as `register.ts`, replacing `prj_your_project` with that project's ID:
 
@@ -134,7 +181,7 @@ console.log('Deployment event accepted.');
 node send-deploy.mjs
 ```
 
-Use the real CI run ID in `idempotencyKey`; keep it unchanged when retrying that event. `401` means the signature or stored secret differs; `400` means the envelope is malformed. See [webhook setup](/build/channels#add-an-authenticated-webhook).
+Use the real CI run ID in `idempotencyKey`; keep it unchanged when retrying that event. `401` means the signature or stored secret differs; `400` means the envelope is malformed. See [webhook setup](/build/channels#write-a-custom-channel).
 
 The chat receives a captioned deployment input and the agent's answer. For example, it can identify the failing readiness check and suggest checking the new version's health endpoint, while noting that the excerpt alone does not establish the root cause. The event is nonhuman input, not a message impersonating the installer.
 
@@ -149,4 +196,4 @@ For this preview, set `CHANNEL_WEBHOOK_URL` to `http://localhost:3000/deploys/we
 
 ## Extend it
 
-Add read-only tools for deployment logs or service status, then give the agent instructions for using them. Keep remediation tools behind [approval](/build/tools#ask-before-a-tool-runs). Disconnect the place to stop delivery. This factory is inbound-only; it does not mirror chat replies to CI.
+Add read-only tools for deployment logs or service status, then give the agent instructions for using them. Keep remediation tools behind [approval](/build/tools#ask-before-a-tool-runs). Disconnect the place to stop delivery. This application is inbound-only; it does not mirror chat replies to CI.
