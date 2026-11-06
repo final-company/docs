@@ -75,6 +75,8 @@ Declare `credentials: { app: 'your-application' }` when a channel needs a connec
 | `credentials.connect({ url, signal })` | Open a provider socket; inject credentials only into specified JSON leaves when sending. |
 | `credentials.secret(name)` | Read an explicitly declared project secret. |
 
+Events a host receives for an installed app arrive unchanged at your channel's `POST /webhook` route, with their signature headers, so verify them as you would any other request. A provider app you run yourself can point straight at the route URL that `channel install` prints.
+
 `ChannelCredentialKind`, signing algorithms, signature encodings, and OAuth client authentication enums are exported by `@finalai/agents/channels`. Requests are restricted to the application's approved destinations. Opaque OAuth handles are temporary and cannot be reused across invocations. They do not provide persistent person-token storage or automatic refresh. Raw installed tokens, signing secrets, and OAuth client secrets are never returned to application code. Socket handshake-header authentication is not currently exposed; the socket API supports credential injection in JSON frames.
 
 Use `ctx.binding.url` to construct callback URLs, such as `${ctx.binding.url}/oauth/callback`. It is supplied uniformly by the host; do not hardcode a deployment origin in application source.
@@ -92,7 +94,7 @@ npx final-agents channel install support --revision arev_your_revision \
 
 Set `FINAL_API_KEY` with `agents:write` and project Editor access. Copy the IDs from Final, and use the exact route URLs printed by the command. This creates a separate binding pinned to that source revision; later source publications do not automatically update it.
 
-To update an active installation, publish a new source revision, then run the command with `--replace` or pass `replace: true` to the client. Without that explicit option, a different revision or configuration is rejected. Replacement keeps the binding ID and base URL. Preserve provider-facing route paths in your code to keep those endpoint URLs usable. An archived binding cannot be replaced.
+To update an active installation, publish a new source revision, then run the command with `--replace` or pass `replace: true` to the client. Without that explicit option, a different revision or configuration is rejected. Omitting `config` preserves the current effective configuration during replacement; explicit `config: {}` resets it to the new source defaults. The CLI omits configuration, so `--replace` keeps existing settings. Replacement keeps the binding ID and base URL. Preserve provider-facing route paths in your code to keep those endpoint URLs usable. An archived binding cannot be replaced.
 
 For a channel running directly on its source agent, use ordinary **Publish** instead. App-credential channels must select an explicit installation: import `bundleRef` from `@finalai/agents` and add `{ channel: bundleRef('channels/support'), install: 'app_your_install' }` to `agent.ts`'s `channels` array. The export names the existing `channels/support.ts` module; the compiler derives its credentials and routes from that module. Optional `key` and `config` select the binding name and configuration.
 
@@ -147,7 +149,7 @@ Use `events` for messages, tools, plans, decisions, and turn completion. `messag
 
 `conversation(...).attach` saves content without starting a turn. `edit`, `remove`, and `react` target an external key. `decisions.resolve` checks the responding person's authority. Never select between concurrent approvals using an ambiguous yes/no.
 
-`ctx.media.transcribe` and `ctx.media.synthesize` are streaming primitives for authored audio applications. Such an application owns its OAuth proof, transport protocol, cancellation, recording notice, and playback lifecycle.
+Audio applications own capture, speech-provider connections, synthesis, cancellation, and playback. They connect to an agent through the same channel identity, message, observation, and socket capabilities as other applications; speech credentials remain with the application.
 
 ## Test it locally
 

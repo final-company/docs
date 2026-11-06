@@ -100,7 +100,7 @@ npx final-agents channel install support --revision arev_your_revision \
 
 Set `FINAL_API_KEY` first. The source definition must be in the target project or an ancestor project in the same organization. When the channel declares application credentials, the selected installation must match. The command checks project access and prints the public route URLs. It does not create provider credentials or select implementation code from a package name.
 
-Use `--replace` to explicitly update an active binding's revision and configuration while retaining its ID and base URL. Without it, different settings are rejected; archived bindings cannot be replaced. See [source publication and installation](/build/channels#install-a-published-channel).
+Use `--replace` to explicitly update an active binding's revision while retaining its configuration, ID, and base URL. SDK callers can provide `config` to replace settings; omitted configuration preserves current settings, while `{}` resets to the new source defaults. Without it, different settings are rejected; archived bindings cannot be replaced. See [source publication and installation](/build/channels#install-a-published-channel).
 
 ### Options for `build` and `publish`
 
