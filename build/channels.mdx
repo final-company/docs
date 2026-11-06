@@ -71,6 +71,7 @@ Declare `credentials: { app: 'your-application' }` when a channel needs a connec
 | `credentials.client()` | Read the public OAuth client ID. |
 | `credentials.verify(...)` | Verify signed bytes with installed signing material. |
 | `credentials.exchange(...)` | Exchange an OAuth grant for a short-lived opaque handle. |
+| `credentials.redirect({ path })` | Get the OAuth redirect URL and state for a `redirect: true` route. |
 | `credentials.fetch(url, { credential })` | Make an authorized provider request using an app credential, OAuth handle, or no credential. |
 | `credentials.connect({ url, signal })` | Open a provider socket; inject credentials only into specified JSON leaves when sending. |
 | `credentials.secret(name)` | Read an explicitly declared project secret. |
@@ -79,7 +80,17 @@ Events a host receives for an installed app arrive unchanged at your channel's `
 
 `ChannelCredentialKind`, signing algorithms, signature encodings, and OAuth client authentication enums are exported by `@finalai/agents/channels`. Requests are restricted to the application's approved destinations. Opaque OAuth handles are temporary and cannot be reused across invocations. They do not provide persistent person-token storage or automatic refresh. Raw installed tokens, signing secrets, and OAuth client secrets are never returned to application code. Socket handshake-header authentication is not currently exposed; the socket API supports credential injection in JSON frames.
 
-Use `ctx.binding.url` to construct callback URLs, such as `${ctx.binding.url}/oauth/callback`. It is supplied uniformly by the host; do not hardcode a deployment origin in application source.
+### OAuth redirects
+
+A provider application stores its redirect URLs once, however many bindings it serves. Declare your callback with `redirect: true`, and ask the host for the values to send:
+
+```ts
+const { url, state } = await ctx.credentials.redirect({ path: '/oauth/callback' });
+```
+
+Send `url` as `redirect_uri` and `state` unchanged, and use the same `url` in the token exchange. `url` is the same for every binding, so register it once in your provider application. When the provider returns, `state` runs that route on the binding that started the flow. A `redirect` route must be a `GET`, and it is reachable only this way.
+
+Use `ctx.binding.url` for URLs that belong to one binding. Do not hardcode a deployment origin in application source.
 
 ## Install a published channel
 
