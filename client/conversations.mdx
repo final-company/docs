@@ -24,14 +24,12 @@ Conversations belong to people: the examples here use a client signed in as a pe
 ```ts
 import { createClient } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 
 const client = createClient({ auth: { bearer: getToken } });
 const project = client.project({ id: 'prj_your_project' });
 
 const agent = await project.agents.get({ name: 'release-assistant' });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
-const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() });
 
 const chat = await project.conversations.direct({ agent, provide: { harness } });
 const sent = await chat.send('What is blocking 1.2.0?');
@@ -142,7 +140,7 @@ An agent participant's settings are its stored `provide`, plus per-chat `instruc
 ```ts
 const settings = await room.participants.settings(added.id);
 await room.participants.provide(added.id, {
-  harness: serverlessFinal({ model: 'gpt-6.1-sol', inference: finalCredits(), environment: runtime.id }),
+  harness: serverlessFinal({ model: 'gpt-6.1-sol', inference: finalCredits() }),
   revision: settings.revision,
 });
 ```

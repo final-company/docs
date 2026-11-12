@@ -182,11 +182,8 @@ The output lists `webhooks`, `errors`, and `api-versions` under `skills`, with e
 
 ```ts ask.ts
 import { finalCredits, serverlessPi } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { client, project } from './client.js';
-
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const { handle, response } = await project.sessions.create({
   agent,
@@ -195,7 +192,6 @@ const { handle, response } = await project.sessions.create({
       model: 'gpt-6.1-sol',
       reasoning: 'low',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
   },
   message: 'Every webhook fails signature verification in my Express app. What am I doing wrong?',

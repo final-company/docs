@@ -131,12 +131,10 @@ This script provides a harness and the `linear` integration for the `issues` slo
 import { createInterface } from 'node:readline/promises';
 import { sessionUpdateOf, textOf } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { client, project } from './client.js';
 
 const terminal = createInterface({ input: process.stdin, output: process.stdout });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 const linear = await project.integrations.get({ name: 'linear' });
 
 const { handle, response } = await project.sessions.create({
@@ -145,7 +143,6 @@ const { handle, response } = await project.sessions.create({
     harness: serverlessFinal({
       model: 'deepseek-v4.1-flash',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
     integrations: { issues: linear },
   },

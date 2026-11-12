@@ -33,12 +33,10 @@ Create the client on your server, never in browser code. Your [API key](/api-key
 
 ```ts
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { project } from './server/final.js';
 
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
-const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() });
 
 const { handle, response } = await project.sessions.create({
   agent,
@@ -125,11 +123,11 @@ import { agent } from '../../../agent.js';
 import { project } from '../../../server/final.js';
 
 export async function POST(request: Request) {
-  const { message, runtimeId } = await request.json();
+  const { message } = await request.json();
   const { handle, response } = await project.sessions.create({
     agent,
     provide: {
-      harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtimeId }),
+      harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() }),
     },
     message,
   });

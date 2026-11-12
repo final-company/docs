@@ -167,7 +167,6 @@ The client lives in one server-only module. It's created with `localCompute: fal
 ```ts server/final.ts
 import { createClient } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 
 const apiKey = process.env.FINAL_API_KEY;
 const projectId = process.env.FINAL_PROJECT_ID;
@@ -177,19 +176,11 @@ if (apiKey == null || projectId == null) throw new Error('Set FINAL_API_KEY and 
 export const client = createClient({ auth: { apiKey }, localCompute: false });
 export const project = client.project({ id: projectId });
 
-let runtimeId: Promise<string> | null = null;
-
-// The harness settings every chat uses. The Workers runtime is created once.
-export const harness = async () => {
-  runtimeId ??= project.sandboxes
-    .create(workers(), { idempotencyKey: 'workers' })
-    .then((runtime) => runtime.id);
-  return serverlessFinal({
-    model: 'deepseek-v4.1-flash',
-    inference: finalCredits(),
-    environment: await runtimeId,
-  });
-};
+// The harness settings every chat uses. Each session gets a Workers sandbox it owns.
+export const harness = serverlessFinal({
+  model: 'deepseek-v4.1-flash',
+  inference: finalCredits(),
+});
 ```
 
 The chat route starts a session on the first message and sends follow-ups to the same session after that. Because this server process created the session from the `agent` value it imported, this process holds the in-process tools' code and Final calls them here. The route streams [NDJSON](https://github.com/ndjson/ndjson-spec), one JSON object per line, so the browser can tell text apart from approval requests:
@@ -216,7 +207,7 @@ export async function POST(request: Request) {
   const session =
     sessionId != null
       ? client.sessions.attach(sessionId)
-      : (await project.sessions.create({ agent, provide: { harness: await harness() } })).handle;
+      : (await project.sessions.create({ agent, provide: { harness } })).handle;
   const turn = await session.send(message);
 
   const encoder = new TextEncoder();

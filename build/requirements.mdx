@@ -78,20 +78,19 @@ A person's own sign-in is never a requirement. Final asks each person to sign in
 ```ts run.ts
 import { createClient } from '@finalai/agents/client';
 import { finalCredits, serverlessPi } from '@finalai/agents/harnesses';
-import { computer, workers } from '@finalai/agents/sandboxes';
+import { computer } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 
 const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
 const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
 
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 const box = await project.sandboxes.create(computer());
 const issues = await project.integrations.get({ name: 'linear' });
 
 await project.sessions.create({
   agent,
   provide: {
-    harness: serverlessPi({ model: 'gpt-6.1-sol', inference: finalCredits(), environment: runtime.id }),
+    harness: serverlessPi({ model: 'gpt-6.1-sol', inference: finalCredits() }),
     compute: { files: box, shell: box },
     integrations: { issues },
   },

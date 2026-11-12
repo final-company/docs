@@ -41,17 +41,17 @@ Every builder takes `model`, `inference`, `permissionMode`, and `environment`; t
 
 `environment` names where the harness runs:
 
-- **A Workers sandbox** for Final's serverless harnesses. Create one per project and reuse it:
+- **A Workers sandbox** for Final's serverless harnesses. Leave `environment` out when you start a session or conversation, and the SDK creates one that the session or conversation owns:
 
   ```ts
   import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-  import { workers } from '@finalai/agents/sandboxes';
 
-  const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
-  const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+  const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() });
   ```
 
   The Workers runtime runs only programs built for it and gives the model no files or shell of its own. A harness there drives the sandboxes provided for `files` and `shell`, wherever they are.
+
+  Schedules and channel installs store their settings for runs that start later, so they name the sandbox: create one with `project.sandboxes.create(workers(), { idempotencyKey: 'workers' })` and pass its `id` as `environment`.
 
 - **A machine sandbox** for Claude Code and Codex: a computer, a Final Device, or another provider's machine. They use their own file and shell tools on the machine they run on, so that machine is also what's provided for `files` and `shell`. Leave `environment` out and they run on the sandbox provided for `shell`:
 
@@ -100,7 +100,6 @@ serverlessNanocodeClaude({
     apiKey('ANTHROPIC_API_KEY'),  // else the project's key, a project secret by name
     finalCredits(),               // else Final's metered inference, billed to the project
   ],
-  environment: runtime.id,
 });
 ```
 

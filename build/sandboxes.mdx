@@ -38,12 +38,11 @@ Create a sandbox in the project, then provide it for each capability. `files` an
 ```ts run.ts
 import { createClient } from '@finalai/agents/client';
 import { finalCredits, serverlessPi } from '@finalai/agents/harnesses';
-import { computer, defineSandboxSetup, workers } from '@finalai/agents/sandboxes';
+import { computer, defineSandboxSetup } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 
 const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
 const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const sessionId = crypto.randomUUID();
 const box = await project.sandboxes.create(computer({ image: 'docker.io/library/node:26-bookworm' }), {
@@ -58,7 +57,7 @@ const { response } = await project.sessions.create({
   id: sessionId,
   agent,
   provide: {
-    harness: serverlessPi({ model: 'gpt-6.1-sol', inference: finalCredits(), environment: runtime.id }),
+    harness: serverlessPi({ model: 'gpt-6.1-sol', inference: finalCredits() }),
     compute: { files: box, shell: box },
   },
   message: 'Run the tests and explain the first failure.',

@@ -113,7 +113,7 @@ When the agent wants to run a shell command, the turn pauses on a **permission**
 import { createInterface } from 'node:readline/promises';
 import { DecisionKind, sessionUpdateOf, textOf } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { computer, defineSandboxSetup, workers } from '@finalai/agents/sandboxes';
+import { computer, defineSandboxSetup } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { client, project } from './client.js';
 
@@ -132,7 +132,6 @@ const box = await project.sandboxes.create(computer({ image: 'docker.io/library/
   setup,
   ownedBy: { session: sessionId },
 });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const { handle, response } = await project.sessions.create({
   id: sessionId,
@@ -142,7 +141,6 @@ const { handle, response } = await project.sessions.create({
       model: 'deepseek-v4.1-flash',
       inference: finalCredits(),
       permissionMode: 'ask',
-      environment: runtime.id,
     }),
     // Files and shell must be the same sandbox.
     compute: { files: box, shell: box },
@@ -205,16 +203,14 @@ Leave `compute` out, and the SDK serves the model's files and shell from the pro
 
 ```ts local.ts
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { project } from './client.js';
 
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 // No `compute`: the model's files and shell are this process's working directory.
 const { response } = await project.sessions.create({
   agent,
   provide: {
-    harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id }),
+    harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() }),
   },
   message: 'Run the checkout tests and tell me why they fail.',
 });

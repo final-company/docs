@@ -174,7 +174,6 @@ export const project = client.project({ id: projectId });
 ```ts ask.ts
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
 import { finalGateway } from '@finalai/agents/integrations';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { client, project } from './client.js';
 
@@ -182,7 +181,6 @@ import { client, project } from './client.js';
 const final = await project.integrations
   .get({ name: 'final' })
   .catch(() => project.integrations.create(finalGateway()));
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const { handle, response } = await project.sessions.create({
   agent,
@@ -190,7 +188,6 @@ const { handle, response } = await project.sessions.create({
     harness: serverlessFinal({
       model: 'deepseek-v4.1-flash',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
     integrations: { final },
   },

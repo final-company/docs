@@ -37,12 +37,10 @@ export const agent = defineAgent({
 ```ts run.ts
 import { createClient } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 
 const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
 const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const { response } = await project.sessions.create({
   agent,
@@ -50,7 +48,6 @@ const { response } = await project.sessions.create({
     harness: serverlessFinal({
       model: 'deepseek-v4.1-flash',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
   },
   message: 'Is 1.2.0 ready to ship?',
