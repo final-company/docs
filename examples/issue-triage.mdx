@@ -5,9 +5,9 @@ description: "Turn bug reports into well-filed Linear issues, with a person's OK
 icon: "bug"
 ---
 
-This agent turns a bug report into a well-filed issue. It searches Linear for duplicates, follows your team's triage steps to pick an owner and a severity, and asks a person before it creates anything. Use it when bug reports arrive from many places and you want each one filed the same way.
+This agent turns a bug report into a well-filed issue. It searches for duplicates, follows your team's triage steps to pick an owner and a severity, and asks a person before it creates anything. Use it when bug reports arrive from many places and you want each one filed the same way.
 
-**What it shows:** an MCP [connection](/build/connections) with an allowlist, a [skill](/build/instructions-and-skills#package-a-skill) with a reference file, a connection tool that needs [approval](/build/tools#ask-before-a-tool-runs), and answering that approval from a [script](/client/sessions#handle-approvals).
+**What it shows:** an [integration requirement](/build/integrations) with a tool allowlist and an approval, a [skill](/build/instructions-and-skills) with a reference file, providing the integration when you start a session, and answering the approval from a [script](/client/sessions#handle-approvals).
 
 ## Files
 
@@ -15,56 +15,44 @@ This agent turns a bug report into a well-filed issue. It searches Linear for du
 
 - issue-triage/
   - package.json
-  - .gitignore
+  - agent.ts
+  - instructions.md
+  - client.ts
+  - setup.ts
   - triage.ts
-  - agent/
-    - agent.ts
-    - instructions.md
-    - connections/
-      - linear.ts
-    - skills/
-      - triage/
-        - SKILL.md
-        - owners.md
+  - skills/
+    - triage/
+      - SKILL.md
+      - owners.md
 
 </Tree>
 
-```ts agent/agent.ts
-import { credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
+The agent doesn't name Linear. It requires an `issues` slot: an MCP server that the caller provides. The slot sets a ceiling on whatever fills it: only four tools are exposed, and `create_issue` always asks a person first.
 
-export default defineAgent({
+```ts agent.ts
+import { defineAgent, markdown, skill } from '@finalai/agents';
+
+export const agent = defineAgent({
   name: 'Issue Triage',
-  description: 'Files bug reports as Linear issues with an owner and a severity.',
-  harness: serverlessFinal({
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
-    }),
-    permissionMode: 'ask',
-  }),
-});
-```
-
-The connection gives the agent four of Linear's MCP tools and asks a person before `create_issue` runs. Final sends the `linear-api-key` secret as a bearer token, so the token never reaches the model:
-
-```ts agent/connections/linear.ts
-import { defineMcpClientConnection } from '@finalai/agents';
-import { always } from '@finalai/agents/approval';
-
-export default defineMcpClientConnection({
-  url: 'https://mcp.linear.app/mcp',
-  auth: { secretKey: 'linear-api-key', headerName: null },
-  tools: {
-    allow: ['list_issues', 'get_issue', 'list_teams', 'create_issue'],
-    approval: { create_issue: always() },
+  description: 'Files bug reports as issues with an owner and a severity.',
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  skills: [skill('./skills/triage', { from: import.meta.url })],
+  require: {
+    harness: { permissionMode: 'ask' },
+    integrations: {
+      issues: {
+        description: 'The issue tracker bug reports are filed in',
+        tools: { allow: ['list_issues', 'get_issue', 'list_teams', 'create_issue'] },
+        approvals: { create_issue: 'ask' },
+      },
+    },
   },
 });
 ```
 
-These are the tool names Linear's MCP server uses. If a tool goes missing after Linear changes its server, update `allow` to match the server's tool list.
+These are the tool names Linear's MCP server uses. If you provide a different issue tracker, or Linear renames a tool, update `allow` and `approvals` to match the server's tool list.
 
-```markdown agent/instructions.md
+```markdown instructions.md
 You triage bug reports for the acme-web team.
 Follow the triage skill for every report. Never create an issue without searching for duplicates first.
 If a report is missing steps to reproduce, ask for them before you file anything.
@@ -74,7 +62,7 @@ The skill holds the team's procedure, and `owners.md` maps product areas to team
 
 <CodeGroup>
 
-```markdown agent/skills/triage/SKILL.md
+```markdown skills/triage/SKILL.md
 ---
 name: triage
 description: Turn a bug report into a Linear issue with an owner and a severity.
@@ -87,7 +75,7 @@ description: Turn a bug report into a Linear issue with an owner and a severity.
 5. Reply with the issue's link, team, and severity.
 ```
 
-```markdown agent/skills/triage/owners.md
+```markdown skills/triage/owners.md
 - Checkout, payments, invoices: Payments team
 - Sign-in, accounts, permissions: Identity team
 - Everything else: Web platform team
@@ -95,71 +83,72 @@ description: Turn a bug report into a Linear issue with an owner and a severity.
 
 </CodeGroup>
 
-## Build and publish it
+## Set it up
 
 <Steps>
-  <Step title="Set up the project">
-    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+  <Step title="Create the project">
+    Create the project the same way as in the [quickstart](/quickstart), add the files above, and export `FINAL_API_KEY` and `FINAL_PROJECT_ID`. `client.ts` is the same as in the quickstart.
 
     ```bash
     mkdir issue-triage && cd issue-triage
-    git init
     npm init -y && npm pkg set type=module
     npm install @finalai/agents zod
     npm install --save-dev typescript tsx @types/node
-    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
     ```
   </Step>
   <Step title="Add your Linear key">
-    Create a personal API key in your Linear account's security settings. In the Final dashboard, add it under **Developer** > **Secrets** with the name `linear-api-key`.
+    Create a personal API key in your Linear account's security settings. In the Final dashboard, add it under **Developer** > **Secrets** in your project with the name `LINEAR_API_KEY`.
   </Step>
-  <Step title="Compile it">
-    ```bash
-    npx final-agents build ./agent
+  <Step title="Create the integration">
+    An integration is a project resource: an MCP server and how calls to it authenticate. Create it once. Final sends the secret as a bearer token, so the token never reaches the model:
+
+    ```ts setup.ts
+    import { secret } from '@finalai/agents/integrations';
+    import { client, project } from './client.js';
+
+    const linear = await project.integrations.create({
+      name: 'linear',
+      mcp: { url: 'https://mcp.linear.app/mcp' },
+      auth: secret('LINEAR_API_KEY'),
+    });
+    console.log(`Created ${linear.id}`);
+    client.close();
     ```
-
-    The summary shows the Linear connection and the secret it needs:
-
-    ```text
-    agent: Issue Triage
-    description: Files bug reports as Linear issues with an owner and a severity.
-    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
-    mcp servers: linear (http)
-    ...
-    secrets: linear-api-key
-    ...
-    wrote agent/.final/compile
-    ```
-  </Step>
-  <Step title="Register and publish it">
-    Register the `issue-triage` slug once in the same project as your key and secret, following the [quickstart](/quickstart#register-the-agent) with that slug and the name **Issue Triage**. This agent declares a secret, so publication requires an organization admin with project edit access.
-
-    Save the [`upload-draft.ts` script](/operate/publishing#publish-code-that-uses-secrets) beside `agent/`, then upload the initial default-branch draft with your project API key:
 
     ```bash
-    node upload-draft.ts issue-triage agent.ts connections/linear.ts instructions.md skills/triage/SKILL.md skills/triage/owners.md
+    npx tsx setup.ts
     ```
 
-    Resolve any reported compile errors or missing secrets. Have that admin review the uploaded files in the agent's **Code** view in Final and choose **Save and publish**. Uploading or compiling does not publish it. After publication, later source edits also use that admin's Code view; the API key cannot make those updates through CI.
+    To have each person file issues as themselves instead, create it with `auth: oauth()`. Final then asks each person to sign in the first time the agent calls Linear for them. See [sign-in](/build/integrations#sign-in).
   </Step>
 </Steps>
 
 ## Try it
 
-This script sends a bug report, streams the reply, and asks you in the terminal when the agent wants to create an issue:
+This script provides a harness and the `linear` integration for the `issues` slot, sends a bug report, streams the reply, and asks you in the terminal when the agent wants to create an issue:
 
 ```ts triage.ts
 import { createInterface } from 'node:readline/promises';
-import { createClient, sessionUpdateOf, textOf } from '@finalai/agents/client';
+import { sessionUpdateOf, textOf } from '@finalai/agents/client';
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+import { agent } from './agent.js';
+import { client, project } from './client.js';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
 const terminal = createInterface({ input: process.stdin, output: process.stdout });
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+const linear = await project.integrations.get({ name: 'linear' });
 
-const { handle, response } = await client.sessions.create({
-  agent: 'issue-triage',
+const { handle, response } = await project.sessions.create({
+  agent,
+  provide: {
+    harness: serverlessFinal({
+      model: 'deepseek-v4.1-flash',
+      inference: finalCredits(),
+      environment: runtime.id,
+    }),
+    integrations: { issues: linear },
+  },
   message:
     "Customers on Safari 18 can't complete checkout. The Pay button spins forever. " +
     'Steps: add any item to the cart, open checkout, click Pay. Works in Chrome.',
@@ -171,10 +160,10 @@ for await (const event of response!.stream()) {
   if (update?.sessionUpdate === 'agent_message_chunk') process.stdout.write(textOf(update));
 
   // The agent wants to call create_issue. Show the request and send your answer.
-  if (event.decisionId && !answered.has(event.decisionId)) {
+  if (event.decisionId != null && !answered.has(event.decisionId)) {
     answered.add(event.decisionId);
     const decision = (await handle.decisions()).find((d) => d.id === event.decisionId);
-    if (!decision) continue;
+    if (decision == null) continue;
     const { title, body } = decision.request;
     const reply = await terminal.question(`\n\n${title}\n${body ?? ''}\nApprove? (y/n) `);
     await handle.respond({
@@ -206,7 +195,10 @@ Filed [P1] Checkout Pay button spins forever on Safari 18 for the Payments team:
 https://linear.app/acme/issue/PAY-218
 ```
 
+Leave `integrations` out of `provide` and `sessions.create` fails with `requirements_unmet`, naming the `issues` slot, before anything is created. See [requirements](/build/requirements).
+
 ## Make it yours
 
-- **Take reports from where they arrive.** Add a [channel](/build/channels) that receives your support tool's webhooks, so new bug reports reach the agent without anyone forwarding them.
-- **Let it update issues too.** Add `update_issue` to `allow` and to `approval`, and add a skill step for adding a comment to the duplicate instead of stopping.
+- **Take reports from where they arrive.** Install a [channel](/build/channels) that receives your support tool's webhooks, so new bug reports reach the agent without anyone forwarding them.
+- **Let it update issues too.** Add `update_issue` to `allow` and to `approvals`, and add a skill step for commenting on the duplicate instead of stopping.
+- **Let your team chat with it in Final.** Publish it with `npx final-agents publish ./agent.ts --name issue-triage`. See [publishing](/operate/publishing).

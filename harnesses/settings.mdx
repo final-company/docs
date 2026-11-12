@@ -1,0 +1,146 @@
+---
+title: "Harness settings and inference"
+sidebarTitle: "Harness settings"
+description: "Choose the harness that runs an agent, the model it uses, where it runs, and how model calls are paid for."
+---
+
+The harness is the program that runs the model loop: it sends the conversation to the model, runs the tools the model asks for, and repeats until it has an answer. An agent only limits which harness may run it. The caller chooses one with **harness settings**, plain data passed as `provide.harness` on every call that starts work.
+
+```js
+{
+  harness: 'pi',                       // a published harness name
+  adapter: 'pi-acp',                   // optional: the ACP adapter, if not the harness's default
+  configuration: {                     // validated against the harness's configuration schema
+    model: 'gpt-6.1-sol',
+    reasoning: 'high',
+    inference: [{ source: 'final', billTo: 'project' }],
+  },
+  environment: 'asbx_01J...',          // optional: where it runs
+}
+```
+
+The builders in `@finalai/agents/harnesses` return exactly this shape for Final's harnesses, so you rarely write it by hand. Harness settings have no state: Final starts a fresh harness for each session, and a running harness is never shared.
+
+## Final's harnesses
+
+| Builder | Harness | Runs as | Reasoning |
+| --- | --- | --- | --- |
+| `serverlessFinal` | `final`: Final's own agent loop, the one Final's built-in agents use | A worker program on Final's Workers runtime | `low`, `medium`, `high` |
+| `serverlessPi` | `pi`: the open-source Pi agent | A worker program on Final's Workers runtime | `none`, `minimal`, `low`, `medium`, `high` |
+| `serverlessNanocodeClaude` | `nanocode-claude`: a Claude Code-style engine for Anthropic models | A worker program on Final's Workers runtime | `low`, `medium`, `high`, `max` |
+| `serverlessNanocodeCodex` | `nanocode-codex`: a Codex-style engine for OpenAI models | A worker program on Final's Workers runtime | `low`, `medium`, `high`, `max` |
+| `claudeCode` | `claude-code`: Claude Code itself | A process on a machine | Set by the model |
+| `codex` | `codex`: the Codex CLI itself | A process on a machine | `minimal`, `low`, `medium`, `high` |
+| `acpAgent` | `acp-agent`: any agent that already speaks ACP v2 with [Final's extensions](/harnesses/acp-extensions) | Already running, at its URL | Its own |
+
+Every builder takes `model`, `inference`, `permissionMode`, and `environment`; the serverless ones require `model`. The model is a string the harness validates, so a provider-qualified ID such as `openrouter/deepseek/deepseek-v4.1-flash` works where the harness accepts it.
+
+`project.harnesses.list()` returns every harness your project can name: its own, its parent projects', and Final's public catalog.
+
+## Where the harness runs
+
+`environment` names where the harness runs:
+
+- **A Workers sandbox** for Final's serverless harnesses. Create one per project and reuse it:
+
+  ```ts
+  import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+  import { workers } from '@finalai/agents/sandboxes';
+
+  const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+  const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+  ```
+
+  The Workers runtime runs only programs built for it and gives the model no files or shell of its own. A harness there drives the sandboxes provided for `files` and `shell`, wherever they are.
+
+- **A machine sandbox** for Claude Code and Codex: a computer, a Final Device, or another provider's machine. They use their own file and shell tools on the machine they run on, so that machine is also what's provided for `files` and `shell`. Leave `environment` out and they run on the sandbox provided for `shell`:
+
+  ```ts
+  import { claudeCode, subscription } from '@finalai/agents/harnesses';
+  import { computer } from '@finalai/agents/sandboxes';
+
+  const box = await project.sandboxes.create(computer());
+  await project.sessions.create({
+    agent,
+    provide: {
+      harness: claudeCode({ model: 'claude-opus-5-5', inference: subscription() }),
+      compute: { files: box, shell: box },
+    },
+    message: 'Fix the failing test.',
+  });
+  ```
+
+- **`atUrl({ url, hop })`** for an ACP v2 endpoint that's already running. Nothing is started. `hop` names the project secret holding its bearer token:
+
+  ```ts
+  import { acpAgent, atUrl, claudeCode, harnessLogin } from '@finalai/agents/harnesses';
+
+  const remoteClaude = claudeCode({
+    environment: atUrl({ url: 'wss://agents.example.com/acp', hop: 'ACP_ENDPOINT_TOKEN' }),
+    inference: harnessLogin(),
+  });
+  const ownAgent = acpAgent({ url: 'wss://agents.example.com/acp', hop: 'ACP_ENDPOINT_TOKEN' });
+  ```
+
+  The endpoint must implement [Final's ACP extensions](/harnesses/acp-extensions); one that doesn't is refused as unsuitable.
+
+See [harnesses, adapters, and environments](/harnesses/overview) for how these pieces fit together.
+
+## Inference sources
+
+`inference` says how the harness reaches its model and who's charged. It's an ordered list of sources, and the first available one wins. A single source needs no list:
+
+```ts
+import { apiKey, finalCredits, serverlessNanocodeClaude, subscription } from '@finalai/agents/harnesses';
+
+serverlessNanocodeClaude({
+  model: 'claude-opus-5-5',
+  inference: [
+    subscription(),               // this person's own subscription for the model's vendor, if connected
+    apiKey('ANTHROPIC_API_KEY'),  // else the project's key, a project secret by name
+    finalCredits(),               // else Final's metered inference, billed to the project
+  ],
+  environment: runtime.id,
+});
+```
+
+| Source | Whose | Wire form |
+| --- | --- | --- |
+| `subscription()` | The acting person's own subscription, resolved per call. `subscription({ credential: 'shared' })` is one connected for the whole project. `vendor` picks a vendor other than the model's. | `{ "source": "subscription", "credential": "personal" }` |
+| `apiKey('NAME', { baseUrl?, vendor? })` | The project secret of that name. | `{ "source": "api-key", "secret": "NAME" }` |
+| `finalCredits({ billTo?, budget? })` | Final's metered inference, billed to the project (default) or the person (`billTo: 'person'`), optionally capped by a named project budget. | `{ "source": "final", "billTo": "project" }` |
+| `harnessLogin()` | The harness's own login on the machine it runs on, like a CLI you signed in to there. | `{ "source": "harness" }` |
+
+A source the harness can't use is skipped. A personal subscription that isn't connected falls through to the next source; if it's the only source, the person is asked to connect it, the same way an [integration](/build/integrations#sign-in) asks them to sign in.
+
+| Harness | Sources it accepts |
+| --- | --- |
+| `final` | `apiKey` (OpenRouter-compatible), `finalCredits` |
+| `pi` | `apiKey`, `finalCredits` |
+| `nanocode-claude`, `nanocode-codex` | `subscription`, `apiKey`, `finalCredits` |
+| `claude-code`, `codex` | `harnessLogin`, `subscription`, `apiKey`, `finalCredits` |
+| `acp-agent` | `harnessLogin` |
+
+Each person connects their own subscriptions in Final. A project chooses which harnesses subscriptions may reach: `project.harnesses.allowances.list()`, `.allow({ harness })`, and `.revoke({ harness })`. Final's own harnesses are allowed by default.
+
+Your Final API key is never used for model calls. Model calls always follow the `inference` the caller provides.
+
+## Permission mode
+
+`permissionMode` (`ask`, `review`, or `auto`) is how freely the harness may act. It can't exceed the agent's `require.harness.permissionMode`, and each harness maps it onto its program's own modes. See [ask before commands run](/build/sandboxes#ask-before-commands-run).
+
+## Check settings against an agent
+
+`project.harnesses.check` says whether settings suit an agent, without starting anything:
+
+```ts
+const check = await project.harnesses.check({ agent, harness });
+if (!check.suitable) console.log(check.problems);
+for (const [capability, status] of Object.entries(check.compute)) console.log(capability, status.status);
+```
+
+Each required capability's `status` is `harness` (the harness's own machine serves it), `sandbox` (a provided sandbox must), or `unavailable`. A harness is unsuitable when its lowest permission level is above the agent's ceiling, when it lacks a feature the agent uses and doesn't mark optional, or when its environment can't run it.
+
+## Change a running agent's harness
+
+In a conversation, change one agent's settings with [`participants.provide`](/client/conversations#change-an-agents-settings). A change within the same harness, like another model, keeps the session. A different harness replaces the session after the current turn and keeps the transcript, sandboxes, and integrations.

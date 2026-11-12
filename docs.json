@@ -82,13 +82,24 @@
             "pages": [
               "build/project-structure",
               "build/configuration",
+              "build/requirements",
               "build/instructions-and-skills",
               "build/tools",
-              "build/connections",
+              "build/hooks",
+              "build/integrations",
               "build/sandboxes",
+              "build/sandbox-setups",
+              "build/where-code-runs",
               "build/schedules",
-              "build/channels",
-              "build/hooks"
+              "build/channels"
+            ]
+          },
+          {
+            "group": "Harnesses",
+            "pages": [
+              "harnesses/settings",
+              "harnesses/overview",
+              "harnesses/acp-extensions"
             ]
           },
           {
@@ -294,15 +305,15 @@
     },
     {
       "source": "/developer-guides/connectors",
-      "destination": "/build/connections"
+      "destination": "/build/integrations"
     },
     {
       "source": "/developer-guides/connectors/index",
-      "destination": "/build/connections"
+      "destination": "/build/integrations"
     },
     {
       "source": "/developer-guides/connectors/quickstart",
-      "destination": "/build/connections"
+      "destination": "/build/integrations"
     },
     {
       "source": "/developer-guides/agent-chats",
@@ -359,6 +370,10 @@
     {
       "source": "/mcp-gateway/access-and-troubleshooting",
       "destination": "/mcp-gateway/troubleshooting"
+    },
+    {
+      "source": "/build/connections",
+      "destination": "/build/integrations"
     }
   ],
   "logo": {

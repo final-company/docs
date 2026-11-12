@@ -1,55 +1,52 @@
 ---
 title: "Troubleshooting"
-description: "Fix common problems with building, publishing, and running agents."
+description: "Fix common problems with defining, starting, and running agents."
 ---
 
 Find the symptom that matches what you're seeing. Each entry explains the cause, then the fix.
 
-## Building
+## Defining an agent
 
 <AccordionGroup>
-  <Accordion title="The build says it needs a newer version of Node.js">
-    The compiler needs Node.js 26 or later. Run `node --version`, upgrade if needed, and run the build again.
+  <Accordion title="Making the document fails with &quot;uses X, which is defined outside it&quot;">
+    A serverless tool or hook uses a variable, import, or helper defined outside its function. Move it inside the function, bundle the code and pass `source`, or make the tool in-process if it needs something only your process has. See [keep it self-contained](/build/tools#keep-it-self-contained).
   </Accordion>
-  <Accordion title="A tool, connection, or schedule doesn't show up in the build summary">
-    The compiler finds files by location, and only reads files directly inside `tools/`, `connections/`, `schedules/`, and `channels/`. Check that the file is in the right folder, ends in `.ts`, and default-exports its definition. See [project structure](/build/project-structure).
+  <Accordion title="final-agents print can't load the module">
+    The CLI imports your module with Node. If it imports other local TypeScript files, run it through tsx: `NODE_OPTIONS='--import tsx' npx final-agents print ./agent.ts`. If the module exports more than one agent, pass `--export <name>`. See [the agent module](/build/project-structure#run-your-scripts).
   </Accordion>
-  <Accordion title="The build rejects memory/, subagents/, or extensions/">
-    These folders aren't supported yet. Use [instructions and skills](/build/instructions-and-skills) for knowledge, [sandbox files](/build/sandboxes) for working state, and ordinary modules for shared code.
-  </Accordion>
-  <Accordion title="The build says compatibility wasn't checked">
-    Without an API key, the build can't ask Final which harness features your organization has. Set `FINAL_API_KEY` and build again.
+  <Accordion title="A file named by markdown() or skill() isn't found">
+    Paths are relative to `from`. Pass `{ from: import.meta.url }` so they resolve against the module that calls them, not your working directory.
   </Accordion>
 </AccordionGroup>
 
-## Publishing
+## Starting work
 
 <AccordionGroup>
-  <Accordion title="Publish says the directory isn't inside a Git checkout">
-    The CLI uses Git to decide which files to upload. Run `git init` in your project, or publish from inside an existing repository.
+  <Accordion title="The call fails with requirements_unmet">
+    Something the agent requires wasn't provided or can't meet the requirement, and nothing was created. Read `cause.requirements`: each item has a `kind`, `name`, and `problem`. Provide what's missing, or mark requirements the agent can do without `optional: true`. See [requirements and providing](/build/requirements#nothing-starts-with-something-missing).
   </Accordion>
-  <Accordion title="Publishing code with secrets requires an organization admin">
-    The API key does not grant organization-admin authority. For a new secret-using agent, upload the initial draft and compile it without publishing, then have an organization admin with project edit access approve it in Final's Code view. Later edits to that secret-using agent also use the admin's Code view. See [the complete draft-and-review flow](/operate/publishing#publish-code-that-uses-secrets).
+  <Accordion title="The harness is unsuitable or &quot;needs an environment&quot;">
+    Final's serverless harnesses need a Workers sandbox as their `environment`: create one with `project.sandboxes.create(workers(), { idempotencyKey: 'workers' })` and pass its `id`. Claude Code and Codex run on a machine, by default the one provided for `shell`. A harness is also unsuitable when its lowest permission level is above the agent's ceiling or it lacks a feature the agent uses. Run `project.harnesses.check({ agent, harness })` to see the problems. See [harness settings](/harnesses/settings).
   </Accordion>
-  <Accordion title="Publish can't find the agent">
-    The agent hasn't been registered, or `--agent` has a typo. [Register it](/quickstart#register-the-agent) once, then pass its slug or ID to `--agent`. Check that your API key belongs to the same project.
+  <Accordion title="files and shell are rejected as different_sandboxes">
+    `files` and `shell` must be the same sandbox. Provide one sandbox for both.
   </Accordion>
-  <Accordion title="Publish fails with a symlink or UTF-8 error">
-    The agent directory can only contain text files, and no symlinks. Move binary files and symlinked folders out of it.
+  <Accordion title="A fetched agent fails with code_unavailable">
+    The agent has in-process tools or hooks, and the calling process doesn't hold their code because it fetched the agent by name. Start it from the process that defines it, or make those tools serverless. See [where code and compute run](/build/where-code-runs).
   </Accordion>
-  <Accordion title="My changes aren't in the published agent">
-    For an agent backed by GitHub, publishing reads from GitHub, not your local files. Push your changes first, then publish with `--ref`. See [agents backed by GitHub](/operate/publishing#agents-backed-by-github).
+  <Accordion title="The model ran commands on my server">
+    The agent requires `files` or `shell`, the call didn't provide them, and the client lends its own process by default. On a server, create the client with `localCompute: false` and provide every capability. See [servers turn local compute off](/build/where-code-runs#servers-turn-local-compute-off).
   </Accordion>
 </AccordionGroup>
 
 ## Running sessions
 
 <AccordionGroup>
-  <Accordion title="The session fails to start with a model or credentials error">
-    The harness couldn't get model access with the agent's credential chain. Check the `model` name and each source in `tryInOrder`, and make sure your organization has the provider key or subscription the chain asks for. Adding `credentials.platform()` as the last source gives the chain a fallback. See [model credentials](/build/configuration#model-credentials).
+  <Accordion title="The session fails with a model or credentials error">
+    No inference source in the harness settings produced model access. Check the `model` name and each source: a personal `subscription()` the person hasn't connected, an `apiKey('NAME')` whose secret isn't set, or a source the harness doesn't accept. Ending the list with `finalCredits()` gives it a fallback. See [inference sources](/harnesses/settings#inference-sources).
   </Accordion>
   <Accordion title="A turn seems stuck">
-    The agent is most likely waiting for an approval. List the open decisions and answer them, or cancel the turn:
+    The agent is most likely waiting for a person: an approval, or a sign-in to an integration. List the open decisions and answer them, or cancel the turn:
 
     ```ts
     const session = client.sessions.attach(sessionId);
@@ -58,47 +55,33 @@ Find the symptom that matches what you're seeing. Each entry explains the cause,
 
     See [handle approvals](/client/sessions#handle-approvals).
   </Accordion>
+  <Accordion title="An in-process tool or the local shell reports itself unavailable">
+    The process that created the session exited or lost its connection. The session carries on, and these come back when a process holding the agent starts it again. Use serverless tools and a provided sandbox for work that must continue without your process.
+  </Accordion>
   <Accordion title="The turn finished, but the reply is empty">
     Check `stopReason` on the result. `cancelled` means someone stopped the turn, and `error` means it failed. An agent can also finish a turn with tool calls and no text.
   </Accordion>
   <Accordion title="ctx.secrets.get() returns null">
-    The secret is either not declared or not set. Add its name to `secrets` in `agent.ts`, publish, and create the value under **Developer** > **Secrets**. See [secrets](/operate/authentication#use-secrets-in-your-code).
+    The secret isn't set in the session's project, or it isn't listed in the agent's `secrets`. Add its name to `secrets` and create the value under **Developer** > **Secrets**. See [secrets](/operate/authentication#use-secrets-in-your-code).
   </Accordion>
-  <Accordion title="A tool or the shell is refused without asking">
-    The agent runs with `permissionMode: 'readonly'`, which refuses changes. Read-only tools still work if they set `annotations: { readOnlyHint: true }`. Switch to `ask` to approve changes one at a time.
+  <Accordion title="An integration's tools are missing">
+    Check the slot's `tools` policy: `deny` wins over `allow`, and the most specific pattern governs. A slot marked `optional` that wasn't provided has no tools at all. See [integrations](/build/integrations#choose-which-tools-the-agent-gets).
   </Accordion>
 </AccordionGroup>
 
 ## Channels and schedules
 
 <AccordionGroup>
-  <Accordion title="My local webhook returns 202, but the agent never replies">
-    `final-agents dev` only runs your route code. It logs what the agent would receive, but doesn't start the agent. Publish, then send the event to the route's public URL.
+  <Accordion title="Publishing a channel fails because the source imports something">
+    A channel is published as one module that imports nothing. Bundle it with `esbuild --bundle --format=esm` and publish the output. See [publish and install](/build/channels#publish-and-install).
   </Accordion>
   <Accordion title="A channel refuses an unconnected place">
-    Connect the provider place to a chat you can manage, using the returned Connect link or the chat's Connected section. A shared place needs a Shared chat. See [Link and Connect](/build/channels#link-a-person-and-connect-a-place).
-  </Accordion>
-  <Accordion title="Publish refuses an owner-directed schedule in a Shared project">
-    The default `owner-direct` target needs a personal My Work project. A Shared project has no personal owner, so set `target: bound-conversation` in the schedule before publishing, then connect a provider place to the intended Shared chat. Publish again if you changed an already-published schedule. Runs remain refused until exactly one distinct chat is connected. See [schedule targets](/build/schedules#schedule-options).
+    Connect the provider place to a chat you can manage, using the returned Connect link or the chat's Connected section. A shared place needs a Shared chat. See [link and connect](/build/channels#link-a-person-and-connect-a-place).
   </Accordion>
   <Accordion title="A schedule doesn't run">
-    Schedules only run for the published revision. Publish, then check `nextRunAt` with `client.schedules.list({ agent })`. Use `runNow` to test it right away. See [schedules](/build/schedules#run-a-schedule-now).
+    Schedules exist only once the agent is published, and runs need the schedule's `provide`. Publish, set `provide` with `client.schedules.update`, then check `nextRunAt` with `client.schedules.list`. Use `runNow` to test it right away. See [schedules](/build/schedules#provide-what-runs-need).
+  </Accordion>
+  <Accordion title="A schedule in a Shared project is refused">
+    The default `owner-direct` target needs a person's own project. In a Shared project, set `target: 'bound-conversation'`, publish, and connect exactly one chat. See [where replies go](/build/schedules#where-replies-go).
   </Accordion>
 </AccordionGroup>
-
-## Read client errors
-
-SDK calls throw typed errors. `isClientError` tells you the HTTP status and an error code you can act on:
-
-```ts
-import { isClientError } from '@finalai/agents/client';
-
-try {
-  await client.sessions.create({ agent: 'release-assistant', message: 'Is 1.2.0 ready?' });
-} catch (error) {
-  if (!isClientError(error)) throw error;
-  console.error(error.status, error.code, error.message);
-}
-```
-
-Two other guards cover common failures. `isDecisionError` means a decision was already answered, expired, or isn't addressed to you, and its `reason` says which. `isTurnRejectedError` means the session isn't accepting messages right now.

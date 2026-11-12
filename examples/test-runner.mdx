@@ -6,7 +6,7 @@ icon: "flask"
 
 This agent runs your test suite on a cloud computer, reads the failing tests and the code they cover, and explains what broke. It runs the tests freely through a dedicated tool, but asks before any other shell command or file edit, so you stay in control while you build trust in it. Use it to triage a red build, or to ask "why does this test fail?" without setting up the project yourself.
 
-**What it shows:** a [sandbox](/build/sandboxes) from a saved [setup guide](/build/sandboxes#use-a-saved-setup-guide), the built-in shell and file tools with `permissionMode: 'ask'`, a [tool that uses the sandbox](/build/sandboxes#use-the-sandbox-from-a-tool), and answering [permission](/client/sessions#handle-approvals) requests from a script.
+**What it shows:** an agent that [requires compute](/build/requirements) (files and a shell), providing a [computer](/build/sandboxes) prepared by a [sandbox setup](/build/sandbox-setups), a tool that reaches the provided machine with `ctx.sandbox('shell')`, a permission ceiling of `ask`, and answering [permission](/client/sessions#handle-approvals) requests from a script.
 
 ## Files
 
@@ -14,67 +14,42 @@ This agent runs your test suite on a cloud computer, reads the failing tests and
 
 - test-runner/
   - package.json
-  - .gitignore
+  - client.ts
   - run.ts
-  - agent/
-    - agent.ts
-    - instructions.md
-    - sandbox.ts
-    - tools/
-      - run_tests.ts
+  - agent.ts
+  - instructions.md
 
 </Tree>
 
-`baseTools` gives the agent the built-in shell and file tools, bound to the computer from `sandbox.ts`. `permissionMode: 'ask'` makes it ask before it runs a command or changes a file:
-
-```ts agent/agent.ts
-import { baseTools, credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
-import { computer } from './sandbox.js';
-
-export default defineAgent({
-  name: 'Test Runner',
-  description: 'Runs the acme-web test suite and explains failures.',
-  tools: baseTools({ shell: computer, files: computer }),
-  harness: serverlessFinal({
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
-    }),
-    permissionMode: 'ask',
-  }),
-});
+```markdown instructions.md
+You keep the acme-web test suite healthy.
+Run tests with run_tests. When something fails, read the failing test and the code it covers before you explain.
+Explain each failure in two or three sentences, then propose the smallest fix as a diff.
+Don't edit files unless someone asks you to.
 ```
 
-The computer comes from a setup guide named `acme-web-dev`, which checks out the repository and installs its dependencies ahead of time, so each session starts ready to test. `workspace: 'session'` keeps the files for the whole session, so a follow-up question sees the same checkout:
+### The agent
 
-```ts agent/sandbox.ts
-import { computerSetupGuide } from '@finalai/agents/sandboxes';
+The agent says what it needs, not where it runs. `compute: { files: 'write', shell: 'execute' }` asks for a machine whose files the model can edit and where it can run commands. Whoever starts the agent decides which machine that is. `permissionMode: 'ask'` is a ceiling: no caller can give it a harness that runs commands or edits files without asking.
 
-export const computer = computerSetupGuide({
-  ref: 'acme-web-dev',
-  version: 'latest',
-  workspace: 'session',
-});
-```
+`run_tests` is a serverless tool. It runs on Final and reaches whatever sandbox the session was provided for `shell`, runs `npm test` in the `acme-web` checkout, and returns only the end of the log, which is where test runners print failures. Your own tools don't ask unless you give them an approval policy, so the agent can run the tests as often as it needs, while the harness's own shell and file tools still ask.
 
-`run_tests` runs `npm test` on the same computer and returns only the end of the log, which is where test runners print failures. Your own tools don't ask unless you give them an approval policy, so the agent can run the tests as often as it needs:
+```ts agent.ts
+import { defineAgent, defineServerlessTool, markdown } from '@finalai/agents';
+import * as z from 'zod';
 
-```ts agent/tools/run_tests.ts
-import { defineTool } from '@finalai/agents';
-import { z } from 'zod';
-
-export default defineTool({
+// Runs on Final and reaches the machine provided for `shell`.
+const runTests = defineServerlessTool({
   description: 'Run the test suite and report whether it passed.',
   inputSchema: z.object({ filter: z.string().optional().describe('Only run matching tests') }),
-  label: { start: ({ filter }) => (filter ? `Running ${filter} tests` : 'Running tests') },
-  async execute({ filter }, ctx) {
-    const sandbox = await ctx.getSandbox('computer');
-    const result = await sandbox.run({
+  execute: async ({ filter }, ctx) => {
+    const shell = await ctx.sandbox('shell');
+    const result = await shell.run({
       command: 'npm',
-      args: filter ? ['test', '--', filter] : ['test'],
+      args: filter == null ? ['test'] : ['test', '--', filter],
+      cwd: 'acme-web',
       timeoutMs: 10 * 60_000,
-      abortSignal: ctx.abortSignal,
+      abortSignal: ctx.signal,
     });
     return {
       passed: result.exitCode === 0,
@@ -82,76 +57,96 @@ export default defineTool({
     };
   },
 });
+
+export const agent = defineAgent({
+  name: 'Test Runner',
+  description: 'Runs the acme-web test suite and explains failures.',
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  tools: { run_tests: runTests },
+  require: {
+    harness: { permissionMode: 'ask' },
+    compute: { files: 'write', shell: 'execute' },
+  },
+});
 ```
 
-```markdown agent/instructions.md
-You keep the acme-web test suite healthy.
-Run tests with run_tests. When something fails, read the failing test and the code it covers before you explain.
-Explain each failure in two or three sentences, then propose the smallest fix as a diff.
-Don't edit files unless someone asks you to.
-```
+`cwd: 'acme-web'` is relative to the sandbox's working directory, where the setup below checks out the repository. Never hardcode an absolute checkout path; ask the sandbox for its description if you need one (see [inspect the machine](#inspect-the-machine)).
 
-## Build and publish it
+## Set it up
 
 <Steps>
-  <Step title="Set up the project">
+  <Step title="Create the project">
     Create the project the same way as in the [quickstart](/quickstart), then add the files above:
 
     ```bash
     mkdir test-runner && cd test-runner
-    git init
     npm init -y && npm pkg set type=module
     npm install @finalai/agents zod
     npm install --save-dev typescript tsx @types/node
-    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
-    ```
-  </Step>
-  <Step title="Create the setup guide">
-    In the Final dashboard, open **Developer** > **Computer Setup Guides** and create a guide with the slug `acme-web-dev` that checks out your repository and installs its dependencies with `npm ci`. Wait until it shows **Ready**.
-  </Step>
-  <Step title="Compile it">
-    ```bash
-    npx final-agents build ./agent
     ```
 
-    The summary shows the computer and the built-in tools bound to it:
+    `client.ts` creates the client and project from your environment:
 
-    ```text
-    agent: Test Runner
-    description: Runs the acme-web test suite and explains failures.
-    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
-    mcp servers: authored (worker)
-    sandboxes: computer
-    base tools: shell → computer, files → computer
-    ...
-    wrote /Users/you/test-runner/agent/.final/compile
+    ```ts client.ts
+    import { createClient } from '@finalai/agents/client';
+    
+    const apiKey = process.env.FINAL_API_KEY;
+    const projectId = process.env.FINAL_PROJECT_ID;
+    if (apiKey == null || projectId == null) throw new Error('Set FINAL_API_KEY and FINAL_PROJECT_ID');
+    
+    export const client = createClient({ auth: { apiKey } });
+    export const project = client.project({ id: projectId });
     ```
   </Step>
-  <Step title="Register and publish it">
-    Register the `test-runner` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
-
-    ```bash
-    npx final-agents publish ./agent --agent test-runner
-    ```
+  <Step title="Let Final reach the repository">
+    The sandbox setup clones `acme/acme-web` from the git host connected to your project. Replace it with your repository, and make sure Final's GitHub App can reach it.
   </Step>
 </Steps>
 
 ## Try it
 
+`run.ts` creates a computer with a [sandbox setup](/build/sandbox-setups) that clones the repository and installs its dependencies, then starts a session with that computer provided for both `files` and `shell`. The computer is owned by the session, so it's deleted with it.
+
 When the agent wants to run a shell command, the turn pauses on a **permission** decision. Its options, like allow once or reject, come with the request, so the script lists them and sends back the one you pick:
 
 ```ts run.ts
 import { createInterface } from 'node:readline/promises';
-import { DecisionKind, createClient, sessionUpdateOf, textOf } from '@finalai/agents/client';
+import { DecisionKind, sessionUpdateOf, textOf } from '@finalai/agents/client';
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { computer, defineSandboxSetup, workers } from '@finalai/agents/sandboxes';
+import { agent } from './agent.js';
+import { client, project } from './client.js';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
 const terminal = createInterface({ input: process.stdin, output: process.stdout });
 
-const { handle, response } = await client.sessions.create({
-  agent: 'test-runner',
+// What should be on the machine. Paths are relative to the sandbox's working directory.
+const setup = defineSandboxSetup({
+  repositories: [{ alias: 'acme-web', repository: 'acme/acme-web', ref: 'main' }],
+  steps: [{ name: 'Install dependencies', cwd: 'acme-web', run: 'npm ci' }],
+  notes: 'The repository is checked out in acme-web. Run tests from there.',
+});
+
+// The session owns the computer, so it is deleted when the session is.
+const sessionId = crypto.randomUUID();
+const box = await project.sandboxes.create(computer({ image: 'docker.io/library/node:26-bookworm' }), {
+  setup,
+  ownedBy: { session: sessionId },
+});
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+
+const { handle, response } = await project.sessions.create({
+  id: sessionId,
+  agent,
+  provide: {
+    harness: serverlessFinal({
+      model: 'deepseek-v4.1-flash',
+      inference: finalCredits(),
+      permissionMode: 'ask',
+      environment: runtime.id,
+    }),
+    // Files and shell must be the same sandbox.
+    compute: { files: box, shell: box },
+  },
   message: 'Run the checkout tests and tell me why they fail.',
 });
 
@@ -160,7 +155,7 @@ for await (const event of response!.stream()) {
   const update = sessionUpdateOf(event);
   if (update?.sessionUpdate === 'agent_message_chunk') process.stdout.write(textOf(update));
 
-  if (event.decisionId && !answered.has(event.decisionId)) {
+  if (event.decisionId != null && !answered.has(event.decisionId)) {
     answered.add(event.decisionId);
     const decision = (await handle.decisions()).find((d) => d.id === event.decisionId);
     if (decision?.kind !== DecisionKind.Permission) continue;
@@ -169,7 +164,8 @@ for await (const event of response!.stream()) {
     console.log(`\n\n${title}`);
     options.forEach((option, i) => console.log(`  ${i + 1}. ${option.name}`));
     const picked = Number(await terminal.question('Choose: ')) - 1;
-    await handle.respond({ decisionId: decision.id, optionId: options[picked].optionId });
+    const option = options[picked] ?? options[options.length - 1]!;
+    await handle.respond({ decisionId: decision.id, optionId: option.optionId });
   }
 }
 
@@ -182,7 +178,7 @@ client.close();
 npx tsx run.ts
 ```
 
-The agent runs the tests with `run_tests`, which doesn't ask. Reading the failing files doesn't ask either. When it wants to run another command, you choose, and the session looks something like this:
+The computer boots on first use, and the setup runs before the agent's first command. The agent runs the tests with `run_tests`, which doesn't ask. Reading the failing files doesn't ask either. When it wants to run another command, you choose, and the session looks something like this:
 
 ```text
 Two checkout tests fail, both in src/checkout/total.test.ts.
@@ -203,7 +199,42 @@ of $19.79. The smallest fix is to round once, after tax:
 +  return Math.round(discounted + tax(discounted));
 ```
 
+### Run it on your own machine instead
+
+Leave `compute` out, and the SDK serves the model's files and shell from the process that creates the session, rooted at its working directory. Run this from the directory that contains your `acme-web` checkout, and the agent works on your local files:
+
+```ts local.ts
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+import { agent } from './agent.js';
+import { project } from './client.js';
+
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+// No `compute`: the model's files and shell are this process's working directory.
+const { response } = await project.sessions.create({
+  agent,
+  provide: {
+    harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id }),
+  },
+  message: 'Run the checkout tests and tell me why they fail.',
+});
+console.log(await response?.text());
+```
+
+This sketch only prints the reply; to answer the agent's permission requests, reuse the decision loop from `run.ts`. Commands then run on your machine with your user's access, so keep the `ask` ceiling. When the script exits, the session survives but its files and shell become unavailable. A server should never rely on this default; see [where code runs](/build/where-code-runs).
+
+### Inspect the machine
+
+The sandbox description lists what the setup produced, including each checkout's real path on that machine:
+
+```ts
+const description = await box.description();
+for (const checkout of description.checkouts) console.log(checkout.alias, checkout.path);
+```
+
 ## Make it yours
 
-- **Let it fix the tests.** Once you trust it, switch to `permissionMode: 'auto'` and keep file edits behind approval with `toolPolicy: { 'files.write': 'ask' }` in `agent.ts`.
-- **Run it on every red build.** Add a [channel](/build/channels) that receives your CI's failure webhooks, and have the route pass the failing job's name as the message.
+- **Reuse the setup.** Publish it once with `project.sandboxSetups.publish({ name: 'acme-web', setup })` and create computers from the published version. Add `services` to start your dev server and `commands` for scripts the agent should know about. See [sandbox setups](/build/sandbox-setups).
+- **Let it fix the tests.** Once you trust it, raise the ceiling to `permissionMode: 'review'`, where edits proceed and commands still wait, or keep edits behind approval with `toolPolicy: { 'files.write': 'ask' }` in `agent.ts`. The caller picks a `permissionMode` at or below the ceiling in its harness settings.
+- **Keep one computer per conversation.** Create the computer with `ownedBy: { conversation: id }` and provide it on the conversation, so follow-up questions see the same checkout. See [conversations](/client/conversations).
+- **Run it on every red build.** Add a [channel](/build/channels) that receives your CI's failure webhooks and sends the failing job's name as the message.

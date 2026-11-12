@@ -1,0 +1,105 @@
+---
+title: "Sandbox setups"
+description: "Describe what should be on a machine once, and have Final prepare any provider's sandbox from it."
+---
+
+A sandbox setup says what should be on a machine: the repositories to check out, environment variables, setup steps, services to start, named commands, network rules, and notes for the agent. It's provider-neutral, so the same setup prepares a Final computer, a Daytona sandbox, or any other provider's machine.
+
+What the machine is built from (its image, preinstalled toolchains, size, and region) belongs to the provider's own options, like [`computer({ image, build })`](/build/sandboxes#computer-options). The setup is everything on top.
+
+## Define a setup
+
+```ts setup.ts
+import { defineSandboxSetup } from '@finalai/agents/sandboxes';
+
+export const setup = defineSandboxSetup({
+  repositories: [{ alias: 'storefront', repository: 'acme/storefront', ref: 'main' }],
+  variables: {
+    NODE_ENV: { value: 'development' },
+    NPM_TOKEN: { secret: 'NPM_TOKEN' },
+  },
+  steps: [{ name: 'Install and seed', cwd: 'storefront', run: './scripts/setup.sh' }],
+  services: [{ name: 'web', cwd: 'storefront', run: 'npm run dev -- --port 3000', port: 3000 }],
+  commands: {
+    e2e: { cwd: 'storefront', run: 'npm run test:e2e', description: 'Run the browser tests against the dev server.' },
+  },
+  network: { allow: ['registry.npmjs.org', '*.github.com'] },
+  notes: 'The dev server listens on port 3000. Sign in as test@example.com with password "test".',
+});
+```
+
+`defineSandboxSetup` validates the setup and throws with every problem it finds. Pass it when you create a sandbox:
+
+```ts
+import { computer } from '@finalai/agents/sandboxes';
+
+const box = await project.sandboxes.create(computer({ image: 'docker.io/library/node:26-bookworm' }), { setup });
+```
+
+Paths are relative to the sandbox's working directory: the `storefront` repository is checked out at `<working directory>/storefront`, and a `cwd` of `storefront` runs there. The real paths differ by provider, so read them from [`box.description()`](/build/sandboxes#use-the-sandbox-from-your-own-code) rather than hardcoding them.
+
+## How a setup is applied
+
+Final applies the setup through the sandbox itself, after the provider reports the machine running:
+
+1. **Repositories** are checked out.
+2. **Commands** become named scripts the agent can run in its shell.
+3. **Steps** run once per sandbox, in order. A failing step stops the sandbox from attaching, unless it's `optional`.
+4. **Services** start after every boot.
+
+Each phase is recorded, so a sandbox that resumes after a pause redoes only what was lost: services restart, but steps don't run again. After a failure is fixed, a retry skips the phases that already finished.
+
+**Variables** are set in every process's environment. A `secret` variable is a [project secret](/operate/authentication#use-secrets-in-your-code) by name, resolved each time the sandbox attaches, and never written to disk, the setup, or logs.
+
+**Network rules** are enforced from the first boot. If a provider can't enforce what the setup asks for, creating the sandbox fails instead of running without it.
+
+## Setup reference
+
+<ParamField path="repositories" type="{ alias, repository, ref? }[]">
+  `repository` is `owner/name` on the project's connected git host, or a clone URL. `ref` is a branch, tag, or commit; the default branch when absent. `alias` is the checkout's directory name, which steps and commands use as `cwd`. The project must be able to reach the repository.
+</ParamField>
+
+<ParamField path="variables" type="Record<string, { value } | { secret }>">
+  Environment variables, as plain values or project secrets by name. Names the platform sets itself are refused.
+</ParamField>
+
+<ParamField path="steps" type="{ name?, cwd?, run, optional?, timeoutSeconds? }[]">
+  Commands run once per sandbox. Steps time out after twenty minutes unless `timeoutSeconds` says otherwise.
+</ParamField>
+
+<ParamField path="services" type="{ name, run, port?, cwd? }[]">
+  Long-running processes started after every boot. A `port` appears in the sandbox description with its URL.
+</ParamField>
+
+<ParamField path="commands" type="Record<string, { run, cwd?, description? }>">
+  Named scripts the agent can run by name. Each `description` is one line in the sandbox description.
+</ParamField>
+
+<ParamField path="network" type="{ allow?, deny? }">
+  Hosts or `*.` patterns the machine may or may not reach. Without `allow`, every host not denied is reachable.
+</ParamField>
+
+<ParamField path="notes" type="string">
+  Markdown about the environment, such as test accounts or which service listens where. It's part of the sandbox description, which the agent can read as a file in the sandbox.
+</ParamField>
+
+## Publish a setup by name
+
+To share a setup across a team, publish it as a named, versioned project resource. Each publish creates the next version, and versions never change:
+
+```ts
+const published = await project.sandboxSetups.publish({ name: 'storefront', setup });
+console.log(published.name, published.version);
+
+const box = await project.sandboxes.create(computer(), {
+  setup: { setup: published.id, version: 'latest' },
+});
+```
+
+`latest` is resolved once, when the sandbox is created, so publishing a new version doesn't change existing sandboxes. Pass a version number to pin one. `project.sandboxSetups.list()` and `get({ id, version })` read what's published; in the dashboard, setups are under the project's **Sandbox setups** settings.
+
+## Keep the work in a script
+
+Put everything it takes to go from a fresh clone to passing tests in one script in your repository, like `scripts/setup.sh`, and make the setup's step call it. The same script works on a computer you open yourself and on a teammate's laptop. When a task turns up a missing dependency, fix the script, not the machine. See [cloud environments](/ai-coding/cloud-environments#write-a-setup-script).
+
+A person's own [Final Device](/build/sandboxes#run-on-a-final-device) takes no setup; it's already set up the way they work.

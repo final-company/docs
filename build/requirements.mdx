@@ -1,0 +1,191 @@
+---
+title: "Requirements and providing"
+sidebarTitle: "Requirements"
+description: "Declare what an agent needs with require, and meet it with a provide object on every call that starts work."
+---
+
+An agent states what it needs; whoever starts it provides it. The agent never names a machine, model, server, or credential, so the same agent runs on a laptop in one call and on a cloud computer in the next, with a different model and a different person's accounts.
+
+| The agent declares | The caller provides | If it isn't provided |
+| --- | --- | --- |
+| `require.harness`: a permission ceiling and an optional recommendation | Harness settings, inline | The call fails. A harness is never optional. |
+| `require.compute.<capability>`: the access the model needs | A sandbox per capability | `files` and `shell` run in the calling process. `computerUse` and `browserUse` fail unless optional. |
+| `require.integrations.<slot>`: a description and a tool policy | An integration per slot | The call fails, unless the slot is optional; then its tools are absent. |
+
+```ts agent.ts
+import { defineAgent } from '@finalai/agents';
+
+export const agent = defineAgent({
+  name: 'Release Captain',
+  instructions: 'You prepare and ship releases.',
+  require: {
+    harness: {
+      permissionMode: 'review',
+      recommended: { harness: 'pi', model: 'gpt-6.1-sol', reasoning: 'high' },
+    },
+    compute: {
+      files: 'write',
+      shell: 'execute',
+      browserUse: { access: 'control', optional: true, description: 'Check the release notes page' },
+    },
+    integrations: {
+      issues: { description: 'Issue tracker for release blockers', tools: { deny: ['delete_*'] } },
+      chat: { description: 'Team chat to announce releases', optional: true },
+    },
+  },
+});
+```
+
+## Harness
+
+`require.harness` limits the harness a caller may provide. It doesn't choose one.
+
+<ParamField path="permissionMode" type="'ask' | 'review' | 'auto'" required>
+  The most the harness may do without asking. `ask`: anything that changes something waits for a person. `review`: edits proceed; commands and outside actions wait. `auto`: nothing waits. A caller can run the harness more strictly, never more freely, and a harness that can't hold the agent to this level is refused.
+</ParamField>
+
+<ParamField path="optionalFeatures" type="('skills' | 'mcpTools' | 'nativeToolPolicy' | 'systemInstructions')[]">
+  Features of the agent the harness may lack. Every feature the agent uses must be supported unless it's listed here. For example, list `skills` if the agent can work on a harness that doesn't load skills.
+</ParamField>
+
+<ParamField path="recommended" type="{ harness, model?, reasoning? }">
+  A hint for whoever provides the harness, such as a picker's default. It binds nobody; Final never acts on it.
+</ParamField>
+
+## Compute
+
+`require.compute` is keyed by what the model drives. Each value is the access it needs, or an object with `access`, `optional`, and `description`.
+
+| Capability | Access | What the model does with it |
+| --- | --- | --- |
+| `files` | `read`, `write` | Reads and edits files with the harness's file tools. |
+| `shell` | `execute` | Runs commands, manages the processes they start, and gets a URL for a port one listens on. |
+| `computerUse` | `view`, `control` | Sees and operates a desktop. |
+| `browserUse` | `view`, `control` | Sees and operates a browser. |
+
+The caller provides one sandbox per capability, and `files` and `shell` must be the same sandbox. See [compute and sandboxes](/build/sandboxes).
+
+## Integrations
+
+`require.integrations` names slots, each filled with an MCP server by the caller. A slot has a `description` shown to whoever provides it, and a ceiling on what any integration in it may expose: `tools` (`allow`, `deny`, `load`) and `approvals`. See [integrations](/build/integrations).
+
+A person's own sign-in is never a requirement. Final asks each person to sign in the first time a call needs it.
+
+## Provide
+
+`provide` is a plain object passed on every call that starts work. Sandboxes and integrations are given as the handles `project.sandboxes.create` and `project.integrations.create` return, or as their ids. Harness settings are inline.
+
+```ts run.ts
+import { createClient } from '@finalai/agents/client';
+import { finalCredits, serverlessPi } from '@finalai/agents/harnesses';
+import { computer, workers } from '@finalai/agents/sandboxes';
+import { agent } from './agent.js';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+const box = await project.sandboxes.create(computer());
+const issues = await project.integrations.get({ name: 'linear' });
+
+await project.sessions.create({
+  agent,
+  provide: {
+    harness: serverlessPi({ model: 'gpt-6.1-sol', inference: finalCredits(), environment: runtime.id }),
+    compute: { files: box, shell: box },
+    integrations: { issues },
+  },
+  message: 'Prepare the 2.4.1 release.',
+});
+```
+
+On the wire, `provide` is JSON that names only things that exist:
+
+```json
+{
+  "harness": {
+    "harness": "pi",
+    "configuration": { "model": "gpt-6.1-sol", "inference": [{ "source": "final", "billTo": "project" }] },
+    "environment": "asbx_01J..."
+  },
+  "compute": { "files": "asbx_01K...", "shell": "asbx_01K..." },
+  "integrations": { "issues": "intg_01H..." }
+}
+```
+
+Every sandbox and integration must belong to the project the call is made in.
+
+### Where provide goes
+
+| Call | Whose requirements are checked |
+| --- | --- |
+| `project.sessions.create({ agent, provide })` | The agent's. |
+| `project.conversations.create({ participants, provide })` | Each agent participant's, against its own `provide` layered over the conversation's. |
+| `project.conversations.direct(...)`, `.home(...)`, `handle.addParticipant(...)` | The agent's. |
+| `handle.participants.provide(participantId, patch)` | The result must still meet the agent's requirements. |
+| `project.channels.install({ agents: { provide } })` | The project agent that answers in the chats the install creates. |
+| `client.schedules.update({ scheduleId, provide })` | The schedule's agent. |
+
+In a conversation, each top-level key (`harness`, `compute`, `integrations`) comes whole from the nearest scope that sets it: the participant, then the conversation. Compute never mixes sandboxes from two scopes.
+
+## Nothing starts with something missing
+
+The SDK runs the same requirements check Final runs before it sends a call. If anything is unmet, the call throws a `requirements_unmet` error that lists each problem, and nothing is created:
+
+```ts
+import { isRequirementsUnmetError } from '@finalai/agents/client';
+
+try {
+  await project.sessions.create({ agent, provide: {}, message: 'Prepare the 2.4.1 release.' });
+} catch (cause) {
+  if (!isRequirementsUnmetError(cause)) throw cause;
+  for (const item of cause.requirements) console.log(`${item.kind} ${item.name}: ${item.problem}`);
+}
+```
+
+```text
+harness harness: not_provided
+integration issues: not_provided
+```
+
+| `problem` | Meaning |
+| --- | --- |
+| `not_provided` | Nothing was provided for it. |
+| `not_found` | The id names nothing, or something in another project. |
+| `unsuitable` | What was provided can't meet it: a harness above the permission ceiling or missing a feature, a sandbox without the capability or with too little access. |
+| `different_sandboxes` | `files` and `shell` named two sandboxes. |
+| `code_unavailable` | The agent has in-process code and no connected process holds it. |
+
+Because of this rule, a running agent always has what it requires. Final adds nothing to its context about requirements, and its tools never fail with "not provided."
+
+If something provided later disappears, like a deleted sandbox, the next prompt fails with `requirements_unmet` and the caller provides again.
+
+### Check harness settings before you start
+
+`project.harnesses.check` says whether harness settings suit an agent and where the harness would run, without starting anything. It's what a harness picker uses:
+
+```ts
+const check = await project.harnesses.check({ agent, harness: settings });
+if (!check.suitable) console.log(check.problems);
+```
+
+### See what a session has
+
+```ts
+const session = client.sessions.attach(sessionId);
+for (const requirement of await session.requirements()) {
+  console.log(requirement.kind, requirement.name, requirement.status);
+}
+```
+
+Each requirement is `provided`, `harness` (the harness's own machine serves it), or `missing`. `session.provide()` returns the provide document the session was resolved with.
+
+## Optional requirements
+
+Mark a compute requirement or an integration slot `optional: true` when the agent can start without it. If it isn't provided, its tools are simply absent, as if the agent never declared it.
+
+An agent can acquire an optional requirement later only if it was provided [Final's gateway](/build/integrations#finals-gateway). The gateway gives it `list_requirements` and `request_requirement` tools. A request opens a `bind` decision for the person who prompted the turn; when they pick something, the agent's settings are updated and its new tools appear. An agent without the gateway never changes what it has.
+
+## Agents fetched by name are data
+
+An agent is always passed as an object: the value you defined, or one you fetched with `project.agents.get({ name })`, `{ id }`, or `{ hash }`. A string is rejected. A fetched agent carries its document but none of your code, so its serverless tools run as usual while an in-process tool can't run for a caller that doesn't hold it. Starting such an agent fails with `code_unavailable`, naming the tool. Agents meant to be started by callers who only fetch them, including Final's own chats, use serverless tools.

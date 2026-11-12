@@ -1,13 +1,13 @@
 ---
 title: "API docs assistant"
 sidebarTitle: "Docs assistant"
-description: "Answer developer questions about your API from a set of skills, with no code beyond agent.ts."
+description: "Answer developer questions about your API from skills you control, with no tools."
 icon: "book-open"
 ---
 
 This agent answers developer questions about an API, the Acme Pay API in this example. Everything it knows lives in skills: one for webhooks, one for error codes, one for API versions. Reach for this pattern when you want a support or docs bot that answers from material you control, and you'd rather edit Markdown than code to improve it.
 
-**What it shows:** [instructions](/build/instructions-and-skills#write-instructions), [skills](/build/instructions-and-skills#package-a-skill) with reference files and a one-file skill, and the harness's [`reasoning`](/build/configuration#choose-a-harness) setting.
+**What it shows:** [instructions](/build/instructions-and-skills), skills from a directory and inline, an agent that requires only a harness, and the harness's `reasoning` setting in [harness settings](/harnesses/settings).
 
 ## Files
 
@@ -15,46 +15,52 @@ This agent answers developer questions about an API, the Acme Pay API in this ex
 
 - docs-assistant/
   - package.json
-  - .gitignore
+  - agent.ts
+  - instructions.md
+  - client.ts
   - ask.ts
-  - agent/
-    - agent.ts
-    - instructions.md
-    - skills/
-      - webhooks/
-        - SKILL.md
-        - events.md
-        - verify.md
-      - errors/
-        - SKILL.md
-        - error-codes.md
-      - api-versions.md
+  - skills/
+    - webhooks/
+      - SKILL.md
+      - events.md
+      - verify.md
+    - errors/
+      - SKILL.md
+      - error-codes.md
+    - api-versions.md
 
 </Tree>
 
-`agent.ts` names the agent and picks the harness. `reasoning: 'low'` keeps answers fast, which suits short Q&A.
+`agent.ts` lists every part of the agent. It requires only a harness: no compute and no integrations, because it answers from its skills. The recommendation suggests a fast model with low reasoning, which suits short Q&A, but the caller decides.
 
-```ts agent/agent.ts
-import { credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
+```ts agent.ts
+import { defineAgent, markdown, skill } from '@finalai/agents';
 
-export default defineAgent({
+export const agent = defineAgent({
   name: 'Docs Assistant',
   description: 'Answers developer questions about the Acme Pay API.',
-  harness: serverlessFinal({
-    reasoning: 'low',
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  skills: [
+    skill('./skills/webhooks', { from: import.meta.url }),
+    skill('./skills/errors', { from: import.meta.url }),
+    skill({
+      name: 'api-versions',
+      description: 'Explain Acme Pay API versions and what changes when you upgrade.',
+      instructions: markdown('./skills/api-versions.md', { from: import.meta.url }),
     }),
-    permissionMode: 'auto',
-  }),
+  ],
+  require: {
+    harness: {
+      permissionMode: 'ask',
+      recommended: { harness: 'pi', model: 'gpt-6.1-sol', reasoning: 'low' },
+    },
+  },
 });
 ```
 
 The instructions set the tone and the rules. They stay short because the details live in skills:
 
-```markdown agent/instructions.md
+```markdown instructions.md
 You answer developer questions about the Acme Pay API.
 
 Answer from your skills. If no skill covers the question, say so and link to https://docs.acme.dev instead of guessing.
@@ -69,7 +75,7 @@ A skill's `description` tells the agent when to load it. The steps refer to the 
 
 <CodeGroup>
 
-```markdown agent/skills/webhooks/SKILL.md
+```markdown skills/webhooks/SKILL.md
 ---
 name: webhooks
 description: Answer questions about receiving, verifying, and retrying Acme Pay webhooks.
@@ -81,7 +87,7 @@ description: Answer questions about receiving, verifying, and retrying Acme Pay 
 4. Link to https://docs.acme.dev/webhooks.
 ```
 
-```markdown agent/skills/webhooks/events.md
+```markdown skills/webhooks/events.md
 | Event | Sent when |
 | --- | --- |
 | payment.succeeded | A payment is captured. |
@@ -92,7 +98,7 @@ description: Answer questions about receiving, verifying, and retrying Acme Pay 
 | dispute.closed | A dispute is won or lost. The outcome is in data.status. |
 ```
 
-```markdown agent/skills/webhooks/verify.md
+```markdown skills/webhooks/verify.md
 Every webhook has an Acme-Signature header like `t=1767225600,v1=5f2b...`.
 
 1. Read the raw request body as a string before parsing it. Parsing and re-serializing JSON changes the bytes and breaks the signature. In Express, use express.raw({ type: 'application/json' }) on the webhook route instead of express.json().
@@ -110,7 +116,7 @@ The signing secret is per endpoint. Using the account's API key, or another endp
 
 <CodeGroup>
 
-```markdown agent/skills/errors/SKILL.md
+```markdown skills/errors/SKILL.md
 ---
 name: errors
 description: Explain an Acme Pay API error code or decline code and how to fix it.
@@ -122,7 +128,7 @@ description: Explain an Acme Pay API error code or decline code and how to fix i
 4. Link to https://docs.acme.dev/errors#<code>.
 ```
 
-```markdown agent/skills/errors/error-codes.md
+```markdown skills/errors/error-codes.md
 | Code | Status | Meaning | Who fixes it |
 | --- | --- | --- | --- |
 | invalid_request | 400 | A parameter is missing or malformed. error.param names it. | Developer |
@@ -136,16 +142,11 @@ description: Explain an Acme Pay API error code or decline code and how to fix i
 
 </CodeGroup>
 
-### A one-file skill
+### An inline skill
 
-A skill that fits in one file can sit directly in `skills/`:
+A skill that fits in one file doesn't need a directory. `skill({ name, description, instructions })` takes its name and description inline and reads the steps from a file when the agent's document is made:
 
-```markdown agent/skills/api-versions.md
----
-name: api-versions
-description: Explain Acme Pay API versions and what changes when you upgrade.
----
-
+```markdown skills/api-versions.md
 Requests pick a version with the Acme-Version header. Without it, the account's default version applies.
 
 Upgrading from 2025-09-01 to 2026-06-01 changes three things:
@@ -156,63 +157,51 @@ Upgrading from 2025-09-01 to 2026-06-01 changes three things:
 Tell developers to send Acme-Version: 2026-06-01 on a few requests and test them before changing the account default.
 ```
 
-## Build and publish it
+## Set it up
 
-<Steps>
-  <Step title="Set up the project">
-    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+Create the project the same way as in the [quickstart](/quickstart), add the files above, and export `FINAL_API_KEY` and `FINAL_PROJECT_ID`:
 
-    ```bash
-    mkdir docs-assistant && cd docs-assistant
-    git init
-    npm init -y && npm pkg set type=module
-    npm install @finalai/agents zod
-    npm install --save-dev typescript tsx @types/node
-    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
-    ```
-  </Step>
-  <Step title="Compile it">
-    ```bash
-    npx final-agents build ./agent
-    ```
+```bash
+mkdir docs-assistant && cd docs-assistant
+npm init -y && npm pkg set type=module
+npm install @finalai/agents zod
+npm install --save-dev typescript tsx @types/node
+```
 
-    The build summary lists the harness and ends with the folder it wrote to:
+Check that every file is found by printing the agent's document. It calls nothing:
 
-    ```text
-    agent: Docs Assistant
-    description: Answers developer questions about the Acme Pay API.
-    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
-    ...
-    wrote /Users/you/docs-assistant/agent/.final/compile
-    ```
-  </Step>
-  <Step title="Register and publish it">
-    Register the `docs-assistant` slug once, as in the [quickstart](/quickstart#register-the-agent), then publish:
+```bash
+npx final-agents print ./agent.ts
+```
 
-    ```bash
-    npx final-agents publish ./agent --agent docs-assistant
-    ```
-  </Step>
-</Steps>
+The output lists `webhooks`, `errors`, and `api-versions` under `skills`, with each skill's files inside it.
 
 ## Try it
 
-Ask a question that one of the skills covers:
+`client.ts` is the same as in the [quickstart](/quickstart). `ask.ts` passes the agent itself, so nothing needs publishing first. It provides the one thing the agent requires, a harness, with the low reasoning level the agent recommends:
 
 ```ts ask.ts
-import { createClient } from '@finalai/agents/client';
+import { finalCredits, serverlessPi } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+import { agent } from './agent.js';
+import { client, project } from './client.js';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
-const { handle, response } = await client.sessions.create({
-  agent: 'docs-assistant',
+const { handle, response } = await project.sessions.create({
+  agent,
+  provide: {
+    harness: serverlessPi({
+      model: 'gpt-6.1-sol',
+      reasoning: 'low',
+      inference: finalCredits(),
+      environment: runtime.id,
+    }),
+  },
   message: 'Every webhook fails signature verification in my Express app. What am I doing wrong?',
 });
 
-console.log((await response!.result()).text);
+console.log(await response!.text());
 
 await handle.close();
 client.close();
@@ -241,5 +230,6 @@ Docs: https://docs.acme.dev/webhooks
 
 ## Make it yours
 
-- **Add a skill per area of your docs.** Copy the `webhooks/` folder, change the `description`, and put the reference material beside `SKILL.md`. The agent sees every skill's description up front, so keep each one specific.
+- **Add a skill per area of your docs.** Copy the `webhooks/` folder, change the `description`, put the reference material beside `SKILL.md`, and add it to `skills` in `agent.ts`. The agent sees every skill's description up front, so keep each one specific.
+- **Let people chat with it in Final.** Publish it with `npx final-agents publish ./agent.ts --name docs-assistant`. See [publishing](/operate/publishing).
 - **Put it on your docs site.** Stream its answers into a chat widget with the route from the [support chat example](/examples/support-chat).

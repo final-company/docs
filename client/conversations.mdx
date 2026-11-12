@@ -1,6 +1,6 @@
 ---
 title: "Conversations"
-description: "Use chats that Final stores, with history, read state, and several people and agents in one room."
+description: "Use chats that Final stores, with history, read state, and several people and agents in one room, each agent with its own provide."
 ---
 
 A conversation is a chat that Final stores for you. People and agents are its participants, every message is kept in order, and Final delivers each message to the right agent. Use conversations when you want a persistent chat without building your own message storage, or when several people or agents share one room.
@@ -10,30 +10,53 @@ A conversation is a chat that Final stores for you. People and agents are its pa
 | What it is | A direct line to one agent | A chat room with people and agents |
 | History | Kept per session | Kept as messages, with read state and threads |
 | Who's in it | You and the agent | Any number of people and agents |
+| What agents are provided | `provide` on the session | `provide` per agent participant, layered over the conversation's |
 | Good for | Tasks, your own chat UI with your own storage | Shared, long-lived chats |
 
-Under the hood, each agent in a conversation works in its own session. When you send a message, Final routes it to the right agents, and each one replies in a turn of its session.
+Under the hood, each agent in a conversation works in its own session. Final creates it the first time a message reaches that agent, from what that participant was provided.
 
-This page describes the **signed-in person client used by Final's web and mobile apps**. `client` in the examples is that existing authenticated client; these are API reference snippets, not a standalone sign-in or API-key setup. This guide does not provide a separate person sign-in integration. A project API key does not create a person-owned conversation. Even with `conversations:read`, its conversation list is empty. Use [sessions](/client/sessions) to build your own application with an API key. To create a Shared chat for a channel, use the [signed-in Final web steps](/build/channels#create-a-shared-chat-in-final); selecting a project there avoids accidentally creating it in your personal project.
+Conversations belong to people: the examples here use a client signed in as a person, created with `createClient({ auth: { bearer: getToken } })` or `{ cookies: true }` in a browser. A project API key has no person inbox, so use [sessions](/client/sessions) to build your own application with an API key.
 
 ## Send a message
 
-`conversations.direct` opens your one-to-one chat with an agent, creating it the first time. `send` posts a message and returns its **deliveries**: one per agent the message was routed to, with the session and turn that's handling it. Use them to wait for the reply:
+`project.conversations.direct` opens your one-to-one chat with an agent, creating it the first time. `provide` is stored only when the agent has no settings in that chat yet, so later calls don't overwrite choices made since:
 
 ```ts
-const chat = await client.conversations.direct({ agent: 'release-assistant' });
+import { createClient } from '@finalai/agents/client';
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+
+const client = createClient({ auth: { bearer: getToken } });
+const project = client.project({ id: 'prj_your_project' });
+
+const agent = await project.agents.get({ name: 'release-assistant' });
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+
+const chat = await project.conversations.direct({ agent, provide: { harness } });
 const sent = await chat.send('What is blocking 1.2.0?');
 
 for (const delivery of sent.deliveries) {
-  if (!delivery.sessionId || !delivery.turnId) continue; // still queued
+  if (delivery.sessionId == null || delivery.turnId == null) continue; // still queued
   const turn = await client.sessions.attach(delivery.sessionId).response(delivery.turnId);
   console.log((await turn.result()).text);
 }
 ```
 
-A delivery without a `turnId` is queued, for example because the agent is still busy with an earlier message. Check again later with `chat.deliveries({ messageId: sent.messageId })`.
+`send` returns the message's **deliveries**: one per agent it was routed to, with the session and turn handling it. A delivery without a `turnId` is queued, for example because the agent is still busy. Check again later with `chat.deliveries({ messageId: sent.messageId })`.
 
 Save `chat.conversation.id` to reopen the same chat later with `client.conversations.get(conversationId)`.
+
+### Find a chat without creating one
+
+`findDirect` and `findHome` look up the person's existing chats and create nothing:
+
+```ts
+const existing = await project.conversations.findDirect({ agent: 'agt_your_agent' });
+const home = await project.conversations.findHome();
+```
+
+`project.conversations.home({ provide })` opens the person's Home thread with the project's agent, creating it the first time.
 
 ## Show messages live
 
@@ -66,12 +89,35 @@ for (const message of page.messages) {
 }
 
 const last = page.messages.at(-1);
-if (last) await chat.markRead({ throughSeq: last.seq });
+if (last != null) await chat.markRead({ throughSeq: last.seq });
 ```
 
 ## Create a group conversation
 
-A signed-in person with Editor access can create a group conversation in a selected project. Pass `projectId` explicitly; omitting it creates the chat in their personal project. A group conversation can have several people and agents. Each agent's **routing mode** decides which messages it answers:
+A group conversation can have several people and agents. Each agent participant has its own `provide`, and the conversation can carry a shared one: each top-level key comes whole from the participant if it sets it, otherwise from the conversation. This room shares one computer between its agents:
+
+```ts
+import { computer } from '@finalai/agents/sandboxes';
+
+const conversationId = crypto.randomUUID();
+const box = await project.sandboxes.create(computer(), { ownedBy: { conversation: conversationId } });
+const issues = await project.integrations.get({ name: 'linear' });
+
+const room = await project.conversations.create({
+  id: conversationId,
+  kind: 'group',
+  title: 'Release 1.2.0',
+  participants: [
+    { user: 'usr_your_teammate' },
+    { agent, routingMode: 'default', provide: { harness, integrations: { issues } } },
+  ],
+  provide: { compute: { files: box, shell: box } },
+});
+```
+
+Choosing the conversation's `id` up front lets you create the sandbox it owns first; the sandbox is deleted with the conversation. Creating fails with `requirements_unmet`, creating nothing, unless every agent's requirements are met.
+
+Each agent's **routing mode** decides which messages it answers:
 
 | Routing mode | The agent... |
 | --- | --- |
@@ -79,24 +125,31 @@ A signed-in person with Editor access can create a group conversation in a selec
 | `all` | Reads every message in the room. |
 | `mention` | Replies only when someone mentions it. |
 
-This room has a person and the release assistant, then adds a reviewer agent that speaks only when asked:
+Add an agent later with its own `provide`, and mention it by participant ID:
 
 ```ts
-const room = await client.conversations.create({
-  projectId: 'prj_your_project',
-  kind: 'group',
-  title: 'Release 1.2.0',
-  participants: [
-    { user: userId },
-    { agent: 'release-assistant', routingMode: 'default' },
-  ],
-});
-
-const reviewer = await room.addParticipant({ agent: 'release-reviewer', routingMode: 'mention' });
-await room.send('Review the release checklist, please.', { mentions: [reviewer.id] });
+const reviewer = await project.agents.get({ name: 'release-reviewer' });
+const added = await room.addParticipant({ agent: reviewer, routingMode: 'mention', provide: { harness } });
+await room.send('Review the release checklist, please.', { mentions: [added.id] });
 ```
 
-User IDs come from `client.people.all()`, which lists your organization's members. Agents must be published before you add them. To mention someone, pass their participant ID, which `addParticipant` and `room.participants()` return.
+User IDs come from `client.people.all()`, which lists your organization's members. `room.participants()` lists everyone in the room.
+
+## Change an agent's settings
+
+An agent participant's settings are its stored `provide`, plus per-chat `instructions` and a narrower `tools` list. Read them, then change them with the revision you read:
+
+```ts
+const settings = await room.participants.settings(added.id);
+await room.participants.provide(added.id, {
+  harness: serverlessFinal({ model: 'gpt-6.1-sol', inference: finalCredits(), environment: runtime.id }),
+  revision: settings.revision,
+});
+```
+
+`null` removes a capability or slot, like `compute: { browserUse: null }`. A stale `revision` fails with `conflict`. The result must still meet the agent's requirements, or the call fails with `requirements_unmet`.
+
+A change within one harness, like another model, applies to the running session. Switching to a different harness replaces the session after the current turn, keeping the transcript, sandboxes, and integrations.
 
 ## Post an event from another system
 
@@ -114,4 +167,4 @@ Final accepts each `eventId` from a source once, so retrying a failed request ne
 
 ## Approvals and stopping work
 
-Agents in conversations ask for approval the same way they do in sessions. Answer with `room.respond({ decisionId, optionId })` or `room.respond({ decisionId, outcome })`; see [handle approvals](/client/sessions#handle-approvals). `room.cancel()` stops every agent's running turn in the conversation.
+Agents in conversations ask for approval the same way they do in sessions. Answer with `room.respond({ decisionId, optionId })` or `room.respond({ decisionId, outcome })`; see [handle approvals](/client/sessions#handle-approvals). `client.conversations.decisions()` lists what awaits the person across conversations. `room.cancel()` stops every agent's running turn in the conversation.

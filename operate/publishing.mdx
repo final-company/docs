@@ -1,156 +1,64 @@
 ---
 title: "Testing and publishing"
-description: "Check your agent locally, try a revision before it goes live, and publish it."
+description: "Try changes by starting sessions, publish an agent by name, and roll back by pointing the name at an earlier hash."
 ---
 
-Changing an agent follows the same loop every time: compile it locally to catch mistakes, try the change in a test session, then publish it so new sessions use it. Each publish creates a **revision**, a numbered snapshot you can inspect and compare later.
+An agent is a document stored by its content hash, and nothing is built or deployed. Starting a session sends the document with the call, so trying a change is just starting a session with the edited agent. **Publishing** gives a hash a name, so others in the project can fetch the agent and Final's chats, schedules, and channels can use it.
 
-## Check it locally
+## Try a change
 
-`build` compiles the agent and reports anything it can't understand, like a tool without a default export or a schedule with an invalid cron expression:
-
-```bash
-npx final-agents build ./agent
-```
-
-It prints a summary of the tools, connections, schedules, and secrets it found, and writes the compiled output to `agent/.final/compile/`. With `FINAL_API_KEY` set, it also checks that your organization's harness supports everything the agent uses.
-
-`build` doesn't type-check your TypeScript. Add a `tsconfig.json` and run `tsc` for that:
-
-```json tsconfig.json
-{
-  "compilerOptions": {
-    "target": "ES2024",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true
-  },
-  "include": ["agent/**/*.ts", "*.ts"]
-}
-```
+Edit the agent module and start a session with it, as in the [quickstart](/quickstart). The new document is stored when the session is created and the session pins its hash, so a published name and the sessions using it are unaffected.
 
 ```bash
-npx tsc
+npx tsx run.ts
 ```
+
+Before you publish a change, try a normal request, a request that makes a tool fail, and a follow-up message. If the agent asks for approvals, check that your app shows them and that declining works. Tools and integrations run for real, so point them at test data.
+
+`final-agents print` writes the document without calling anything, which is a quick way to check that serverless tools are self-contained and files named by `markdown` and `skill` exist:
+
+```bash
+npx final-agents print ./agent.ts
+```
+
+Type-check your TypeScript with `tsc` as usual; making the document doesn't.
 
 ## Publish
 
-Code that declares secrets, or an authored channel that requests installed application credentials, needs an organization admin who can edit the project to approve publication. Use [the draft-and-review flow below](#publish-code-that-uses-secrets) for those agents. An API key can publish an agent without those declarations.
-
 ```bash
-npx final-agents publish ./agent --agent release-assistant --note 'Add release_status tool'
+npx final-agents publish ./agent.ts --name release-assistant
 ```
-
-Publishing does three things:
-
-1. **Uploads your files.** It sends every file Git would commit from the agent directory, including new files you haven't committed yet. Ignored files stay on your machine.
-2. **Compiles them on Final.** If compilation fails, nothing is published.
-3. **Makes the new revision current.** New sessions start on it, and its schedules and channels go live.
 
 ```text
-committed 9f3c2a1 to main (2 written, 0 deleted)
-published: revision 4 (arev_9wQe...)
+published release-assistant: sha256:9f3c2a1...
+id: agt_7Hq2...
 ```
 
-Sessions that are already running keep the revision they started with, so a publish never changes an agent in the middle of a conversation. If nothing changed since the last publish, you'll see `already current` instead of a new revision.
+`publish` stores the document by its content hash and points the name at it. It reads `FINAL_API_KEY` and `FINAL_PROJECT_ID`; `--project` and `--host` override them. Pass `--export <name>` when the module exports more than one agent.
 
-<Warning>
-Publishing makes the agent's repository match your local directory, and deletes remote files that aren't in it. Always publish from a complete checkout of the agent.
-</Warning>
+From code, it's one call:
 
-`--note` labels the revision in its history. `--message` sets the commit message.
-
-### Publish code that uses secrets
-
-An organization admin **with Editor access to the agent's project** must publish code that declares secrets, including secrets used by MCP connections and authored channels, or requests installed application credentials from an authored channel. An API key does not inherit that admin authority. A local build and a read-only draft compilation are allowed; publishing or making a test revision is a separate approval. For reusable channel code, choose **Publish source only** in Code view. This still requires the same administrator approval, but stores an immutable revision without activating routes, listeners, schedules, or a new current revision. Source-only publication does not need source-project application credentials or secret values. Ordinary publication of an app-credential channel requires an explicit installation selection; see [channel installation](/build/channels#install-a-published-channel).
-
-For a new agent, register its initial definition with your project API key first. The same upload flow also applies to a previously published agent that has no approved secret or authored-channel application credential declarations yet. Upload its first secret-using draft using the script below. List only source files, with paths relative to `agent/`; never include secret values, `.env` files, or generated output. The script only writes the listed files; it does not remove existing files. Delete obsolete files in the agent's **Code** view before publishing.
-
-```ts upload-draft.ts
-import { readFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createClient } from '@finalai/agents/client';
-
-const [definition, ...paths] = process.argv.slice(2);
-if (definition == null || paths.length === 0)
-  throw new Error('Usage: node upload-draft.ts <agent-slug> <source-path> ...');
-if (paths.some((path) => isAbsolute(path) || path.split(/[\\/]/).some((part) =>
-  part === '..' || part === '.final' || part === 'node_modules' || part.startsWith('.env'))))
-  throw new Error('Pass source paths inside agent/, without credentials or build output.');
-const directory = fileURLToPath(new URL('./agent/', import.meta.url));
-const files = await Promise.all(paths.map(async (path) => ({
-  path,
-  content: await readFile(join(directory, path), 'utf8'),
-})));
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
-try {
-  const head = await client.definitions.files({ definition });
-  const request: Parameters<typeof client.definitions.commit>[0] = {
-    definition, files, message: 'Upload draft for review',
-  };
-  if (head.commitSha != null) request.parentSha = head.commitSha;
-  const committed = await client.definitions.commit(request);
-  const compiled = await client.definitions.compile({ definition, ref: committed.commitSha });
-  console.log(JSON.stringify({
-    commitSha: committed.commitSha, ok: compiled.ok,
-    missingSecrets: compiled.missingSecrets, diagnostics: compiled.diagnostics,
-  }, null, 2));
-  if (!compiled.ok || compiled.missingSecrets.length > 0) process.exitCode = 1;
-} finally {
-  client.close();
-}
+```ts
+const published = await project.agents.publish({ agent, name: 'release-assistant' });
+console.log(published.name, published.hash);
 ```
 
-For the deployment watcher, save that script beside `agent/` and run:
+Publishing does two things:
 
-```bash
-node upload-draft.ts deployment-watcher agent.ts instructions.md channels/deploys.ts
-```
+1. **Points the name at the hash.** New sessions that fetch the agent by name use it. Sessions already running keep the hash they started with, so a publish never changes an agent in the middle of a conversation.
+2. **Updates the agent's schedules.** Each schedule in the document is created or updated by its key, and schedules the document no longer has are turned off. See [schedules](/build/schedules).
 
-Require `ok: true` and an empty `missingSecrets` list before continuing; otherwise fix the code or create the named secrets in the correct project. Then ask the organization admin to open that agent's **Code** view in Final, review the uploaded files, and choose **Save and publish**. Publication must use the reviewed draft; uploading or compiling alone does not activate it. After a secret-using revision is published, further source edits and publication also use that admin's Code view; the API key cannot update that published secret-using agent through CI.
-
-To read the resulting channel URLs with the API key's `agents:read` permission, save this alongside the upload script:
-
-```ts show-routes.ts
-import { createClient } from '@finalai/agents/client';
-
-const definition = process.argv[2];
-if (definition == null) throw new Error('Usage: node show-routes.ts <agent-slug>');
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
-try {
-  console.log(JSON.stringify(await client.definitions.channels({ definition }), null, 2));
-} finally {
-  client.close();
-}
-```
-
-```bash
-node show-routes.ts deployment-watcher
-```
-
-Each channel's `routes` lists `method`, `path`, `url`, and `aliasUrl`. Prefer the `aliasUrl` for provider webhooks and OAuth callbacks. Reading URLs neither edits nor republishes the agent.
+Names use lowercase letters, digits, `.`, `_`, and `-`, and are unique in a project.
 
 ### Publish from CI
 
-Use this workflow for agents that do not declare secrets or request installed application credentials from authored channels. Secret-using agents use the [admin review flow](#publish-code-that-uses-secrets) instead.
-
-Publish from your CI pipeline to release every change merged to `main`. In GitHub Actions, store your key as a repository secret named `FINAL_API_KEY`:
+To release every change merged to `main`, publish from your CI pipeline. In GitHub Actions, store your key as a repository secret named `FINAL_API_KEY`:
 
 ```yaml .github/workflows/publish-agent.yml
 name: Publish agent
 on:
   push:
     branches: [main]
-    paths: ['agent/**']
 
 jobs:
   publish:
@@ -161,66 +69,45 @@ jobs:
         with:
           node-version: 26
       - run: npm ci
-      - run: npx final-agents publish ./agent --agent release-assistant --note "${{ github.sha }}"
+      - run: npx final-agents publish ./agent.ts --name release-assistant
         env:
           FINAL_API_KEY: ${{ secrets.FINAL_API_KEY }}
+          FINAL_PROJECT_ID: prj_your_project
 ```
 
-## Test a revision before publishing
+Final doesn't watch your repository: an agent is published only when something calls `publish`.
 
-A test revision compiles a branch of the agent's repository without making it current. For a secret-using agent, sign in to Final as an organization admin with project edit access, review the candidate draft, then open the agent's **More agent actions → Run draft test…**. Enter a prompt in **Test draft** and choose **Run test**. This creates a test revision and session without activating schedules or channels.
-
-The project API key cannot create a secret-using test revision. For agents without privileged declarations, the API-key client can create a test revision and start a session like this:
+## Fetch a published agent
 
 ```ts
-const revision = await client.definitions.testRevision({
-  definition: 'release-assistant',
-  ref: 'add-release-status',
-});
-
-const { handle, response } = await client.sessions.create({
-  agent: 'release-assistant',
-  revisionId: revision.id,
-  message: 'CI is failing on 1.2.0. Should we ship it?',
-});
-console.log((await response!.result()).text);
-await handle.close();
+const agent = await project.agents.get({ name: 'release-assistant' });
 ```
 
-`ref` is a branch or commit in the agent's repository, not your local files. For an agent backed by GitHub, push a branch. For an agent Final hosts, write your changes to a new branch with `client.definitions.commit({ definition, branch, message, files })`.
+Fetch by `{ name }`, `{ id }`, or `{ hash }` for an exact version. A fetched agent is data: pass it to `project.sessions.create`, a conversation participant, or `publish` like the value you defined. Its serverless tools run as usual. An in-process tool can't run for a caller that doesn't hold its code, so `agent.inProcess` lists them and starting such an agent fails with `code_unavailable`. Agents meant for Final's chats, schedules, and teammates who fetch them use [serverless tools](/build/tools#in-process-or-serverless).
 
-Test revisions never activate schedules or channels, but tools and connections run for real, so point them at test data.
-
-Before you publish a change, try a normal request, a request that makes a tool fail, and a follow-up message. If the agent asks for approvals, check that your app shows them and that declining works.
-
-## Agents backed by GitHub
-
-If you created the agent from a connected GitHub repository in the dashboard, Final reads its source from GitHub instead of your upload. The `upload-draft.ts` flow above is for agents whose source Final hosts; do not use it to upload over a GitHub-backed agent.
-
-For a secret-using GitHub agent, push the reviewed source to the connected repository's default branch. An organization admin with project edit access then opens the agent's **Code** view in Final, reviews that source, and chooses **Save and publish**. Use the signed-in admin test flow above to try a saved draft; the API key cannot approve its secret access.
-
-For an agent without privileged declarations, push your changes and use the CLI to publish a branch, tag, or commit:
-
-```bash
-npx final-agents publish ./agent --agent release-assistant --ref main
-```
-
-The CLI still compiles your local directory to catch errors, but publishes what's on GitHub at `--ref`. Use a commit SHA to publish an exact version.
+`project.agents.list()` lists the agents published in the project and those it inherits from parent projects.
 
 ## Review history and roll back
 
-List an agent's revisions and compare any two:
+`history` lists every hash a name has pointed at, newest first:
 
 ```ts
-const { revisions } = await client.definitions.revisions({ definition: 'release-assistant' });
-for (const revision of revisions) {
-  console.log(revision.number, revision.note, revision.createdAt);
-}
-
-const diff = await client.definitions.revisionDiff({ definition: 'release-assistant', from: 3 });
-console.log(diff.changes);
+const { publications } = await project.agents.history({ name: 'release-assistant' });
+for (const publication of publications) console.log(publication.hash, publication.publishedAt);
 ```
 
-`revisionDiff` compares the compiled agents, so it shows changes like an edited instruction or a new tool. Without `to`, it compares against the current revision.
+To roll back, fetch the earlier hash and publish it under the name again:
 
-To roll back, restore the earlier files in your checkout, for example with `git revert`, and publish again. The fix becomes a new revision, so the history stays complete.
+```ts
+const previous = publications[1];
+if (previous != null) {
+  const earlier = await project.agents.get({ hash: previous.hash });
+  await project.agents.publish({ agent: earlier, name: 'release-assistant' });
+}
+```
+
+The rollback is a new publication, so the history stays complete.
+
+## Documents as files
+
+`final-agents print ./agent.ts > agent.json` saves the document. `project.agents.parse(json)` validates a saved document and returns it as an agent, without calling Final, so a document can be reviewed, stored, or published from a system that doesn't run your TypeScript.

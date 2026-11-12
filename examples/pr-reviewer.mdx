@@ -1,44 +1,70 @@
 ---
 title: "Pull request reviewer"
 sidebarTitle: "Pull request reviewer"
-description: "Review a public GitHub pull request from a Final chat."
+description: "Review a public GitHub pull request from a script or a Final chat."
 icon: "code-pull-request"
 ---
 
-Ask this agent in Final to review a public pull request. It reads the diff with one read-only tool and replies in the chat. It does not check out code, run tests, or change the repository.
+This agent reviews a public pull request. It reads the diff with one read-only tool and replies with what it found. It doesn't check out code, run tests, or change the repository.
 
-## Create the project
+**What it shows:** a [serverless tool](/build/tools#in-process-or-serverless) that makes public HTTP requests, an agent with no compute or integration requirements, and starting a [published](/operate/publishing) agent by name.
 
-Use Node.js 26 or later:
+## Files
 
-```bash
-mkdir pr-reviewer && cd pr-reviewer
-git init
-pnpm init --init-type module --no-init-package-manager
-printf 'node_modules/\n.final/\n.env*\n' > .gitignore
-pnpm add @finalai/agents @finalai/final-agent-provider zod
-mkdir -p agent/tools
-```
+<Tree>
 
-Create these three files:
+- pr-reviewer/
+  - package.json
+  - agent.ts
+  - instructions.md
+  - client.ts
+  - review.ts
 
-```text
-agent/
-  agent.ts
-  instructions.md
-  tools/read_pull_request.ts
-```
+</Tree>
 
-```ts agent/agent.ts
-import { credentials, defineAgent } from '@finalai/agents';
-import { serverlessPi } from '@finalai/agents/harnesses';
-export default defineAgent({
+`agent.ts` lists the agent's only tool. The tool is serverless: its code travels with the agent and runs on Final, so the agent works for any caller, including a chat in Final where none of your code is running. Everything it uses, including the size limit, is declared inside `execute`:
+
+```ts agent.ts
+import { defineAgent, defineServerlessTool, markdown } from '@finalai/agents';
+import * as z from 'zod';
+
+const readPullRequest = defineServerlessTool({
+  description: 'Read the diff of a public GitHub pull request. Does not run tests.',
+  inputSchema: z.object({
+    owner: z.string(),
+    repo: z.string(),
+    number: z.number().int().positive(),
+  }),
+  outputSchema: z.object({ diff: z.string(), truncated: z.boolean() }),
+  annotations: { readOnlyHint: true },
+  execute: async ({ owner, repo, number }, ctx) => {
+    const limit = 60_000;
+    const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${number}`;
+    const response = await fetch(url, {
+      headers: { accept: 'application/vnd.github.diff', 'user-agent': 'Final-PR-Reviewer-Example' },
+      signal: ctx.signal,
+    });
+    if (response.status === 429 || response.headers.get('x-ratelimit-remaining') === '0')
+      throw new Error('GitHub rate limit reached; retry after the reset time.');
+    if (response.status === 404) throw new Error('Pull request not found or not publicly readable.');
+    if (!response.ok) throw new Error(`GitHub returned ${response.status}.`);
+    const diff = await response.text();
+    return { diff: diff.slice(0, limit), truncated: diff.length > limit };
+  },
+});
+
+export const agent = defineAgent({
   name: 'Pull request reviewer',
-  harness: serverlessPi({ credentials: credentials.chain({ payer: 'organization', tryInOrder: [credentials.platform()] }) }),
+  description: 'Reviews the diff of a public GitHub pull request.',
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  tools: { read_pull_request: readPullRequest },
+  require: {
+    harness: { permissionMode: 'ask', recommended: { harness: 'final', model: 'deepseek-v4.1-flash' } },
+  },
 });
 ```
 
-```markdown agent/instructions.md
+```markdown instructions.md
 When asked to review a pull request, read its diff using read_pull_request.
 Report concrete bugs and security problems with file and hunk references.
 Separate confirmed observations from hypotheses. If the diff is truncated,
@@ -46,75 +72,89 @@ say the review is incomplete. Never claim you ran tests or checked out code.
 Keep proposed fixes as suggestions; you have no repository write tools.
 ```
 
-```ts agent/tools/read_pull_request.ts
-import { defineTool } from '@finalai/agents';
-import { z } from 'zod';
+The agent requires only a harness. It needs no files, shell, or integrations, so callers provide nothing else. See [requirements](/build/requirements).
 
-export default defineTool({
-  description: 'Read the diff of a public GitHub pull request. Does not run tests.',
-  inputSchema: z.object({ owner: z.string(), repo: z.string(), number: z.number().int().positive() }),
-  outputSchema: z.object({ diff: z.string(), truncated: z.boolean() }),
-  annotations: { readOnlyHint: true },
-  execute: async ({ owner, repo, number }, ctx) => {
-    const response = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${number}`, {
-      headers: { accept: 'application/vnd.github.diff', 'user-agent': 'Final-PR-Reviewer-Example' },
-      signal: ctx.abortSignal,
-    });
-    if (response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0'))
-      throw new Error('GitHub rate limit reached; retry after the response reset time.');
-    if (response.status === 403) throw new Error('GitHub refused the request; check repository access and provider restrictions.');
-    if (response.status === 404) throw new Error('Pull request not found or not publicly readable.');
-    if (!response.ok) throw new Error(`GitHub returned ${response.status}.`);
-    const diff = await response.text();
-    return { diff: diff.slice(0, 60_000), truncated: diff.length > 60_000 };
-  },
-});
-```
+GitHub supports the diff media type on its [pull request endpoint](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request). Unauthenticated requests share a low rate limit per outgoing IP address, so this example suits trying a public pull request, not high-volume review. For private repositories, replace the tool with an [integration slot](/build/integrations) that a caller fills with a GitHub MCP server.
 
-GitHub supports the diff media type on its [pull request endpoint](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request). Unauthenticated GitHub requests have a low rate limit shared by the egress IP; this example is for trying a public PR, not high-volume review. For authenticated or private repositories, replace this tool with an appropriately authorized [GitHub connection](/build/connections); channel credentials are not handed to authored tools.
+## Publish it
 
-## Configure and publish
+<Steps>
+  <Step title="Set up the project">
+    ```bash
+    mkdir pr-reviewer && cd pr-reviewer
+    npm init -y && npm pkg set type=module
+    npm install @finalai/agents zod
+    ```
 
-Export your [API key](/api-keys) as `FINAL_API_KEY`. Register this agent once in the same project as the key. Save the following as `register.ts`, replacing `prj_your_project` with that project's ID:
+    Add `agent.ts` and `instructions.md` from above. Export your [API key](/api-keys) as `FINAL_API_KEY` and the project's ID as `FINAL_PROJECT_ID`.
+  </Step>
+  <Step title="Publish it by name">
+    ```bash
+    npx final-agents publish ./agent.ts --name pr-reviewer
+    ```
 
-```ts register.ts
-import { createClient } from '@finalai/agents/client';
-
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
-try {
-  const definition = await client.definitions.create({
-    slug: 'pull-request-reviewer',
-    name: 'Pull request reviewer',
-    projectId: 'prj_your_project',
-  });
-  console.log(`Registered ${definition.slug} (${definition.id})`);
-} finally {
-  client.close();
-}
-```
-
-```bash
-node register.ts
-```
-
-Then build and publish with that slug:
-
-```bash
-pnpm exec final-agents build ./agent
-pnpm exec final-agents publish ./agent --agent pull-request-reviewer
-```
+    Publishing stores the agent's document, including the tool's source, and points the name `pr-reviewer` at it. Nothing is built or deployed. To check the document first, run `npx final-agents print ./agent.ts`.
+  </Step>
+</Steps>
 
 ## Try it
 
-Open a chat with the published agent in Final and send:
+### From a script
 
-```text
-Review OWNER/REPO pull request NUMBER, including authorization checks and test coverage.
+Fetch the published agent by name and start a session with it. A fetched agent is data, which works here because its only tool is serverless:
+
+```ts client.ts
+import { createClient } from '@finalai/agents/client';
+
+const apiKey = process.env.FINAL_API_KEY;
+const projectId = process.env.FINAL_PROJECT_ID;
+if (apiKey == null || projectId == null) throw new Error('Set FINAL_API_KEY and FINAL_PROJECT_ID');
+
+export const client = createClient({ auth: { apiKey } });
+export const project = client.project({ id: projectId });
 ```
 
-Replace `OWNER`, `REPO`, and `NUMBER` with a public pull request. A useful answer names a concrete hunk and explains a failure case, or says no concrete issue was found. It must not claim to have run validation.
+```ts review.ts
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+import { client, project } from './client.js';
 
-To receive provider events or post reviews back to an outside thread, write a [channel application](/build/channels) with its own signature verification, identity proof, and provider API calls. Those capabilities are available through the same SDK used for custom integrations.
+// The published agent, as data. Its only tool is serverless, so it runs without this script.
+const agent = await project.agents.get({ name: 'pr-reviewer' });
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+
+const [owner, repo, number] = process.argv.slice(2);
+if (owner == null || repo == null || number == null)
+  throw new Error('Usage: npx tsx review.ts OWNER REPO NUMBER');
+
+const { handle, response } = await project.sessions.create({
+  agent,
+  provide: {
+    harness: serverlessFinal({
+      model: 'deepseek-v4.1-flash',
+      inference: finalCredits(),
+      environment: runtime.id,
+    }),
+  },
+  message: `Review ${owner}/${repo} pull request ${number}, including authorization checks and test coverage.`,
+});
+console.log(await response!.text());
+
+await handle.close();
+client.close();
+```
+
+```bash
+npx tsx review.ts OWNER REPO NUMBER
+```
+
+Replace `OWNER`, `REPO`, and `NUMBER` with a public pull request. A useful answer names a concrete hunk and explains a failure case, or says no concrete issue was found. It must not claim to have run tests. [Harness settings](/harnesses/settings) covers other models and who pays for inference.
+
+### From a Final chat
+
+Open a chat with `pr-reviewer` in Final and send the same request. Final provides the harness when it adds the agent to a chat, and the serverless tool runs without any of your code online.
+
+## Extend it
+
+- **Post reviews back to GitHub.** Write a [channel](/build/channels) that receives pull request events and posts replies with its own provider credentials.
+- **Run the tests too.** Add a `shell` requirement and let the caller provide a computer with the repository checked out. See [sandboxes](/build/sandboxes).

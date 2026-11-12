@@ -1,28 +1,28 @@
 ---
 title: "Example agents"
 sidebarTitle: "Overview"
-description: "Complete agents you can copy, build, and publish, each showing a different part of the Agent SDK."
+description: "Complete agents you can copy, run, and publish, each showing a different part of the Agent SDK."
 icon: "code"
 ---
 
-Each example is a complete project: every file of the agent, the commands to build and publish it, and a script or request to try it, with the output you should see. They're ordered from simplest to most involved, so if you're new to the SDK, start at the top. Every example builds and publishes the same way as the [quickstart](/quickstart).
+Each example is a complete project: the agent's module and its files, the commands to publish or run it, and a script or request to try it, with the output you should see. They're ordered from simplest to most involved, so if you're new to the SDK, start at the top. Every example defines its agent the same way as the [quickstart](/quickstart): one `agent.ts` that lists every part and states what the agent requires, and a caller that provides it.
 
 <Columns cols={2}>
   <Card title="API docs assistant" icon="book-open" href="/examples/docs-assistant">
     Answers developer questions about your API from Markdown you control.
-    **Shows:** instructions, skills with reference files, reasoning level.
+    **Shows:** instructions, skills with reference files, harness settings.
   </Card>
   <Card title="Issue triage assistant" icon="bug" href="/examples/issue-triage">
     Files bug reports in Linear with an owner and severity, after checking for duplicates.
-    **Shows:** MCP connection, skill, approval for a connection tool.
+    **Shows:** integration slot with a tool policy, skill, approval for an integration tool.
   </Card>
   <Card title="Morning pull request digest" icon="newspaper" href="/examples/pr-digest">
     Posts a weekday summary of merged, stuck, and failing pull requests.
-    **Shows:** schedule, GitHub MCP server limited to read-only tools, `runNow`.
+    **Shows:** schedule and what its runs are provided, GitHub integration limited to read-only tools, `runNow`.
   </Card>
   <Card title="Billing support agent" icon="credit-card" href="/examples/billing-support">
     Looks up Stripe customers, issues credits, and cancels subscriptions.
-    **Shows:** tools that call an API, shared `lib/` code, `whenInput` approvals.
+    **Shows:** serverless tools that call an API, project secrets, `whenInput` approvals.
   </Card>
   <Card title="Support chat in a Next.js app" icon="comments" href="/examples/support-chat">
     Streams an order-support agent into your site, with Approve and Decline buttons.
@@ -30,19 +30,19 @@ Each example is a complete project: every file of the agent, the commands to bui
   </Card>
   <Card title="Test runner" icon="flask" href="/examples/test-runner">
     Runs your test suite on a cloud computer and explains what broke.
-    **Shows:** sandbox from a setup guide, shell and file tools, permission prompts.
+    **Shows:** files and shell provided by a computer, sandbox setup, permission prompts.
   </Card>
   <Card title="Pull request reviewer" icon="code-pull-request" href="/examples/pr-reviewer">
-    Reads a public pull request diff when asked in a Final chat.
-    **Shows:** a read-only diff tool, public HTTP requests, and bounded review context.
+    Reviews a public pull request diff from a script or a Final chat.
+    **Shows:** a serverless read-only tool, publishing by name, starting a fetched agent.
   </Card>
   <Card title="Deployment watcher" icon="rocket" href="/examples/deploy-watcher">
     Explains signed CI deployment events and log excerpts in a Shared chat.
-    **Shows:** authenticated webhook, project secret, idempotency, local preview.
+    **Shows:** authenticated webhook channel, project secret, idempotency, publishing and installing a channel.
   </Card>
   <Card title="Audit log for agent actions" icon="list-check" href="/examples/audit-log">
     Records every tool call, approval, and turn to Datadog.
-    **Shows:** lifecycle hooks, posting on failure, the Final connection.
+    **Shows:** serverless lifecycle hooks, reporting failed turns, Final's gateway as an integration.
   </Card>
 </Columns>
 
@@ -50,11 +50,14 @@ Each example is a complete project: every file of the agent, the commands to bui
 
 | Feature | Examples |
 | --- | --- |
+| [Requirements and providing](/build/requirements) | Every example; [audit log](/examples/audit-log) and [issue triage](/examples/issue-triage) fill integration slots, [test runner](/examples/test-runner) provides compute |
 | [Instructions and skills](/build/instructions-and-skills) | [Docs assistant](/examples/docs-assistant), [issue triage](/examples/issue-triage) |
 | [Tools](/build/tools) | [Billing support](/examples/billing-support), [support chat](/examples/support-chat), [test runner](/examples/test-runner), [pull request reviewer](/examples/pr-reviewer) |
 | [Approvals](/build/tools#ask-before-a-tool-runs) | [Issue triage](/examples/issue-triage), [billing support](/examples/billing-support), [support chat](/examples/support-chat), [test runner](/examples/test-runner) |
-| [Connections](/build/connections) | [Issue triage](/examples/issue-triage), [pull request digest](/examples/pr-digest), [audit log](/examples/audit-log) |
+| [Where code runs](/build/where-code-runs) | [Pull request reviewer](/examples/pr-reviewer), [audit log](/examples/audit-log), [support chat](/examples/support-chat) |
+| [Integrations](/build/integrations) | [Issue triage](/examples/issue-triage), [pull request digest](/examples/pr-digest), [audit log](/examples/audit-log) |
 | [Sandboxes](/build/sandboxes) | [Test runner](/examples/test-runner) |
+| [Harness settings](/harnesses/settings) | [Docs assistant](/examples/docs-assistant), [pull request reviewer](/examples/pr-reviewer) |
 | [Schedules](/build/schedules) | [Pull request digest](/examples/pr-digest) |
 | [Channels](/build/channels) | [Deployment watcher](/examples/deploy-watcher) |
 | [Hooks](/build/hooks) | [Audit log](/examples/audit-log) |
@@ -62,4 +65,4 @@ Each example is a complete project: every file of the agent, the commands to bui
 
 ## Before you start
 
-Every example needs Node.js 26 or later, Git, and a [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions, exported as `FINAL_API_KEY`. Examples that call other services, like Linear, GitHub, or Stripe, say which token to store as a [secret](/operate/authentication#use-secrets-in-your-code) and what access it needs. Code that declares secrets also needs an organization admin with project edit access to [review and publish it](/operate/publishing#publish-code-that-uses-secrets); an API key can prepare the new agent's initial draft, but does not grant that approval.
+Every example needs Node.js 26 or later and a [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions. Export the key as `FINAL_API_KEY` and the ID of the project the examples run in as `FINAL_PROJECT_ID`. The scripts run with `npx tsx`, so install `@finalai/agents`, `zod`, and `tsx` in the example's project. Examples that call other services, like Linear, GitHub, or Stripe, say which token to store as a [secret](/operate/authentication#use-secrets-in-your-code) or which integration to create, and what access it needs.

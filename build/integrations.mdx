@@ -1,0 +1,169 @@
+---
+title: "Integrations and sign-in"
+sidebarTitle: "Integrations"
+description: "Require slots for MCP servers in the agent, create integrations in your project, and let each person sign in."
+---
+
+An integration gives the agent every tool an MCP server offers, without writing a tool for each one: your issue tracker, your code host, or Final's own gateway. The agent declares named **slots** with what each is for and the most it may expose. The caller fills each slot with an **integration**, a project resource that holds the server's URL and how calls to it authenticate. Each person's own sign-in happens at runtime, the first time a call needs it.
+
+## Require a slot
+
+```ts agent.ts
+import { defineAgent } from '@finalai/agents';
+
+export const agent = defineAgent({
+  name: 'Triage Assistant',
+  instructions: 'You file bug reports with an owner and severity, after checking for duplicates.',
+  require: {
+    harness: { permissionMode: 'ask' },
+    integrations: {
+      issues: {
+        description: 'Issue tracker where bugs are filed',
+        tools: { allow: ['list_issues', 'get_issue', 'create_issue'] },
+        approvals: { create_issue: 'ask' },
+      },
+    },
+  },
+});
+```
+
+The slot name, `issues`, is how the agent refers to it; it says nothing about which server fills it. Final never fills a slot by matching names. Mark a slot `optional: true` if the agent can work without it; when it isn't provided, its tools are absent.
+
+## Choose which tools the agent gets
+
+A slot's policy is a ceiling over whatever integration fills it. Without `tools`, the agent gets every tool the server lists. Narrow that to what the agent needs, so it has fewer wrong choices and can't reach tools it shouldn't use:
+
+| Setting | What it does |
+| --- | --- |
+| `tools.allow` | Only expose these tools. |
+| `tools.deny` | Hide these tools, even if `allow` matches them. |
+| `tools.load` | List these tools to the agent up front. Other exposed tools stay reachable through search. |
+| `tools.allowAnnotations`, `tools.denyAnnotations` | Select tools by their MCP annotations, such as `{ readOnlyHint: true }`. |
+| `approvals` | `'ask'` or `'allow'` per tool, so a person confirms calls first. |
+
+Entries can be exact names or `*` patterns. `deny` wins over `allow`, and when several patterns match a tool, the most specific one governs. This slot allows every read tool and every issue tool, never deletes, and asks before updates:
+
+```ts
+issues: {
+  description: 'Issue tracker',
+  tools: { allow: ['list_*', 'get_*', '*_issue'], deny: ['delete_*'] },
+  approvals: { 'update_*': 'ask' },
+},
+```
+
+Annotation selectors rely on the server labeling its tools accurately, so use them only with servers you trust.
+
+## Create an integration
+
+Integrations belong to a project and are created once. Names are unique in a project, so later calls fetch the same one with `get({ name })`:
+
+```ts setup.ts
+import { createClient } from '@finalai/agents/client';
+import { finalGateway, oauth, secret } from '@finalai/agents/integrations';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+// Each person signs in with their own Linear account.
+const linear = await project.integrations.create({
+  name: 'linear',
+  mcp: { url: 'https://mcp.linear.app/mcp' },
+  auth: oauth(),
+});
+
+// One token from a project secret, for everyone.
+const github = await project.integrations.create({
+  name: 'github',
+  mcp: { url: 'https://api.githubcopilot.com/mcp/' },
+  auth: secret('GITHUB_TOKEN'),
+});
+
+// Final's own tools and the services connected to the project.
+const final = await project.integrations.create(finalGateway());
+
+console.log(linear.id, github.id, final.id);
+```
+
+Then provide it for the slot when you start work:
+
+```ts
+const issues = await project.integrations.get({ name: 'linear' });
+
+await project.sessions.create({
+  agent,
+  provide: { harness, integrations: { issues } },
+  message: 'File a bug: the export button does nothing on Safari.',
+});
+```
+
+<ParamField path="name" type="string" required>
+  Lowercase letters, digits, `.`, `_`, and `-`. Unique in the project.
+</ParamField>
+
+<ParamField path="mcp.url" type="string" required>
+  The MCP server's HTTP endpoint.
+</ParamField>
+
+<ParamField path="mcp.headers" type="Record<string, string>">
+  Static, non-secret headers sent with each request. Put tokens in `auth`.
+</ParamField>
+
+<ParamField path="auth" type="IntegrationAuthInput" required>
+  How calls authenticate. Build it with a helper from `@finalai/agents/integrations`:
+
+  | Helper | Calls authenticate with |
+  | --- | --- |
+  | `oauth()` | Each person's own sign-in with the server's OAuth provider. Add `{ scopes }` to request specific scopes. |
+  | `oauth({ credential: 'shared' })` | One sign-in that serves everyone in the project. |
+  | `secret('NAME', { header? })` | A [project secret](/operate/authentication#use-secrets-in-your-code), sent as `Authorization: Bearer <secret>` or in `header`. |
+  | `platformIdentity(scopes)` | A short-lived signed assertion of the calling session, which your server verifies against Final's published keys. |
+  | `noAuth()` | Nothing. |
+</ParamField>
+
+Secrets and tokens never reach the model or the harness. Integrations reach MCP servers over HTTP; servers that only run locally over stdio aren't supported.
+
+## Sign-in
+
+A personal sign-in isn't a requirement, and the agent never handles it. The first time a call needs a person's sign-in, Final holds the call and raises a `sign_in` decision for that person. When they finish signing in, the held call continues. Each person signs in once per integration in a project, and Final refreshes their token after that.
+
+In Final's web and mobile apps, the person sees a sign-in card in the chat. In your own app, list the session's open decisions, start the person's sign-in, and send them to the authorization URL:
+
+```ts
+import { DecisionKind } from '@finalai/agents/client';
+
+const session = client.sessions.attach(sessionId);
+for (const decision of await session.decisions()) {
+  if (decision.kind !== DecisionKind.SignIn || decision.request.signIn == null) continue;
+  const { authorizationUrl } = await project.integrations.signIn({
+    id: decision.request.signIn.integrationId,
+    decisionId: decision.id,
+    returnUrl: 'https://app.example.com/final/sign-in',
+  });
+  // Send the person to authorizationUrl.
+}
+```
+
+The provider redirects back to `returnUrl` with `state` and `code`. Complete the sign-in as the same person, and the decision resolves:
+
+```ts
+await project.integrations.completeSignIn({ state, code });
+```
+
+`signIn` and `completeSignIn` act for the person the client is authenticated as. `project.integrations.signOut({ id })` forgets their sign-in.
+
+A shared integration (`oauth({ credential: 'shared' })`) is signed in once for everyone. Use shared integrations for work no person is present for, such as [schedules](/build/schedules) and [channels](/build/channels).
+
+## Final's gateway
+
+`finalGateway()` is an ordinary integration for Final's MCP gateway: the project's tasks, chats, agents, and search, plus the tools of every service connected under **Connectors**. It's the same set of tools the [MCP gateway](/mcp-gateway/overview) gives Claude Code or Codex. It authenticates with a platform identity assertion for the calling session, so it needs no token.
+
+```ts
+require: {
+  harness: { permissionMode: 'ask' },
+  integrations: {
+    final: { description: "Final's tools and the project's connected services", tools: { deny: ['create_agent_session'] } },
+  },
+},
+```
+
+Connected services can add many tools, so the agent searches for the ones it needs instead of seeing them all up front. An agent provided the gateway can also ask for an [optional requirement](/build/requirements#optional-requirements) it was started without.

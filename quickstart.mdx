@@ -1,11 +1,11 @@
 ---
 title: "Build your first agent"
 sidebarTitle: "Quickstart"
-description: "Create a release assistant, publish it to Final, and send it a message."
+description: "Define a release assistant, start it with what it requires, and publish it by name."
 icon: "rocket"
 ---
 
-You'll build a release assistant: an agent that answers "is this release ready to ship?" by calling a checklist tool. You'll define it, compile it locally, publish it to Final, and send it a message from a script. It takes about 10 minutes.
+You'll build a release assistant: an agent that answers "is this release ready to ship?" by calling a checklist tool. You'll define it in one module, start a session from a script, and publish it so others can fetch it by name. It takes about 10 minutes.
 
 <Tip>
 Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let-an-agent-set-it-up).
@@ -13,8 +13,8 @@ Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let
 
 **Before you start**, you need:
 
-- Node.js 26 or later and Git. Check with `node --version`.
-- A [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions. You won't need it until step 5.
+- Node.js 26 or later. Check with `node --version`.
+- A [Final API key](/api-keys) with the `agents:read`, `agents:write`, and `agents:execute` permissions, and the ID of the project it belongs to (`prj_...`). You won't need them until step 4.
 
 <Steps>
   <Step title="Create the project">
@@ -22,152 +22,112 @@ Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let
 
     ```bash
     mkdir release-assistant && cd release-assistant
-    git init
     npm init -y
     npm pkg set type=module
     npm install @finalai/agents zod
     npm install --save-dev typescript tsx @types/node
-    mkdir -p agent/tools
-    ```
-
-    Add a `.gitignore`. The CLI uses Git to decide which files to upload, so anything ignored here never leaves your machine.
-
-    ```text .gitignore
-    node_modules/
-    .final/
-    .env*
     ```
   </Step>
-  <Step title="Describe the agent">
-    Every agent has an `agent.ts` that names it and picks its **harness**: the agent loop that sends messages to the model, runs the tools the model asks for, and repeats until the answer is ready. `serverlessFinal` is Final's own agent loop. Final hosts it, so there's nothing for you to run.
+  <Step title="Define the agent">
+    An agent is one value, made with `defineAgent`, that lists every part explicitly. This one has instructions, one tool, and one requirement:
 
-    ```ts agent/agent.ts
-    import { credentials, defineAgent } from '@finalai/agents';
-    import { serverlessFinal } from '@finalai/agents/harnesses';
+    ```ts agent.ts
+    import { defineAgent, defineServerlessTool, markdown } from '@finalai/agents';
+    import * as z from 'zod';
 
-    export default defineAgent({
+    const releaseChecklist = defineServerlessTool({
+      description: 'List the checks a release must pass before it ships.',
+      inputSchema: z.object({ version: z.string() }),
+      execute: async ({ version }) => ({
+        version,
+        checks: ['CI is green on main', 'CHANGELOG.md has an entry', 'Release owner signed off'],
+      }),
+    });
+
+    export const agent = defineAgent({
       name: 'Release Assistant',
       description: 'Checks whether a release is ready to ship.',
-      harness: serverlessFinal({
-        credentials: credentials.chain({
-          payer: 'organization',
-          tryInOrder: [credentials.platform()],
-        }),
-      }),
+      instructions: markdown('./instructions.md', { from: import.meta.url }),
+      tools: { release_checklist: releaseChecklist },
+      require: {
+        harness: { permissionMode: 'ask', recommended: { harness: 'final', model: 'deepseek-v4.1-flash' } },
+      },
     });
     ```
 
-    `credentials` decides how model usage is paid for. This setup uses model access that Final provides and bills it to your organization. Because there's no `model` field, the agent uses your organization's default model. [Configuration](/build/configuration) covers both choices.
+    - **The tool** is `release_checklist`, the key in `tools`. It's a **serverless** tool: self-contained, so its source becomes part of the agent and runs on Final's runtime. [Tools](/build/tools) covers the other kind, in-process tools that run in your own process.
+    - **`require.harness`** says the agent needs a harness, the program that runs the model loop, held to `ask`: anything that changes something waits for a person. `recommended` is a hint for whoever starts it; it binds nobody.
 
-    Then tell the agent how to behave:
+    Then write the instructions beside it:
 
-    ```markdown agent/instructions.md
+    ```markdown instructions.md
     You help maintainers decide whether a release is ready to ship.
     Call release_checklist for the version, then list each check as done or missing.
     Ask for evidence instead of assuming a check passed.
     ```
   </Step>
-  <Step title="Give it a tool">
-    A tool is a function the agent can call. The file name becomes the tool's name, so this one is `release_checklist`. The `description` and `inputSchema` tell the model when to call it and with what arguments.
-
-    ```ts agent/tools/release_checklist.ts
-    import { defineTool } from '@finalai/agents';
-    import { z } from 'zod';
-
-    export default defineTool({
-      description: 'List the checks a release must pass before it ships.',
-      inputSchema: z.object({ version: z.string() }),
-      execute: ({ version }) => ({
-        version,
-        checks: ['CI is green on main', 'CHANGELOG.md has an entry', 'Release owner signed off'],
-      }),
-    });
-    ```
-
-    A real tool would read these checks from your CI or release system. [Tools](/build/tools) shows how.
-  </Step>
-  <Step title="Compile it">
-    Compile the agent locally to catch mistakes before you publish:
+  <Step title="Check the document">
+    `final-agents print` writes the agent's document, the JSON Final stores, without calling anything:
 
     ```bash
-    npx final-agents build ./agent
+    npx final-agents print ./agent.ts
     ```
 
-    The build prints a summary of what it found and ends with the folder it wrote to:
-
-    ```text
-    agent: Release Assistant
-    description: Checks whether a release is ready to ship.
-    ...
-    wrote /Users/you/release-assistant/agent/.final/compile
+    ```json
+    {
+      "version": 5,
+      "identity": { "name": "Release Assistant", "description": "Checks whether a release is ready to ship." },
+      "instructions": "You help maintainers decide whether a release is ready to ship.\n...",
+      "require": { "harness": { "permissionMode": "ask", ... }, "compute": {}, "integrations": {} },
+      "tools": { "release_checklist": { "code": { "placement": "serverless", ... } } },
+      ...
+    }
     ```
 
-    If something is wrong with your files, the build prints a line starting with `error:` and stops. Once `FINAL_API_KEY` is set, the build also checks the agent against your organization's setup.
+    If a serverless tool uses something defined outside it, `print` fails and names it.
   </Step>
-  <Step title="Register the agent" id="register-the-agent">
-    Registering creates the agent in your Final project and reserves its **slug**, the ID you use to call it. You do this once per agent.
-
-    Export your API key, then create a client module that the next scripts share:
+  <Step title="Connect to your project">
+    Export your API key and project ID, then create a client module the next scripts share:
 
     ```bash
     export FINAL_API_KEY='paste-your-key-here'
+    export FINAL_PROJECT_ID='prj_your_project'
     ```
 
     ```ts client.ts
     import { createClient } from '@finalai/agents/client';
 
     const apiKey = process.env.FINAL_API_KEY;
-    if (!apiKey) throw new Error('Set FINAL_API_KEY first');
+    const projectId = process.env.FINAL_PROJECT_ID;
+    if (apiKey == null || projectId == null) throw new Error('Set FINAL_API_KEY and FINAL_PROJECT_ID');
 
-    export const client = createClient({
-      host: 'https://agent-session.final.ai/api',
-      auth: { apiKey },
-    });
+    export const client = createClient({ auth: { apiKey } });
+    export const project = client.project({ id: projectId });
     ```
 
-    ```ts register.ts
-    import { client } from './client.js';
-
-    const definition = await client.definitions.create({
-      slug: 'release-assistant',
-      name: 'Release Assistant',
-    });
-    console.log(`Registered ${definition.slug} (${definition.id})`);
-
-    client.close();
-    ```
-
-    ```bash
-    npx tsx register.ts
-    ```
-
-    ```text
-    Registered release-assistant (adef_7Hq2...)
-    ```
-
-    If the slug is already taken, pick another one and use it in the next two steps.
+    Everything you create through `project` belongs to that project.
   </Step>
-  <Step title="Publish it">
-    Publishing uploads the `agent/` folder, compiles it on Final, and makes the result the agent's current revision:
-
-    ```bash
-    npx final-agents publish ./agent --agent release-assistant
-    ```
-
-    The CLI prints the build summary again, then the new revision:
-
-    ```text
-    published: revision 1 (arev_3Ld9...)
-    ```
-  </Step>
-  <Step title="Send it a message">
-    Start a session with a first message and wait for the answer:
+  <Step title="Start a session">
+    Start a session with a first message, providing a harness:
 
     ```ts run.ts
-    import { client } from './client.js';
+    import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+    import { workers } from '@finalai/agents/sandboxes';
+    import { agent } from './agent.js';
+    import { client, project } from './client.js';
 
-    const { handle, response } = await client.sessions.create({
-      agent: 'release-assistant',
+    // Final's Workers runtime runs the harness. The key makes reruns reuse the same one.
+    const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+
+    const { handle, response } = await project.sessions.create({
+      agent,
+      provide: {
+        harness: serverlessFinal({
+          model: 'deepseek-v4.1-flash',
+          inference: finalCredits(),
+          environment: runtime.id,
+        }),
+      },
       message: 'Is 1.2.0 ready to ship? CI is green and the changelog is updated.',
     });
 
@@ -178,6 +138,11 @@ Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let
     await handle.close();
     client.close();
     ```
+
+    - **`serverlessFinal`** builds harness settings for Final's own agent loop, a program that runs on Final's Workers runtime, which `environment` names.
+    - **`inference: finalCredits()`** pays for model calls with Final's metered inference, billed to the project. See [inference sources](/harnesses/settings#inference-sources) for your own keys and subscriptions.
+
+    Run it:
 
     ```bash
     npx tsx run.ts
@@ -196,26 +161,41 @@ Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let
 
     Stop reason: end_turn
     ```
+
+    Leave out `harness` and the call fails with `requirements_unmet`, naming the harness, and creates nothing.
+  </Step>
+  <Step title="Publish it by name">
+    Publishing gives the agent a name others in the project can fetch it by, such as your teammates' scripts or Final's chats:
+
+    ```bash
+    npx final-agents publish ./agent.ts --name release-assistant
+    ```
+
+    ```text
+    published release-assistant: sha256:4f1c...
+    ```
+
+    The hash identifies this exact document. Publish again after a change and the name points at the new hash; sessions already running keep the one they started with.
   </Step>
 </Steps>
 
 <Check>
-You've built, published, and called an agent. To change it, edit the files in `agent/` and run `npx final-agents publish ./agent --agent release-assistant` again. New sessions pick up the new revision.
+You've defined an agent, started it with what it requires, and published it. To change it, edit `agent.ts` and run `npx tsx run.ts` again: the new document goes with the call, so there's nothing to deploy.
 </Check>
 
 ## Next steps
 
 <Columns cols={2}>
+  <Card title="Give it files and a shell" icon="terminal" href="/build/sandboxes">
+    Require compute, and provide a cloud computer or your own machine.
+  </Card>
+  <Card title="Connect your issue tracker" icon="plug" href="/build/integrations">
+    Require an integration slot and provide an MCP server.
+  </Card>
   <Card title="Stream replies into your app" icon="comments" href="/client/sessions">
     Show text as it's written and let people approve actions.
   </Card>
-  <Card title="Call a real API from a tool" icon="code" href="/build/tools">
-    Read release status from your own service with a stored secret.
-  </Card>
-  <Card title="Connect your issue tracker" icon="plug" href="/build/connections">
-    Give the agent tools from an MCP server.
-  </Card>
   <Card title="How agents work" icon="layer-group" href="/concepts">
-    Learn what revisions, sessions, and turns are.
+    Learn what documents, requirements, sessions, and turns are.
   </Card>
 </Columns>

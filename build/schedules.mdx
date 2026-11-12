@@ -7,23 +7,75 @@ A schedule sends your agent the same prompt on a timer, so it can do recurring w
 
 ## Add a schedule
 
-Add a Markdown file to `agent/schedules/`. The frontmatter sets when it runs, and the body is the prompt:
+Declare schedules on the agent. The key names the schedule:
 
-```markdown agent/schedules/daily-digest.md
----
-cron: '0 9 * * 1-5'
-timezone: America/Los_Angeles
----
+```ts agent.ts
+import { defineAgent } from '@finalai/agents';
 
-Summarize the releases that shipped in the last 24 hours.
-List anything blocking the next release, with an owner for each item.
+export const agent = defineAgent({
+  name: 'Release Digest',
+  instructions: 'You summarize releases for the team.',
+  require: {
+    harness: { permissionMode: 'ask' },
+    integrations: { releases: { description: 'Where releases are tracked' } },
+  },
+  schedules: {
+    'daily-digest': {
+      cron: '0 9 * * 1-5',
+      timezone: 'America/Los_Angeles',
+      prompt: 'Summarize the releases that shipped in the last 24 hours. List anything blocking the next release, with an owner for each item.',
+    },
+  },
+});
 ```
 
-This runs at 9:00 a.m. Los Angeles time, Monday through Friday. The file name is the schedule's key, `daily-digest`, which you use to find or trigger it later.
+This runs at 9:00 a.m. Los Angeles time, Monday through Friday. `prompt` can also be `markdown('./digest.md', { from: import.meta.url })`.
 
-Schedules start running when you [publish](/operate/publishing). Local builds and test revisions never trigger them. Use your personal **My Work** project for the default `owner-direct` examples here. For an agent in a Shared project, add `target: bound-conversation` to the schedule before its first publish, then [connect a provider place to a Shared chat](/build/channels#link-a-person-and-connect-a-place). Runs are refused until that connection exists; publishing with an API key cannot assign a personal owner to a Shared-project schedule.
+Schedules exist once the agent is [published](/operate/publishing). Publishing creates or updates each schedule by its key and turns off schedules the new document no longer has. Sessions you start directly never trigger them.
 
-## Schedule options
+```bash
+npx final-agents publish ./agent.ts --name release-digest
+```
+
+## Provide what runs need
+
+Nobody is present when a schedule fires, so it carries its own `provide`, set up once. Each run is checked against the agent's requirements like any other call that starts work:
+
+```ts schedule.ts
+import { createClient } from '@finalai/agents/client';
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! }, localCompute: false });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+const agent = await project.agents.get({ name: 'release-digest' });
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+const releases = await project.integrations.get({ name: 'github' });
+
+const [digest] = await client.schedules.list({ agent: agent.id! });
+if (digest == null) throw new Error('Publish the agent first');
+
+await client.schedules.update({
+  scheduleId: digest.id,
+  provide: {
+    harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id }),
+    integrations: { releases },
+  },
+});
+```
+
+`update` fails with `requirements_unmet` unless the `provide` meets the agent's requirements. Keep in mind that no person is acting:
+
+- **Integrations** should use a project secret or a shared sign-in (`oauth({ credential: 'shared' })`), since there's no one to show a sign-in card to.
+- **Compute** must be a specific sandbox. There's no calling process to lend its machine, and runs of one schedule share that sandbox's disk.
+- **Inference** can't rely on a personal subscription; use a project key or `finalCredits()`.
+
+## Where replies go
+
+<ParamField path="target" type="'owner-direct' | 'bound-conversation'" default="'owner-direct'">
+  `owner-direct` posts to the owner's direct conversation with the agent, for an agent in a person's own project. In a Shared project, set `target: 'bound-conversation'` and [connect a place](/build/channels#link-a-person-and-connect-a-place) to the chat that should receive runs; a run is refused unless exactly one chat is connected.
+</ParamField>
 
 <ParamField path="cron" type="string" required>
   A five-field cron expression: minute, hour, day of month, month, day of week. `0 9 * * 1-5` means 9:00 on weekdays.
@@ -33,42 +85,21 @@ Schedules start running when you [publish](/operate/publishing). Local builds an
   An IANA time zone such as `America/Los_Angeles` or `Europe/Berlin`. Set it explicitly so "9 a.m." means what you expect.
 </ParamField>
 
-<ParamField path="target" type="'owner-direct' | 'bound-conversation'" default="'owner-direct'">
-  Where the prompt and reply go. `owner-direct` uses the owner's direct conversation when the agent is in their personal My Work project. A Shared project has no personal owner; set `bound-conversation` before publishing its schedules with an API key. `bound-conversation` requires exactly one distinct chat across the agent's active connected chat routes. Multiple places may point to that same chat. With zero or several distinct chats, the run is refused rather than choosing one. Observe routes are excluded. See [connecting a place](/build/channels#link-a-person-and-connect-a-place).
-</ParamField>
-
-If you'd rather write schedules in TypeScript, default-export `defineSchedule(...)` from `agent/schedules/daily-digest.ts` with the same fields and the prompt in `markdown`. Use one file or the other for each schedule, not both:
-
-```ts agent/schedules/daily-digest.ts
-import { defineSchedule } from '@finalai/agents';
-
-export default defineSchedule({
-  cron: '0 9 * * 1-5',
-  timezone: 'America/Los_Angeles',
-  markdown: 'Summarize the releases that shipped in the last 24 hours.',
-});
-```
-
 ## Run a schedule now
 
-`runNow` triggers a published schedule immediately, which is handy for testing a new prompt. It returns as soon as the run starts, with the conversation the reply goes to:
+`runNow` triggers a schedule immediately, which is handy for testing a new prompt. It returns as soon as the run starts:
 
 ```ts
-const run = await client.schedules.runNow({ agent: 'release-assistant', key: 'daily-digest' });
+const run = await client.schedules.runNow({ scheduleId: digest.id });
 console.log(run.conversationId);
 ```
 
-Open that chat in Final to read the reply once the agent finishes. Programmatic [conversation history](/client/conversations#load-history-and-mark-it-read) requires an existing signed-in person client; the API key used to trigger the schedule does not provide a person inbox.
+Open that chat in Final to read the reply once the agent finishes.
 
 ## Pause or change a schedule
 
-List an agent's schedules to see when each one runs next, then update it by ID:
-
 ```ts
-const [digest] = await client.schedules.list({ agent: 'release-assistant' });
-console.log(digest.key, digest.nextRunAt);
-
 await client.schedules.update({ scheduleId: digest.id, enabled: false });
 ```
 
-`update` also accepts `cron`, `timezone`, and `prompt`, which is useful for adjusting a schedule without a new release.
+`update` also accepts `cron`, `timezone`, `prompt`, and `provide`, so you can adjust a schedule without publishing again. Each schedule's `nextRunAt` and `provide` are on what `list` returns.
