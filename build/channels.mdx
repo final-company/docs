@@ -4,13 +4,13 @@ sidebarTitle: "Channels"
 description: "Build a channel application with identity, routes, provider credentials, and conversation events."
 ---
 
-A channel application translates an outside surface into people, places, and events. Its source compiles with your agent into an ordinary bundle. The SDK provides the same capabilities for your application regardless of provider. Write the provider integration in your own application source.
+A channel application translates an outside surface, like a webhook, a chat app, or email, into people, places, and events in Final's chats. A channel is its own document, separate from any agent: one self-contained module, published by name and installed in a project. Its handlers always run on Final's serverless runtime. The SDK provides the same capabilities for your application regardless of provider; write the provider integration in your own channel source.
 
 ## Write a custom channel
 
-Install the authoring SDK with `pnpm add @finalai/agents zod`, then add `channels/topics.ts` to your agent directory. This complete example accepts signed topic events. Create the project secret `topic-hook-secret` first and store the same value with the event producer. [Publish through admin review](/operate/publishing#publish-code-that-uses-secrets), including the channel file in the draft.
+Install the SDK with `npm install @finalai/agents zod`, then write the channel in its own module. This complete example accepts signed topic events. Create the project secret `topic-hook-secret` first and store the same value with the event producer.
 
-```ts agent/channels/topics.ts
+```ts channels/topics.ts
 import { defineChannel, POST } from '@finalai/agents/channels';
 import { z } from 'zod';
 
@@ -58,13 +58,13 @@ export default defineChannel({
 });
 ```
 
-Send JSON such as `{"id":"event-1042","topic":"deployments","text":"Release deployed"}`. Set `x-topic-signature` to the hexadecimal HMAC-SHA256 of the exact body. A first event discovers the place and returns its Connect link; connect it to a chat, then retry the same event ID. This channel is inbound-only: replies stay in Final. See the complete [deployment watcher](/examples/deploy-watcher).
+Once it's [published and installed](#publish-and-install), send JSON such as `{"id":"event-1042","topic":"deployments","text":"Release deployed"}` to its route. Set `x-topic-signature` to the hexadecimal HMAC-SHA256 of the exact body. A first event discovers the place and returns its Connect link; connect it to a chat, then retry the same event ID. This channel is inbound-only: replies stay in Final. See the complete [deployment watcher](/examples/deploy-watcher).
 
 The example uses nonhuman `input`. To post as a member, implement a redirect or challenge identity mechanism, resolve the proven provider principal with `people.resolve`, and pass its returned member handle to `conversation(...).post({ from, ... })`. Never match members by email. Handles are invocation-scoped: store provider references and resolve fresh handles later.
 
 ## Installed application credentials
 
-Declare `credentials: { app: 'your-application' }` when a channel needs a connected application. Publishing requires normal administrator approval for that grant. An installation selected for a running binding must match the declaration. Installed tokens and client secrets stay outside the bundle.
+Declare `credentials: { app: 'your-application' }` when a channel needs a connected application's credentials. The installation you install the channel on must match the declaration. Installed tokens and client secrets never reach channel code.
 
 | Operation | Purpose |
 | --- | --- |
@@ -76,7 +76,7 @@ Declare `credentials: { app: 'your-application' }` when a channel needs a connec
 | `credentials.connect({ url, signal })` | Open a provider socket; inject credentials only into specified JSON leaves when sending. |
 | `credentials.secret(name)` | Read an explicitly declared project secret. |
 
-Events a host receives for an installed app arrive unchanged at your channel's `POST /webhook` route, with their signature headers, so verify them as you would any other request. A provider app you run yourself can point straight at the route URL that `channel install` prints.
+Events a host receives for an installed app arrive unchanged at your channel's `POST /webhook` route, with their signature headers, so verify them as you would any other request. A provider app you run yourself can point straight at the route URL the install returns.
 
 `ChannelCredentialKind`, signing algorithms, signature encodings, and OAuth client authentication enums are exported by `@finalai/agents/channels`. Requests are restricted to the application's approved destinations. Opaque OAuth handles are temporary and cannot be reused across invocations. They do not provide persistent person-token storage or automatic refresh. Raw installed tokens, signing secrets, and OAuth client secrets are never returned to application code. Socket handshake-header authentication is not currently exposed; the socket API supports credential injection in JSON frames.
 
@@ -92,44 +92,46 @@ Send `url` as `redirect_uri` and `state` unchanged, and use the same `url` in th
 
 Use `ctx.binding.url` for URLs that belong to one binding. Do not hardcode a deployment origin in application source.
 
-## Install a published channel
+## Publish and install
 
-For a reusable application, first [upload its source draft](/operate/publishing#publish-code-that-uses-secrets), including its `channels/<key>.ts` module. A signed-in organization admin with project Editor access chooses **Publish source only** in the agent's Code view. This approves an immutable revision without changing the source agent's current revision, routes, listeners, or schedules. It does not require an application installation or secret values in the source project, because the code is not activated there. App and secret declarations still require approval.
-
-Copy the resulting `arev_…` revision ID. Connect your application and configure any declared project secrets in the target project. That project must be the source definition's project or a descendant of it in the same organization. When the channel declares app credentials, the selected installation must match that declaration.
+A channel is published as one ES module that imports nothing, so bundle it first:
 
 ```bash
-npx final-agents channel install support --revision arev_your_revision \
-  --project prj_your_project --install app_your_install
+npx esbuild channels/topics.ts --bundle --format=esm --platform=browser --outfile=dist/topics.js
 ```
 
-Set `FINAL_API_KEY` with `agents:write` and project Editor access. Copy the IDs from Final, and use the exact route URLs printed by the command. This creates a separate binding pinned to that source revision; later source publications do not automatically update it.
+Then publish the bundle under a name and install it in a project. The install connects the channel to one of the project's connected applications, and says what the project's agent gets in every chat the channel creates:
 
-To update an active installation, publish a new source revision, then run the command with `--replace` or pass `replace: true` to the client. Without that explicit option, a different revision or configuration is rejected. Omitting `config` preserves the current effective configuration during replacement; explicit `config: {}` resets it to the new source defaults. The CLI omits configuration, so `--replace` keeps existing settings. Replacement keeps the binding ID and base URL. Preserve provider-facing route paths in your code to keep those endpoint URLs usable. An archived binding cannot be replaced.
-
-For a channel running directly on its source agent, use ordinary **Publish** instead. App-credential channels must select an explicit installation: import `bundleRef` from `@finalai/agents` and add `{ channel: bundleRef('channels/support'), install: 'app_your_install' }` to `agent.ts`'s `channels` array. The export names the existing `channels/support.ts` module; the compiler derives its credentials and routes from that module. Optional `key` and `config` select the binding name and configuration.
-
-Save the client equivalent as `configure-channel.ts`, replace the IDs, and run `node configure-channel.ts` with Node.js 26 or later:
-
-```ts configure-channel.ts
+```ts install-channel.ts
+import { readFile } from 'node:fs/promises';
 import { createClient } from '@finalai/agents/client';
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! }, localCompute: false });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+await project.channels.publish({ name: 'topics', source: await readFile('dist/topics.js', 'utf8') });
+
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+const binding = await project.channels.install({
+  channel: { name: 'topics' },
+  connectorInstallId: 'app_your_install',
+  agents: {
+    provide: {
+      harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id }),
+    },
+  },
 });
-try {
-  console.log(await client.channelBindings.create({
-    projectId: 'prj_your_project',
-    connectorInstallId: 'app_your_install',
-    revisionId: 'arev_your_revision',
-    channelKey: 'support',
-    config: {},
-  }));
-} finally {
-  client.close();
-}
+for (const route of binding.routes) console.log(route.method, route.path, route.aliasUrl ?? route.url);
+client.close();
 ```
+
+- **`connectorInstallId`** is the connected application the channel runs for, from the project's **Connectors** page.
+- **`agents.provide`** is checked against the requirements of the project's agent, the one that answers in the chats this install creates. The install fails with `requirements_unmet`, and nothing is written, unless it meets them. Every chat the install creates gets the same settings, so provide shared integrations and specific sandboxes.
+- **`routes`** lists each route's public URL. Prefer `aliasUrl` for provider webhooks and OAuth callbacks.
+
+An install is pinned to the channel's hash when it was installed. To update it, publish the new source, then install again with `replace: true`. Without `replace`, a different channel or configuration is rejected. Omitting `config` keeps the current configuration; `config: {}` resets it. Replacing keeps the binding's ID and base URL, so keep provider-facing route paths stable in your code.
 
 ## Link a person and connect a place
 
@@ -162,13 +164,6 @@ Use `events` for messages, tools, plans, decisions, and turn completion. `messag
 
 Audio applications own capture, speech-provider connections, synthesis, cancellation, and playback. They connect to an agent through the same channel identity, message, observation, and socket capabilities as other applications; speech credentials remain with the application.
 
-## Test it locally
+## Final's own chat surface
 
-```bash
-AGENT_LOCAL_SECRETS_JSON='{"topic-hook-secret":"local-test-value"}' \
-  pnpm exec final-agents dev ./agent
-```
-
-The local preview verifies routes and prints what would be received without running the agent. For the example above, post to `http://localhost:3000/topics/events`. Installed application operations require a host-provided opaque credential facade; the CLI does not accept raw installed credential JSON.
-
-Final's own room renderer is configured separately in `channels/final.ts` with `finalChannel({ onMessage, renderer, events })` from `@finalai/agents/channels/final`.
+Final's own room renderer is configured with `finalChannel({ onMessage, renderer, events })` from `@finalai/agents/channels/final`.

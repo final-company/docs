@@ -1,130 +1,84 @@
 ---
-title: "Agent configuration"
-sidebarTitle: "Configuration"
-description: "Name your agent, choose its harness and model, and decide who pays for model usage."
+title: "Agent definition"
+sidebarTitle: "Definition"
+description: "Every field defineAgent takes: identity, instructions, parts, requirements, and policies."
 ---
 
-`agent.ts` is the one required file in an agent. It names the agent, picks the **harness** that runs it, and sets the model and model credentials. Everything else, like tools and instructions, lives in its own file.
+`defineAgent` takes one object that is everything the agent is. It names nothing that runs the agent (no harness, model, machine, server, or credential); those come from whoever starts it, through [requirements](/build/requirements).
 
-```ts agent/agent.ts
-import { credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
+```ts agent.ts
+import { defineAgent, files, markdown } from '@finalai/agents';
 
-export default defineAgent({
+export const agent = defineAgent({
   name: 'Release Assistant',
   description: 'Checks whether a release is ready to ship.',
-  secrets: ['release-service-token'],
-  harness: serverlessFinal({
-    model: 'deepseek-v4.1-flash',
-    reasoning: 'medium',
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
-    }),
-    permissionMode: 'auto',
-  }),
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  workspace: files('./workspace', { from: import.meta.url }),
+  secrets: ['RELEASE_SERVICE_TOKEN'],
+  toolPolicy: { 'files.write': 'ask' },
+  require: {
+    harness: { permissionMode: 'review' },
+    compute: { files: 'write', shell: 'execute' },
+  },
 });
 ```
 
-## Agent fields
+## Identity
 
-<ParamField path="name" type="string">
-  The display name people see in Final.
+<ParamField path="name" type="string" required>
+  The display name people see in Final. It's not the name you publish under; you choose that when you [publish](/operate/publishing).
 </ParamField>
 
 <ParamField path="description" type="string">
   One sentence on what the agent does.
 </ParamField>
 
-<ParamField path="harness" type="harness" required>
-  The agent loop that runs the agent, created with a helper such as `serverlessFinal({...})`. See [choose a harness](#choose-a-harness).
+<ParamField path="avatar" type="AgentAvatarIface">
+  An image or animation shown for the agent in Final's apps.
+</ParamField>
+
+## What the agent knows
+
+<ParamField path="instructions" type="string | markdown(...) | array" required>
+  System instructions for the harness. Several are joined by a blank line. See [instructions and skills](/build/instructions-and-skills).
+</ParamField>
+
+<ParamField path="skills" type="skill(...)[]">
+  Procedures the agent loads when a task needs one.
+</ParamField>
+
+<ParamField path="workspace" type="files(...) | Record<string, string>">
+  Files written once into the workspace of whatever sandbox provides `files`, such as config files the agent should start with. Paths are relative to the workspace.
+</ParamField>
+
+## What the agent can do
+
+<ParamField path="tools" type="Record<string, tool>">
+  The agent's own tools, made with `defineServerlessTool` or `defineInProcessTool`. The key is the tool's name. See [tools](/build/tools).
+</ParamField>
+
+<ParamField path="hooks" type="Record<string, hook>">
+  Code that runs on session events, made with `defineServerlessHook` or `defineInProcessHook`. The key is the hook's name. See [hooks](/build/hooks).
+</ParamField>
+
+<ParamField path="schedules" type="Record<string, { cron, timezone?, prompt, target? }>">
+  Prompts sent on a cron schedule once the agent is published. The key names the schedule. See [schedules](/build/schedules).
 </ParamField>
 
 <ParamField path="secrets" type="string[]">
-  Names of the [secrets](/operate/authentication#use-secrets-in-your-code) your tools, hooks, and routes read with `ctx.secrets.get()`. Secrets referenced by connections and credentials are added for you.
+  Project secrets the agent's own code may read with `ctx.secrets.get(name)`. Reading a secret that isn't listed fails. See [secrets](/operate/authentication#use-secrets-in-your-code).
 </ParamField>
 
-<ParamField path="tools" type="baseTools(...)">
-  Built-in shell and file tools, bound to a computer from `sandbox.ts`. Off unless you add them. See [sandboxes](/build/sandboxes).
+## What the agent requires
+
+<ParamField path="require" type="object" required>
+  `harness` (required), `compute`, and `integrations`. See [requirements and providing](/build/requirements).
 </ParamField>
+
+## Approvals for the harness's own tools
 
 <ParamField path="toolPolicy" type="Record<string, 'allow' | 'ask'>">
-  Extra approval rules for built-in capabilities like `shell` and `files.write`, or for connection tools as `<connection>/<tool>`. See [sandboxes](/build/sandboxes#ask-before-commands-run).
+  Asks before, or allows, the harness's built-in tools by capability or name, such as `shell` or `files.write`. It applies within the permission mode the harness runs with, so `toolPolicy: { 'files.write': 'ask' }` keeps asking before edits even when the caller allows more. The harness must support native tool policies; mark `nativeToolPolicy` as an optional feature if the agent can run without it.
 </ParamField>
 
-## Choose a harness
-
-The harness is the program that runs your agent: it sends the conversation to the model, runs the tools the model asks for, and loops until the model has an answer. Final hosts these harnesses for you:
-
-| Helper | What it runs | Reasoning levels |
-| --- | --- | --- |
-| `serverlessFinal` | Final's own agent loop, the one Final's built-in agents use. Start here. | `low`, `medium`, `high` |
-| `serverlessPi` | The open-source Pi agent loop that `serverlessFinal` is built on. Works with OpenAI, Anthropic, and OpenRouter models. | `none`, `minimal`, `low`, `medium`, `high` |
-
-Import either from `@finalai/agents/harnesses`. Both take the same options:
-
-<ParamField path="credentials" type="credential chain" required>
-  How model usage is paid for. See [model credentials](#model-credentials).
-</ParamField>
-
-<ParamField path="model" type="string">
-  The model to use, such as `deepseek-v4.1-flash`. Leave it out to use your organization's default model.
-</ParamField>
-
-<ParamField path="reasoning" type="string">
-  How much the model thinks before it answers. Higher levels are slower and cost more.
-</ParamField>
-
-<ParamField path="permissionMode" type="'ask' | 'auto' | 'readonly'">
-  Whether the agent asks before running shell commands and editing files. `ask` pauses for approval, `auto` runs them without asking, and `readonly` refuses them. Only matters when the agent has [shell and file tools](/build/sandboxes).
-</ParamField>
-
-<Accordion title="See which harnesses and models your organization has">
-  The package also exports helpers for Claude- and Codex-style engines and for harnesses you run on your own machine. To list what's installed for your organization, along with each harness's configuration options, call `providers.list()` with a [client](/client/sessions#create-a-client):
-
-  ```ts
-  const providers = await client.providers.list();
-  for (const provider of providers) {
-    console.log(provider.name, provider.ref.specifier);
-  }
-  ```
-</Accordion>
-
-## Model credentials
-
-Your Final API key lets your code call Final. It isn't used for model calls. Those use the **credential chain** you set on the harness, which answers two questions:
-
-- **Who pays?** `payer: 'organization'` bills model usage to your organization.
-- **Which credentials, in what order?** `tryInOrder` lists where to get model access. Final uses the first one that works.
-
-This chain uses your organization's own model provider key, and falls back to model access from Final when there isn't one:
-
-```ts agent/agent.ts
-harness: serverlessFinal({
-  credentials: credentials.chain({
-    payer: 'organization',
-    tryInOrder: [
-      credentials.apiKey({ owner: 'organization' }),
-      credentials.platform(),
-    ],
-  }),
-}),
-```
-
-| Source | What it uses |
-| --- | --- |
-| `credentials.platform()` | Model access provided by Final. The simplest choice. |
-| `credentials.apiKey({ owner: 'organization' })` | Your organization's own API key for a model provider. |
-| `credentials.apiKey({ secret: 'openrouter-key', vendor: 'openrouter' })` | A provider key you've stored as a [secret](/operate/authentication#use-secrets-in-your-code). |
-| `credentials.subscription({ owner: 'organization' })` | A model provider subscription connected to your organization. |
-
-<Accordion title="Other payers">
-  | Payer | Who pays for model usage |
-  | --- | --- |
-  | `organization` | The organization. Use this for shared and production agents. |
-  | `agent-owner` | The person who owns the agent. |
-  | `prompting-user` | The person who sent the message. |
-  | `conversation-owner` | The person who owns the conversation. |
-
-  For `apiKey` and `subscription`, `owner: 'payer'` uses the payer's own key or subscription instead of the organization's.
-</Accordion>
+Approvals for your own tools are set on each tool, and for integration tools on the slot. See [ask before a tool runs](/build/tools#ask-before-a-tool-runs) and [integrations](/build/integrations#choose-which-tools-the-agent-gets).

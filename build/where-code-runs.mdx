@@ -1,0 +1,61 @@
+---
+title: "Where code and compute run"
+sidebarTitle: "Where code runs"
+description: "What runs in your process, what runs on Final, and how to keep a server from lending its own machine."
+---
+
+Three kinds of work happen while an agent runs, and each has its own place:
+
+| What | Who drives it | Where it runs |
+| --- | --- | --- |
+| `files`, `shell` | The model, through the harness's built-in tools | The sandbox provided for them. Not provided: the process that created the session, on its machine. |
+| `computerUse`, `browserUse` | The model | The sandbox provided for them. Not provided: creation fails unless the requirement is optional, since a bare process has no screen to offer. |
+| An in-process tool or hook | Final, calling your code | The process that created the session. It needs that process running and holding the code. |
+| A serverless tool or hook, a channel's handlers | Final, calling your code | Final's serverless runtime, from the source in the agent's or channel's document. It needs no process. |
+
+The harness itself runs in the environment its settings name: Final's Workers runtime for its serverless harnesses, or a machine sandbox for Claude Code and Codex. See [harness settings](/harnesses/settings).
+
+## Local compute is the default
+
+When you leave out `files` or `shell`, the SDK provides them from the process that starts the session. The model's file edits and commands then run in that process's working directory, on that machine. This is what you want for a coding agent you run from your own terminal:
+
+```ts
+await project.sessions.create({
+  agent,
+  provide: { harness },   // no compute: files and shell are this machine
+  message: 'Fix the failing test in src/parse.ts.',
+});
+```
+
+The SDK opens one connection to Final per agent it starts and serves the agent's files, shell, and in-process code over it. Final still receives a complete `provide`: the SDK registers the process as a sandbox and names it for each capability it left out.
+
+While the process runs, everything works. When it exits, the session survives: in-process tools and the local files and shell report themselves unavailable until a process holding the agent reconnects, and serverless tools keep working. The connection doesn't keep a Node process alive, so a script that's done exits normally.
+
+## Servers turn local compute off
+
+<Warning>
+A backend that leaves out `shell` gives the model a shell inside that backend. A server should provide every capability explicitly and turn the default off.
+</Warning>
+
+```ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! }, localCompute: false });
+```
+
+With `localCompute: false`, a capability you leave out fails with `requirements_unmet` instead of running locally. In-process tools still run in the process that created the session.
+
+## Serverless or in-process code
+
+Choose per tool and per hook, by how you define it:
+
+- **`defineServerlessTool` / `defineServerlessHook`** for code that's self-contained: it calls an HTTP API, transforms data, or uses the agent's sandbox through `ctx.sandbox`. Its source is part of the agent's document, so it runs for every caller, including Final's own chats and callers who [fetched the agent by name](/build/requirements#agents-fetched-by-name-are-data), and keeps running after your process exits.
+- **`defineInProcessTool` / `defineInProcessHook`** for code that needs your process: a database connection, an in-memory cache, a local file, a library. It runs only for sessions your process started, while your process runs.
+
+One agent can mix both. Neither is a compute capability: nothing is provided for them, and they reach the agent's machine through `ctx.sandbox(capability)` from wherever they run.
+
+A serverless function can't import packages or use variables defined outside it. To use a library, bundle the code into one module and pass it as `source` (see [use a library](/build/tools#use-a-library)), make the tool in-process, or put the logic behind your own server as an [integration](/build/integrations).
+
+## Nothing is deployed
+
+An agent's document, including the source of its serverless tools, is sent when a session is created and stored by its content hash. There's no build, upload, or deploy step. [Publishing](/operate/publishing) only gives a hash a name others can fetch.

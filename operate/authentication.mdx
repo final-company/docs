@@ -1,84 +1,88 @@
 ---
 title: "Credentials and secrets"
-description: "Understand the three kinds of credentials an agent uses, and keep each one out of your source."
+description: "Understand the credentials an agent touches, and keep each one out of your source."
 ---
 
-An agent touches three kinds of credentials, and each is set up in a different place. Mixing them up is the most common setup mistake, so it helps to keep them apart:
+An agent touches several kinds of credentials, and each is set up in a different place. Mixing them up is the most common setup mistake, so it helps to keep them apart:
 
 | Credential | What it's for | Where it lives |
 | --- | --- | --- |
-| **Final API key** | Lets your code and the CLI publish agents that do not declare secrets, and start sessions. | `FINAL_API_KEY` on your machine or server. |
-| **Model credentials** | Pay for the agent's model calls. | The `credentials` chain in `agent.ts`. |
-| **Secrets** | Let the agent's code call other services, like your release API. | **Developer** > **Secrets** in the dashboard, read with `ctx.secrets`. |
+| **Final API key** | Lets your code and the CLI publish agents and start work in a project. | `FINAL_API_KEY` on your machine or server. |
+| **Inference** | Pays for the agent's model calls. | The `inference` sources in the [harness settings](/harnesses/settings#inference-sources) the caller provides. |
+| **Integration auth** | Lets the agent's MCP servers act for a person or the project. | The [integration](/build/integrations): a person's sign-in, a shared sign-in, or a project secret. |
+| **Secrets** | Let the agent's own code call other services, like your release API. | **Developer** > **Secrets** in the dashboard, read with `ctx.secrets`. |
 
-Publishing or running an agent with your API key doesn't make it a model credential. The agent's model calls always follow the chain in `agent.ts`.
+Your API key is never used for model calls or integration calls. Model calls follow the `inference` the caller provides; integration calls follow the integration's auth.
 
 ## Authenticate your code and the CLI
 
-[Create an API key](/api-keys) and export it:
+[Create an API key](/api-keys) and export it with your project's ID:
 
 ```bash
 export FINAL_API_KEY='paste-your-key-here'
+export FINAL_PROJECT_ID='prj_your_project'
 ```
 
-The `final-agents` CLI reads `FINAL_API_KEY` automatically. The client doesn't read environment variables, so pass the key when you create it:
+The `final-agents` CLI reads both automatically. The client doesn't read environment variables, so pass them when you create it:
 
 ```ts
 import { createClient } from '@finalai/agents/client';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
 ```
 
 Keep the key on your server. Browser apps should call your backend, which calls Final.
 
-## Pay for model calls
+## Act for your app's end users
 
-Model credentials are part of the agent's definition, so every session uses the same rules no matter who calls the agent. Set them with `credentials.chain` on the harness:
+When your app starts work for one of its own users, name them as the `actor`, so their personal sign-ins and subscriptions are theirs:
 
-```ts agent/agent.ts
-harness: serverlessFinal({
-  credentials: credentials.chain({
-    payer: 'organization',
-    tryInOrder: [credentials.platform()],
-  }),
-}),
+```ts
+await project.sessions.create({
+  agent,
+  provide: { harness },
+  actor: { externalId: 'user_4821', displayName: 'Morgan Lee' },
+  message: 'What is blocking 1.2.0?',
+});
 ```
 
-This uses model access provided by Final and bills it to your organization. To use your own provider key or subscription, see [model credentials](/build/configuration#model-credentials).
+## Pay for model calls
+
+Inference is part of the harness settings, so whoever starts the agent decides how it's paid for, per call. The agent's author doesn't:
+
+```ts
+serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+```
+
+This uses Final's metered inference and bills the project. To use a project API key or a person's own subscription, see [inference sources](/harnesses/settings#inference-sources).
 
 ## Use secrets in your code
 
-A secret is a named value, like an API token, that Final stores encrypted and hands to the agent's code at run time. Tools, hooks, channel routes, and dynamic instructions can read secrets. Your source only contains the name, so tokens never end up in Git.
+A secret is a named value, like an API token, that Final stores encrypted and hands to the agent's code at run time. Your source only contains the name.
 
 <Steps>
   <Step title="Create the secret">
-    In the dashboard, go to **Developer** > **Secrets** and click **New secret**. Use a descriptive name, like `release-service-token`.
+    In the dashboard, go to **Developer** > **Secrets** and click **New secret**. Use a descriptive name, like `RELEASE_SERVICE_TOKEN`.
   </Step>
-  <Step title="Declare it in agent.ts">
-    List every secret your code reads. Reading a secret that isn't listed fails.
+  <Step title="Declare it on the agent">
+    List every secret the agent's tools and hooks read. Reading a secret that isn't listed fails.
 
-    ```ts agent/agent.ts
-    secrets: ['release-service-token'],
+    ```ts agent.ts
+    secrets: ['RELEASE_SERVICE_TOKEN'],
     ```
-
-    Secrets referenced by a [connection's](/build/connections) `auth`, a credential chain, or a channel's `credentials.secrets` are declared for you. For example, a channel with `credentials: { app: null, secrets: ['deploy-webhook-secret'] }` declares that secret name. Store its value in the project and your event producer, never in source.
   </Step>
   <Step title="Read it">
     `ctx.secrets.get()` returns the value, or `null` if the secret isn't set:
 
     ```ts
-    const token = await ctx.secrets.get('release-service-token');
-    if (!token) throw new Error('The release-service-token secret is not set');
+    const token = await ctx.secrets.get('RELEASE_SERVICE_TOKEN');
+    if (token == null) throw new Error('The RELEASE_SERVICE_TOKEN secret is not set');
     ```
   </Step>
 </Steps>
 
-Publishing code that declares secrets requires an organization admin with project edit access. A project API key can upload a new agent's initial draft and request read-only compilation, but cannot publish or create a secret-using test revision. After that revision is published, later source changes also use the admin's Final Code view. Follow [draft upload and admin publication](/operate/publishing#publish-code-that-uses-secrets).
-
-To test channel routes locally, pass secret values to `final-agents dev` with `AGENT_LOCAL_SECRETS_JSON`; see [test it locally](/build/channels#test-it-locally).
+Secrets resolve in the project the session runs in, for serverless and in-process code alike. The same secrets back `apiKey('NAME')` inference sources, `secret('NAME')` integration auth, and `{ secret: 'NAME' }` [sandbox setup](/build/sandbox-setups) variables; those don't need to be listed in `secrets`.
 
 <Warning>
 Never log secret values or return them from a tool. Anything a tool returns goes to the model and can show up in the agent's replies.

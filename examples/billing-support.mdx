@@ -7,7 +7,7 @@ icon: "credit-card"
 
 This agent helps your support team with billing requests in Stripe. It looks up customers, applies account credits, and cancels subscriptions. Small credits and end-of-period cancellations go through on their own, while large credits and immediate cancellations wait for a person's OK. Use this pattern for any tool where most calls are routine and a few are risky, like refunds, deletes, or production changes.
 
-**What it shows:** [tools](/build/tools) that call a real API with a stored secret, a helper module in `lib/` shared by several tools, and [`whenInput`](/build/tools#ask-before-a-tool-runs) approvals that look at each call's input.
+**What it shows:** [serverless tools](/build/tools#in-process-or-serverless) that call a real API with a stored [secret](/operate/authentication#use-secrets-in-your-code), how to share helper code between serverless tools, and [`whenInput`](/build/tools#ask-before-a-tool-runs) approvals that look at each call's input.
 
 ## Files
 
@@ -15,39 +15,14 @@ This agent helps your support team with billing requests in Stripe. It looks up 
 
 - billing-support/
   - package.json
-  - .gitignore
+  - client.ts
   - support.ts
-  - agent/
-    - agent.ts
-    - instructions.md
-    - lib/
-      - stripe.ts
-    - tools/
-      - find_customer.ts
-      - credit_account.ts
-      - cancel_subscription.ts
+  - agent.ts
+  - instructions.md
 
 </Tree>
 
-```ts agent/agent.ts
-import { credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
-
-export default defineAgent({
-  name: 'Billing Support',
-  description: 'Looks up Stripe customers, issues credits, and cancels subscriptions.',
-  secrets: ['stripe-secret-key'],
-  harness: serverlessFinal({
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
-    }),
-    permissionMode: 'ask',
-  }),
-});
-```
-
-```markdown agent/instructions.md
+```markdown instructions.md
 You help the Acme support team with billing requests in Stripe.
 
 Always start with find_customer, and confirm the customer's name and email with the support agent before you change anything.
@@ -57,75 +32,52 @@ Larger credits and immediate cancellations need a manager's approval, so tell th
 After every change, say what you did and the customer's new balance or cancellation date.
 ```
 
-### A shared Stripe helper
+### The agent
 
-Every tool calls Stripe the same way, so the request code lives in `lib/`. The compiler doesn't scan `lib/`, so the file isn't mistaken for a tool. Stripe takes form-encoded bodies, and `Idempotency-Key` makes retries safe: `ctx.callId` is unique to each tool call, so if a request is retried, Stripe applies it once.
+The three tools are serverless: their source travels inside the agent's document and runs on Final, so they work no matter which process starts the session. A serverless tool can't import modules or use variables from outside its own function, so each one reads the Stripe key and calls Stripe itself.
 
-```ts agent/lib/stripe.ts
-import type { ToolContextIface } from '@finalai/agents';
+- `find_customer` only reads, so it never asks. It returns a compact summary instead of Stripe's full objects, which keeps the model's context small.
+- `credit_account` asks for approval only when the credit is over $50. `whenInput` runs your function on each call's input before the tool runs, and asks a person only when it returns `true`.
+- `cancel_subscription` lets a subscription run to the end of the period without asking, but asks before cutting it off now.
 
-export async function stripe<T>(
-  ctx: ToolContextIface,
-  path: string,
-  options: { method?: 'GET' | 'POST' | 'DELETE'; form?: Record<string, string> } = {},
-): Promise<T> {
-  const key = await ctx.secrets.get('stripe-secret-key');
-  if (!key) throw new Error('The stripe-secret-key secret is not set');
+The two tools that change data send `ctx.callId` as Stripe's `Idempotency-Key`. It's unique to each tool call, so if a request is retried, Stripe applies it once.
 
-  const method = options.method ?? 'GET';
-  const response = await fetch(`https://api.stripe.com/v1${path}`, {
-    method,
-    headers: {
-      authorization: `Bearer ${key}`,
-      'content-type': 'application/x-www-form-urlencoded',
-      ...(method === 'POST' ? { 'idempotency-key': ctx.callId } : {}),
-    },
-    body: options.form ? new URLSearchParams(options.form) : undefined,
-    signal: ctx.abortSignal,
-  });
+```ts agent.ts expandable
+import { defineAgent, defineServerlessTool, markdown } from '@finalai/agents';
+import { whenInput } from '@finalai/agents/approval';
+import * as z from 'zod';
 
-  const data = await response.json();
-  if (!response.ok) throw new Error(`Stripe: ${data.error?.message ?? response.status}`);
-  return data as T;
-}
-```
-
-### The tools
-
-`find_customer` only reads, so it never asks. It returns a compact summary instead of Stripe's full objects, which keeps the model's context small:
-
-```ts agent/tools/find_customer.ts
-import { defineTool } from '@finalai/agents';
-import { z } from 'zod';
-import { stripe } from '../lib/stripe.js';
-
-interface Customer {
-  id: string;
-  name: string | null;
-  email: string | null;
-  balance: number;
-}
-interface Subscription {
-  id: string;
-  status: string;
-  cancel_at_period_end: boolean;
-  items: { data: { price: { nickname: string | null; id: string } }[] };
-}
-
-export default defineTool({
+// Serverless tools are self-contained: each one carries its own small Stripe helper.
+const findCustomer = defineServerlessTool({
   description: 'Find a Stripe customer by email, with their balance and active subscriptions.',
   inputSchema: z.object({ email: z.email() }),
   annotations: { readOnlyHint: true },
-  async execute({ email }, ctx) {
-    const query = new URLSearchParams({ query: `email:'${email}'` });
-    const customers = await stripe<{ data: Customer[] }>(ctx, `/customers/search?${query}`);
-    const customer = customers.data[0];
-    if (!customer) return { found: false };
+  execute: async ({ email }, ctx) => {
+    const key = await ctx.secrets.get('STRIPE_SECRET_KEY');
+    if (key == null) throw new Error('The STRIPE_SECRET_KEY secret is not set');
+    const stripe = async (path: string) => {
+      const response = await fetch(`https://api.stripe.com/v1${path}`, {
+        headers: { authorization: `Bearer ${key}` },
+        signal: ctx.signal,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(`Stripe: ${data.error?.message ?? response.status}`);
+      return data;
+    };
 
-    const subscriptions = await stripe<{ data: Subscription[] }>(
-      ctx,
-      `/subscriptions?customer=${customer.id}&status=active`,
-    );
+    const query = new URLSearchParams({ query: `email:'${email}'` });
+    const customers: { data: { id: string; name: string | null; email: string | null; balance: number }[] } =
+      await stripe(`/customers/search?${query}`);
+    const customer = customers.data[0];
+    if (customer == null) return { found: false };
+
+    const subscriptions: {
+      data: {
+        id: string;
+        cancel_at_period_end: boolean;
+        items: { data: { price: { id: string; nickname: string | null } }[] };
+      }[];
+    } = await stripe(`/subscriptions?customer=${customer.id}&status=active`);
     return {
       found: true,
       id: customer.id,
@@ -141,17 +93,8 @@ export default defineTool({
     };
   },
 });
-```
 
-`credit_account` asks for approval only when the credit is over $50. `whenInput` runs your function on each call's input before the tool runs, and asks a person only when it returns `true`. The type argument names the input fields the rule reads:
-
-```ts agent/tools/credit_account.ts
-import { defineTool } from '@finalai/agents';
-import { whenInput } from '@finalai/agents/approval';
-import { z } from 'zod';
-import { stripe } from '../lib/stripe.js';
-
-export default defineTool({
+const creditAccount = defineServerlessTool({
   description: "Add a credit to a customer's Stripe balance. It applies to their next invoice.",
   inputSchema: z.object({
     customerId: z.string().startsWith('cus_'),
@@ -159,113 +102,160 @@ export default defineTool({
     reason: z.string().describe('Why the credit was given, shown on the customer record'),
   }),
   approval: whenInput<{ amountCents: number }>((input) => input.amountCents > 5_000),
-  async execute({ customerId, amountCents, reason }, ctx) {
-    const transaction = await stripe<{ id: string; ending_balance: number }>(
-      ctx,
-      `/customers/${customerId}/balance_transactions`,
-      {
-        method: 'POST',
-        form: { amount: String(-amountCents), currency: 'usd', description: reason },
+  execute: async ({ customerId, amountCents, reason }, ctx) => {
+    const key = await ctx.secrets.get('STRIPE_SECRET_KEY');
+    if (key == null) throw new Error('The STRIPE_SECRET_KEY secret is not set');
+    const response = await fetch(`https://api.stripe.com/v1/customers/${customerId}/balance_transactions`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${key}`,
+        'content-type': 'application/x-www-form-urlencoded',
+        // Unique to this tool call, so a retried request is applied once.
+        'idempotency-key': ctx.callId,
       },
-    );
-    return { transactionId: transaction.id, creditCents: -transaction.ending_balance };
+      body: new URLSearchParams({ amount: String(-amountCents), currency: 'usd', description: reason }),
+      signal: ctx.signal,
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(`Stripe: ${data.error?.message ?? response.status}`);
+    return { transactionId: data.id, creditCents: -data.ending_balance };
   },
 });
-```
 
-`cancel_subscription` lets a subscription run to the end of the period without asking, but asks before cutting it off now:
-
-```ts agent/tools/cancel_subscription.ts
-import { defineTool } from '@finalai/agents';
-import { whenInput } from '@finalai/agents/approval';
-import { z } from 'zod';
-import { stripe } from '../lib/stripe.js';
-
-export default defineTool({
+const cancelSubscription = defineServerlessTool({
   description: 'Cancel a Stripe subscription, either at the end of the billing period or now.',
   inputSchema: z.object({
     subscriptionId: z.string().startsWith('sub_'),
     when: z.enum(['period_end', 'now']),
   }),
   approval: whenInput<{ when: 'period_end' | 'now' }>((input) => input.when === 'now'),
-  async execute({ subscriptionId, when }, ctx) {
-    if (when === 'now') {
-      await stripe(ctx, `/subscriptions/${subscriptionId}`, { method: 'DELETE' });
-      return { subscriptionId, canceled: 'now' };
-    }
-    await stripe(ctx, `/subscriptions/${subscriptionId}`, {
-      method: 'POST',
-      form: { cancel_at_period_end: 'true' },
+  execute: async ({ subscriptionId, when }, ctx) => {
+    const key = await ctx.secrets.get('STRIPE_SECRET_KEY');
+    if (key == null) throw new Error('The STRIPE_SECRET_KEY secret is not set');
+    const response = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+      method: when === 'now' ? 'DELETE' : 'POST',
+      headers: {
+        authorization: `Bearer ${key}`,
+        'content-type': 'application/x-www-form-urlencoded',
+        'idempotency-key': ctx.callId,
+      },
+      body: when === 'now' ? undefined : new URLSearchParams({ cancel_at_period_end: 'true' }),
+      signal: ctx.signal,
     });
-    return { subscriptionId, canceled: 'at period end' };
+    const data = await response.json();
+    if (!response.ok) throw new Error(`Stripe: ${data.error?.message ?? response.status}`);
+    return { subscriptionId, canceled: when === 'now' ? 'now' : 'at period end' };
+  },
+});
+
+export const agent = defineAgent({
+  name: 'Billing Support',
+  description: 'Looks up Stripe customers, issues credits, and cancels subscriptions.',
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  secrets: ['STRIPE_SECRET_KEY'],
+  tools: {
+    find_customer: findCustomer,
+    credit_account: creditAccount,
+    cancel_subscription: cancelSubscription,
+  },
+  require: {
+    harness: { permissionMode: 'ask' },
   },
 });
 ```
 
-## Build and publish it
+The agent requires nothing but a harness: no compute and no integrations. `permissionMode: 'ask'` is a ceiling, so whoever starts it can't give it a harness that acts without asking. The `whenInput` predicates are serverless too, so they follow the same self-contained rule as the tools.
+
+<Accordion title="Share helper code instead of repeating it">
+  Repeating a ten-line helper in three tools is the simplest way to stay self-contained. When helpers grow, write the tools as ordinary modules that import whatever they need, bundle them into one ES module with a bundler such as esbuild, and pass that text as each tool's `source`, naming its export:
+
+  ```ts
+  import { readFileSync } from 'node:fs';
+  import { defineServerlessTool } from '@finalai/agents';
+  import * as z from 'zod';
+
+  // One module, bundled with its helpers by your build (esbuild, Rollup) and imported as text.
+  const tools = readFileSync(new URL('./dist/stripe-tools.js', import.meta.url), 'utf8');
+
+  const findCustomer = defineServerlessTool({
+    description: 'Find a Stripe customer by email, with their balance and active subscriptions.',
+    inputSchema: z.object({ email: z.email() }),
+    annotations: { readOnlyHint: true },
+    source: tools,
+    export: 'findCustomer',
+  });
+  ```
+
+  The trade-off is a build step, and the whole bundle becomes part of the agent's document, so changing any helper changes the agent's hash. If a helper needs something only your app has, like a database connection, make the tool [in-process](/build/tools#in-process-or-serverless) instead.
+</Accordion>
+
+## Set it up
 
 <Steps>
-  <Step title="Set up the project">
+  <Step title="Create the project">
     Create the project the same way as in the [quickstart](/quickstart), then add the files above:
 
     ```bash
     mkdir billing-support && cd billing-support
-    git init
     npm init -y && npm pkg set type=module
     npm install @finalai/agents zod
     npm install --save-dev typescript tsx @types/node
-    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
+    ```
+
+    `client.ts` creates the client and project from your environment, as in the quickstart:
+
+    ```ts client.ts
+    import { createClient } from '@finalai/agents/client';
+
+    const apiKey = process.env.FINAL_API_KEY;
+    const projectId = process.env.FINAL_PROJECT_ID;
+    if (apiKey == null || projectId == null) throw new Error('Set FINAL_API_KEY and FINAL_PROJECT_ID');
+
+    export const client = createClient({ auth: { apiKey } });
+    export const project = client.project({ id: projectId });
     ```
   </Step>
   <Step title="Add a Stripe key">
-    In Stripe, create a restricted key with write access to **Customers** and **Subscriptions** and nothing else. Start with a test-mode key while you try the agent. In the Final dashboard, add it under **Developer** > **Secrets** with the name `stripe-secret-key`.
+    In Stripe, create a restricted key with write access to **Customers** and **Subscriptions** and nothing else. Start with a test-mode key while you try the agent. In the Final dashboard, add it under **Developer** > **Secrets** in the same project, with the name `STRIPE_SECRET_KEY`.
   </Step>
-  <Step title="Compile it">
-    ```bash
-    npx final-agents build ./agent
-    ```
-
-    ```text
-    agent: Billing Support
-    description: Looks up Stripe customers, issues credits, and cancels subscriptions.
-    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
-    mcp servers: authored (worker)
-    ...
-    secrets: stripe-secret-key
-    ...
-    wrote agent/.final/compile
-    ```
-
-    `authored (worker)` is your three tools, which run on Final.
-  </Step>
-  <Step title="Register and publish it">
-    Register the `billing-support` slug once in the same project as your key and secret, following the [quickstart](/quickstart#register-the-agent) with that slug and the name **Billing Support**. This agent declares a secret, so publication requires an organization admin with project edit access.
-
-    Save the [`upload-draft.ts` script](/operate/publishing#publish-code-that-uses-secrets) beside `agent/`, then upload the initial default-branch draft with your project API key:
+  <Step title="Check the document">
+    Print the agent's document to confirm that each tool's source was captured:
 
     ```bash
-    node upload-draft.ts billing-support agent.ts instructions.md lib/stripe.ts tools/find_customer.ts tools/credit_account.ts tools/cancel_subscription.ts
+    npx final-agents print ./agent.ts
     ```
 
-    Resolve any reported compile errors or missing secrets. Have that admin review the uploaded files in the agent's **Code** view in Final and choose **Save and publish**. Uploading or compiling does not publish it. After publication, later source edits also use that admin's Code view; the API key cannot make those updates through CI.
+    Each tool appears with `"placement": "serverless"` and its source. If a tool uses a name from outside its function, `print` fails and names it.
   </Step>
 </Steps>
 
+Nothing needs to be published: the script below sends the agent's document when it starts the session.
+
 ## Try it
 
-This script plays the support agent: it sends a request, streams the reply, and asks you in the terminal whenever a call needs approval. Change the email to a customer in your Stripe test data.
+This script plays the support agent: it starts a session, sends each line you type, streams the reply, and asks you in the terminal whenever a call needs approval. Change the email to a customer in your Stripe test data.
 
 ```ts support.ts
 import { createInterface } from 'node:readline/promises';
-import { createClient, sessionUpdateOf, textOf } from '@finalai/agents/client';
+import { sessionUpdateOf, textOf } from '@finalai/agents/client';
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+import { agent } from './agent.js';
+import { client, project } from './client.js';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
 const terminal = createInterface({ input: process.stdin, output: process.stdout });
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
-const { handle } = await client.sessions.create({ agent: 'billing-support' });
+const { handle } = await project.sessions.create({
+  agent,
+  provide: {
+    harness: serverlessFinal({
+      model: 'deepseek-v4.1-flash',
+      inference: finalCredits(),
+      environment: runtime.id,
+    }),
+  },
+});
 
 // Each line you type is a message. Approval requests interrupt the stream.
 let message = await terminal.question('> ');
@@ -276,10 +266,10 @@ while (message.trim()) {
     const update = sessionUpdateOf(event);
     if (update?.sessionUpdate === 'agent_message_chunk') process.stdout.write(textOf(update));
 
-    if (event.decisionId && !answered.has(event.decisionId)) {
+    if (event.decisionId != null && !answered.has(event.decisionId)) {
       answered.add(event.decisionId);
       const decision = (await handle.decisions()).find((d) => d.id === event.decisionId);
-      if (!decision) continue;
+      if (decision == null) continue;
       const { title, body } = decision.request;
       const reply = await terminal.question(`\n\n${title}\n${body ?? ''}\nApprove? (y/n) `);
       await handle.respond({
@@ -300,7 +290,7 @@ client.close();
 npx tsx support.ts
 ```
 
-Ask for a small credit, then a large one. Only the second one stops for approval:
+Ask for a small credit, then a large one. Only the second one stops for approval. The exact wording varies:
 
 ```text
 > jordan@example.com was double-charged for March. Credit them $20.
@@ -318,5 +308,6 @@ Done. I added $120.00. Jordan's credit balance is now $140.00.
 
 ## Make it yours
 
+- **Publish it for your team.** Run `npx final-agents publish ./agent.ts --name billing-support` so others can fetch it by name and add it to chats. Because every tool is serverless, a caller that only fetched the agent can still run it. See [publishing](/operate/publishing).
 - **Route approvals to the right people.** In a real support tool, show the decision in your UI and let only managers answer it. The [support chat example](/examples/support-chat) shows how to forward decisions to a browser.
 - **Keep an audit trail.** Add the [audit log hook](/examples/audit-log) so every credit and cancellation is recorded with who asked for it and who approved it.

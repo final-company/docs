@@ -5,7 +5,7 @@ description: "Organize coding work in a project, connect your repository, and ke
 icon: "folder"
 ---
 
-A project is where a team's coding work lives in Final. It holds the repositories your agents work on, the computers and setup guides they run on, your agents, and the people who can use them. Set one up per team or product, and use branches, not new projects, for individual tasks.
+A project is where a team's coding work lives in Final. It holds the repositories your agents work on, the computers and sandbox setups they run on, your agents, and the people who can use them. Set one up per team or product, and use branches, not new projects, for individual tasks.
 
 ## Create a project
 
@@ -15,14 +15,14 @@ Every member has a personal project called **My Work**, which is a good place to
 2. Choose **New Subproject** and enter a name, such as `storefront`.
 3. Click **Create Project**.
 
-Subprojects inherit from their parent. Agents, computer setup guides, and connected subscriptions in a parent project are available in the projects below it, so you can share a setup across several teams by putting it one level up.
+Subprojects inherit from their parent. Agents, sandbox setups, and harnesses in a parent project are available in the projects below it, so you can share a setup across several teams by putting it one level up.
 
 To invite people to a shared project, open its menu (**...**), choose **Members**, and add them with a role:
 
 | Role | Can |
 | --- | --- |
 | **Viewer** | See the project's agents, computers, and repositories. |
-| **Editor** | Create and change computers, agents, and setup guides. |
+| **Editor** | Create and change computers, agents, and sandbox setups. |
 | **Admin** | Everything an editor can, plus manage members and access. |
 
 ## Connect your repository
@@ -68,9 +68,9 @@ Commit the setup script the instructions mention, too. The [cloud environments](
 
 <AccordionGroup>
   <Accordion title="Where does a Final agent's own code live?">
-    A Final agent is defined by a few files, such as `agent.ts`, `instructions.md`, and `sandbox.ts`. When you create an agent with **New Final repository**, Final creates a repository for those files with them in an `agent/` directory. You can also keep them in a directory of a GitHub repository you connected, including your application repository.
+    A Final agent is defined by an `agent.ts` module and the files it names, such as `instructions.md`. When you create an agent in Final, Final keeps a repository for those files. You can also keep them anywhere you like, including your application repository, and [publish](/operate/publishing) the agent from there.
 
-    Either way, the agent's source is separate from the code it works on. Connecting the agent's repository doesn't put your application on its computer. The computer gets your application from the repositories listed in its [setup guide](/ai-coding/cloud-environments#prepare-computers-for-a-final-agent).
+    Either way, the agent's source is separate from the code it works on. Connecting the agent's repository doesn't put your application on its computer. The computer gets your application from the repositories listed in its [sandbox setup](/ai-coding/cloud-environments#prepare-computers-for-a-final-agent).
   </Accordion>
   <Accordion title="Do Claude Code and Codex need an agent definition?">
     No. Stock Claude Code and Codex run directly in your checkout and read `CLAUDE.md`, `AGENTS.md`, and their own settings files from the repository and your home directory. You only write an agent definition when you want a Final agent.

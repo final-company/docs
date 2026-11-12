@@ -7,9 +7,9 @@ icon: "newspaper"
 
 Every weekday at 9 a.m., this agent reads your repository's pull requests and posts a short digest: what merged since the last one, what's been waiting on review, and which ready pull requests have failing checks. Use it to replace the "what happened yesterday?" part of standup, or to keep reviews from going stale.
 
-**What it shows:** a [schedule](/build/schedules) written in Markdown, an MCP [connection](/build/connections) to GitHub limited to read-only tools with an annotation selector, and triggering a schedule from a script with [`runNow`](/build/schedules#run-a-schedule-now).
+**What it shows:** a [schedule](/build/schedules) declared on the agent, an [integration requirement](/build/integrations) limited to read-only tools with an annotation selector, giving the schedule what its runs need, and triggering a run with `runNow`.
 
-Use your personal **My Work** project for this version and sign in as its owner with an **organization admin** role: the GitHub connection declares a secret, so you must approve publication. The default `owner-direct` schedule target posts to your direct chat. Create the API key for My Work and register the agent there. If you are not an organization admin, use a Shared project with the `bound-conversation` option below and have an organization admin with project edit access publish it; a Shared project has no personal owner for `owner-direct`.
+Use your personal **My Work** project for this version. The schedule's default `owner-direct` target posts to your direct chat with the agent there. For a Shared project, see [make it yours](#make-it-yours).
 
 ## Files
 
@@ -17,62 +17,45 @@ Use your personal **My Work** project for this version and sign in as its owner 
 
 - pr-digest/
   - package.json
-  - .gitignore
-  - run-now.ts
-  - agent/
-    - agent.ts
-    - instructions.md
-    - connections/
-      - github.ts
-    - schedules/
-      - morning-digest.md
+  - agent.ts
+  - instructions.md
+  - client.ts
+  - setup.ts
+  - schedule.ts
 
 </Tree>
 
-```ts agent/agent.ts
-import { credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
+The agent requires a `github` slot. `allowAnnotations: [{ readOnlyHint: true }]` exposes every tool the server marks as read-only, so whatever GitHub server fills the slot, the agent can search and read pull requests but can't comment, merge, or push. The schedule is a prompt with a timer: 9:00 a.m. New York time, Monday through Friday.
 
-export default defineAgent({
+```ts agent.ts
+import { defineAgent, markdown } from '@finalai/agents';
+
+export const agent = defineAgent({
   name: 'PR Digest',
   description: 'Posts a weekday digest of pull request activity in acme/web.',
-  harness: serverlessFinal({
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
-    }),
-    permissionMode: 'auto',
-  }),
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  require: {
+    harness: { permissionMode: 'ask' },
+    integrations: {
+      github: {
+        description: 'GitHub, to read pull requests, reviews, and checks',
+        tools: { allowAnnotations: [{ readOnlyHint: true }] },
+      },
+    },
+  },
+  schedules: {
+    'morning-digest': {
+      cron: '0 9 * * 1-5',
+      timezone: 'America/New_York',
+      prompt: "Write this morning's pull request digest for acme/web.",
+    },
+  },
 });
 ```
 
-The connection points at GitHub's MCP server. Instead of naming each tool, `allow: [{ readOnlyHint: true }]` exposes every tool the server marks as read-only, so the agent can search and read pull requests but can't comment, merge, or push:
+Annotation selectors rely on the server labeling its tools accurately, so use them only with servers you trust. The instructions say what a good digest looks like, so the schedule's prompt can stay short:
 
-```ts agent/connections/github.ts
-import { defineMcpClientConnection } from '@finalai/agents';
-
-export default defineMcpClientConnection({
-  url: 'https://api.githubcopilot.com/mcp/',
-  description: "GitHub's MCP server, limited to tools that only read.",
-  auth: { secretKey: 'github-token', headerName: null },
-  tools: { allow: [{ readOnlyHint: true }] },
-});
-```
-
-The schedule is a prompt with a timer. It runs at 9:00 a.m. New York time, Monday through Friday, and posts to the agent owner's direct conversation:
-
-```markdown agent/schedules/morning-digest.md
----
-cron: '0 9 * * 1-5'
-timezone: America/New_York
----
-
-Write this morning's pull request digest for acme/web.
-```
-
-The instructions say what a good digest looks like, so the schedule's prompt can stay short:
-
-```markdown agent/instructions.md
+```markdown instructions.md
 You write a short morning digest of pull request activity in the acme/web GitHub repository.
 
 Cover these sections, in this order:
@@ -84,82 +67,98 @@ Link every pull request. If a section is empty, write "Nothing today" under it.
 Keep the digest under 25 lines, and don't add a greeting or sign-off.
 ```
 
-## Build and publish it
+## Set it up
 
 <Steps>
-  <Step title="Set up the project">
-    Create the project the same way as in the [quickstart](/quickstart), then add the files above:
+  <Step title="Create the project">
+    Create the project the same way as in the [quickstart](/quickstart), add the files above, and export `FINAL_API_KEY` and `FINAL_PROJECT_ID` for your My Work project. `client.ts` is the same as in the quickstart.
 
     ```bash
     mkdir pr-digest && cd pr-digest
-    git init
     npm init -y && npm pkg set type=module
     npm install @finalai/agents zod
     npm install --save-dev typescript tsx @types/node
-    printf 'node_modules/\n.final/\n.env*\n' > .gitignore
     ```
   </Step>
   <Step title="Add a GitHub token">
-    Create a fine-grained personal access token in GitHub with read access to the repository's **Pull requests**, **Commit statuses**, and **Contents**. In the same My Work project in Final, add it under **Developer** > **Secrets** with the name `github-token`.
+    Create a fine-grained personal access token in GitHub with read access to the repository's **Pull requests**, **Commit statuses**, and **Contents**. In the same project in Final, add it under **Developer** > **Secrets** with the name `GITHUB_TOKEN`.
   </Step>
-  <Step title="Compile it">
-    ```bash
-    npx final-agents build ./agent
+  <Step title="Create the integration">
+    A schedule runs with nobody present to sign in, so give it an integration that authenticates with the stored token:
+
+    ```ts setup.ts
+    import { secret } from '@finalai/agents/integrations';
+    import { client, project } from './client.js';
+
+    const github = await project.integrations.create({
+      name: 'github',
+      mcp: { url: 'https://api.githubcopilot.com/mcp/' },
+      auth: secret('GITHUB_TOKEN'),
+    });
+    console.log(`Created ${github.id}`);
+    client.close();
     ```
 
-    The summary shows the connection and the schedule with its time zone:
+    ```bash
+    npx tsx setup.ts
+    ```
+  </Step>
+  <Step title="Publish it">
+    Publishing gives the agent a name in the project and creates its schedules:
+
+    ```bash
+    npx final-agents publish ./agent.ts --name pr-digest
+    ```
 
     ```text
-    agent: PR Digest
-    description: Posts a weekday digest of pull request activity in acme/web.
-    harness: package:@finalai/final-agent-provider/harnesses/serverless-final
-    mcp servers: github (http)
-    ...
-    schedules: morning-digest (0 9 * * 1-5, America/New_York)
-    secrets: github-token
-    ...
-    wrote agent/.final/compile
+    published pr-digest: sha256:4be1...
+    id: agt_...
     ```
-  </Step>
-  <Step title="Register and publish it">
-    Register the `pr-digest` slug once in My Work, as in the [quickstart](/quickstart#register-the-agent), substituting that slug and the name **PR Digest**. Its GitHub connection declares a secret, so publication needs an organization admin who can edit this project.
-
-    Save the [`upload-draft.ts` script](/operate/publishing#publish-code-that-uses-secrets) beside `agent/`, then upload this initial draft with your project API key:
-
-    ```bash
-    node upload-draft.ts pr-digest agent.ts instructions.md connections/github.ts schedules/morning-digest.md
-    ```
-
-    Ask that admin to review the uploaded files in the agent's **Code** view in Final and choose **Save and publish**. Uploading and compiling do not activate the schedule; it starts when published. Future source changes also use that admin's Code view, rather than API-key CI publishing.
   </Step>
 </Steps>
 
-## Try it
+## Give the schedule what it needs
 
-You don't have to wait for 9 a.m. This script requests one run and prints its receipt. Read the finished digest in your direct chat with **PR Digest** in Final; the publishing API key does not provide person-owned conversation history or events.
+A published schedule has no harness or integrations yet, so it can't run. Like every call that starts work, it needs a `provide` that meets the agent's requirements; an incomplete one is refused with `requirements_unmet`. This script sets it, then runs the schedule once so you don't have to wait for 9 a.m.:
 
-```ts run-now.ts
-import { createClient } from '@finalai/agents/client';
+```ts schedule.ts
+import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
+import { workers } from '@finalai/agents/sandboxes';
+import { client, project } from './client.js';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
+const agent = await project.agents.get({ name: 'pr-digest' });
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+const github = await project.integrations.get({ name: 'github' });
+
+const schedules = await client.schedules.list({ agent: agent.id ?? undefined });
+const digest = schedules.find((schedule) => schedule.key === 'morning-digest');
+if (digest == null) throw new Error('Publish the agent first: its schedules appear when it is published');
+
+// What every run of the schedule starts with.
+await client.schedules.update({
+  scheduleId: digest.id,
+  provide: {
+    harness: serverlessFinal({
+      model: 'deepseek-v4.1-flash',
+      inference: finalCredits(),
+      environment: runtime.id,
+    }),
+    integrations: { github },
+  },
 });
+console.log(`Next run: ${digest.nextRunAt}`);
 
-try {
-  const run = await client.schedules.runNow({ agent: 'pr-digest', key: 'morning-digest' });
-  console.log(JSON.stringify(run, null, 2));
-  console.log('Open your direct chat with PR Digest in Final to read the result.');
-} finally {
-  client.close();
-}
+// Run it once now instead of waiting for 9 a.m.
+const run = await client.schedules.runNow({ scheduleId: digest.id });
+console.log(JSON.stringify(run, null, 2));
+client.close();
 ```
 
 ```bash
-npx tsx run-now.ts
+npx tsx schedule.ts
 ```
 
-After a minute or so, open Final to read a digest like:
+After a minute or so, open your direct chat with **PR Digest** in Final to read a digest like:
 
 ```text
 Merged
@@ -173,7 +172,9 @@ Failing checks
 - #1293 Bump the payments SDK to 4.2 (@renovate): e2e / checkout failed
 ```
 
+To change the time or pause it, use `client.schedules.update` with `cron`, `timezone`, or `enabled: false`. See [schedules](/build/schedules#provide-what-runs-need).
+
 ## Make it yours
 
-- **Post it in a Shared chat.** Add an authored channel and set `target: bound-conversation` in the schedule **before publishing**, especially if the agent belongs to a Shared project. Publish, then connect the provider place to the intended Shared chat as described in [channels](/build/channels#link-a-person-and-connect-a-place). Runs are refused until exactly one chat is connected. If the agent is already published, publish again to activate the target change. All active chat routes for that agent must select the same chat; observe routes do not choose the schedule target.
+- **Post it in a Shared chat.** Add `target: 'bound-conversation'` to the schedule and publish in the Shared project, then connect a provider place to the chat it should post in, as described in [channels](/build/channels). Runs are refused until exactly one chat is connected.
 - **Cover more repositories.** List them in `instructions.md`, and give the token read access to each one.

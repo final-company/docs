@@ -7,9 +7,9 @@ Instructions are the standing guidance the agent reads on every turn: its role, 
 
 ## Write instructions
 
-Put the agent's instructions in `agent/instructions.md`:
+Keep the instructions in a Markdown file beside the agent module and pass it with `markdown`:
 
-```markdown agent/instructions.md
+```markdown instructions.md
 You help maintainers prepare releases for the acme-web repository.
 
 Before you assess a release, call release_checklist for its version.
@@ -18,50 +18,39 @@ Never mark a release ready without the release owner's sign-off.
 End with the version, the open checks, and the next action.
 ```
 
-Good instructions say what the agent is for, which tools to use when, and what a finished answer looks like. Instructions guide the model but don't enforce anything, so if an action must never happen without a person's OK, also add an [approval policy](/build/tools#ask-before-a-tool-runs).
+```ts agent.ts
+import { defineAgent, markdown } from '@finalai/agents';
 
-### Split long instructions
-
-As instructions grow, split them into files in `agent/instructions/`. The compiler loads `instructions.md` first, then each file in `instructions/` in filename order. Number the files if order matters:
-
-<Tree>
-
-- agent/
-  - instructions.md
-  - instructions/
-    - 10-release-policy.md
-    - 20-writing-style.md
-
-</Tree>
-
-### Compute instructions when a session starts
-
-Sometimes the right instructions depend on who's asking or where. Export `defineDynamic(...)` from a `.ts` file in `instructions/`, and return `defineInstructions(...)` from its `session.started` handler:
-
-```ts agent/instructions/context.ts
-import { defineDynamic, defineInstructions } from '@finalai/agents';
-
-export default defineDynamic({
-  description: 'Tells the agent whether it is in a shared conversation.',
-  preview: 'You are working in conversation conv_...',
-  events: {
-    'session.started': async (_event, ctx) =>
-      defineInstructions({
-        content: ctx.session.conversation
-          ? `You are working in the conversation "${ctx.session.conversation.title ?? 'Untitled'}".`
-          : 'You are working on a standalone task.',
-      }),
-  },
+export const agent = defineAgent({
+  name: 'Release Assistant',
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  require: { harness: { permissionMode: 'ask' } },
 });
 ```
 
-The handler runs once when a session starts, and its result stays fixed for the rest of that session. `description` and `preview` show what the fragment contains before any session runs. Handlers can read [secrets](/operate/authentication#use-secrets-in-your-code) and call APIs with `fetch`. Use a `turn.started` handler instead to recompute the value on every turn.
+`from: import.meta.url` makes the path relative to the module. The file is read when the agent's document is made, and its text becomes part of the document. Pass a string instead for short instructions.
+
+Good instructions say what the agent is for, which tools to use when, and what a finished answer looks like. Instructions guide the model but don't enforce anything, so if an action must never happen without a person's OK, also add an [approval](/build/tools#ask-before-a-tool-runs).
+
+### Split long instructions
+
+Pass an array, and the parts are joined in order with a blank line between them:
+
+```ts
+instructions: [
+  markdown('./instructions.md', { from: import.meta.url }),
+  markdown('./release-policy.md', { from: import.meta.url }),
+  markdown('./writing-style.md', { from: import.meta.url }),
+],
+```
+
+Instructions are part of the agent's document, so they're the same in every session. Context that depends on who's asking or where belongs in the message, or in a conversation participant's per-chat `instructions` (see [conversations](/client/conversations#change-an-agents-settings)).
 
 ## Package a skill
 
-A skill is a folder in `agent/skills/` with a `SKILL.md` file. Its frontmatter `description` tells the agent when the skill applies, and the body holds the steps:
+A skill is a directory with a `SKILL.md` file. Its front matter `description` tells the agent when the skill applies, and the body holds the steps:
 
-```markdown agent/skills/triage/SKILL.md
+```markdown skills/triage/SKILL.md
 ---
 name: triage
 description: Triage a failed release check into an issue with an owner and severity.
@@ -73,9 +62,27 @@ description: Triage a failed release check into an issue with an owner and sever
 4. Reply with a link to the issue and the next step.
 ```
 
-Any other file in the folder, like `checklist.md` here, ships with the skill, and the agent can read it while following the steps. A skill that fits in one file can be `agent/skills/triage.md` instead.
+Pass the directory to the agent with `skill`:
+
+```ts
+import { skill } from '@finalai/agents';
+
+skills: [skill('./skills/triage', { from: import.meta.url })],
+```
+
+Every other file in the directory, like `checklist.md` here, ships with the skill, and the agent can read it while following the steps. For a skill that fits in a few lines, define it inline:
+
+```ts
+skill({
+  name: 'changelog',
+  description: 'Write a changelog entry for a release.',
+  instructions: 'List user-facing changes first, then fixes, each with its pull request.',
+}),
+```
 
 The agent sees each skill's name and description up front, and loads the full steps only when it decides the skill applies. That keeps long procedures out of every turn.
+
+Some harnesses don't load skills. If the agent can work without them, add `skills` to `require.harness.optionalFeatures`; otherwise those harnesses are refused as [unsuitable](/build/requirements#nothing-starts-with-something-missing).
 
 ## Instructions, skills, or something else
 
@@ -84,5 +91,5 @@ The agent sees each skill's name and description up front, and loads the full st
 | Always follow a rule or keep a persona | [Instructions](#write-instructions) |
 | Follow a multi-step procedure for some tasks | [A skill](#package-a-skill) |
 | Look up current data, like release status | [A tool](/build/tools) |
+| Start with files in its workspace | [`workspace`](/build/configuration#what-the-agent-knows) seed files |
 | Keep notes or files while it works | [Sandbox files](/build/sandboxes) |
-| Remember facts across sessions | Not supported yet. Put stable facts in instructions or skills. |

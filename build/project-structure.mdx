@@ -1,86 +1,98 @@
 ---
-title: "Project structure"
-description: "Where each agent file goes and how the compiler finds it."
+title: "The agent module"
+sidebarTitle: "Agent module"
+description: "Define an agent as one explicit value in a TypeScript module, and keep its text files beside it."
 ---
 
-An agent is one directory. The compiler looks at where each file sits to decide what it is: a file in `tools/` is a tool, a file in `schedules/` is a schedule, and so on. You never register files by hand, so adding a capability means adding a file.
-
-Here's a release assistant that uses every kind of file:
+An agent is one value made with `defineAgent`, exported from a module you choose. It lists every part explicitly: there's no folder convention to follow and nothing is discovered from file names. Import tools, hooks, and skills like any other code, and pass them in.
 
 <Tree>
 
 - release-assistant/
   - package.json
-  - .gitignore
-  - agent/
-    - agent.ts
-    - instructions.md
-    - instructions/
-      - release-policy.md
-    - tools/
-      - release_checklist.ts
-    - connections/
-      - issues.ts
-    - skills/
-      - triage/
-        - SKILL.md
-        - checklist.md
-    - sandbox.ts
-    - schedules/
-      - daily-digest.md
-    - channels/
-      - deploys.ts
-    - hooks/
-      - audit.ts
-    - lib/
-      - verify-signature.ts
+  - agent.ts
+  - instructions.md
+  - release-policy.md
+  - skills/
+    - triage/
+      - SKILL.md
+      - checklist.md
+  - tools.ts
+  - hooks.ts
+  - run.ts
 
 </Tree>
 
-Only `agent.ts` is required. You pass the agent directory to the CLI: `npx final-agents build ./agent` and `npx final-agents publish ./agent`.
+```ts agent.ts
+import { defineAgent, markdown, skill } from '@finalai/agents';
+import { audit } from './hooks.js';
+import { releaseStatus, publishRelease } from './tools.js';
 
-## What goes where
+export const agent = defineAgent({
+  name: 'Release Assistant',
+  description: 'Checks whether a release is ready to ship and publishes it.',
+  instructions: [
+    markdown('./instructions.md', { from: import.meta.url }),
+    markdown('./release-policy.md', { from: import.meta.url }),
+  ],
+  skills: [skill('./skills/triage', { from: import.meta.url })],
+  tools: { release_status: releaseStatus, publish_release: publishRelease },
+  hooks: { audit },
+  secrets: ['RELEASE_SERVICE_TOKEN'],
+  require: { harness: { permissionMode: 'ask' } },
+});
+```
 
-| Path | What it defines | Guide |
-| --- | --- | --- |
-| `agent.ts` | The agent's name, harness, model credentials, and built-in tools. Default-export `defineAgent(...)`. | [Configuration](/build/configuration) |
-| `instructions.md` | Standing guidance the agent always follows. | [Instructions](/build/instructions-and-skills) |
-| `instructions/*.md`, `instructions/*.ts` | More instruction fragments, loaded after `instructions.md` in filename order. | [Instructions](/build/instructions-and-skills) |
-| `skills/<name>/SKILL.md` | A procedure the agent loads when it needs it, plus any files beside it. `skills/<name>.md` works for a one-file skill. | [Skills](/build/instructions-and-skills#package-a-skill) |
-| `tools/*.ts` | One tool per file, named after the file. | [Tools](/build/tools) |
-| `connections/*.ts` | One MCP server per file. | [Connections](/build/connections) |
-| `sandbox.ts` | The computer the agent's shell and file tools run on. You can use `sandbox/index.ts` instead, but not both. | [Sandboxes](/build/sandboxes) |
-| `schedules/*.md`, `schedules/*.ts` | One scheduled prompt per file, named after the file. | [Schedules](/build/schedules) |
-| `channels/*.ts` | HTTP routes that turn requests into messages for the agent. | [Channels](/build/channels) |
-| `hooks/**/*.ts` | Code that runs on session events. Subfolders are allowed. | [Hooks](/build/hooks) |
+Only `name`, `instructions`, and `require` are required. Lay out the other files however you like: one file per tool, or all of them in `agent.ts`.
 
-Each TypeScript file in these folders default-exports its definition. Apart from `hooks/` and skill folders, the compiler only reads files directly inside each folder. Put shared helpers in a folder it doesn't scan, like `agent/lib/`, and import them. Keep them inside the agent directory, because that's all `publish` uploads.
+## Text files beside the module
 
-<Note>
-`memory/`, `subagents/`, and `extensions/` aren't supported yet, and the compiler rejects them. Use [instructions and skills](/build/instructions-and-skills) for knowledge, [sandbox files](/build/sandboxes) for working state, and ordinary modules for shared code.
-</Note>
+`markdown(path, { from: import.meta.url })` and `skill(path, { from: import.meta.url })` name text files relative to the module. Nothing is read when you call them; the files are read when the agent's document is made, which is when you start a session, publish, or print. Pass inline strings instead when that's simpler:
+
+```ts
+instructions: 'You help maintainers decide whether a release is ready to ship.',
+```
+
+`files(path, { from: import.meta.url })` names a directory, for the agent's `workspace` seed files. See [agent definition](/build/configuration).
+
+## The agent's document
+
+`final-agents print` writes the document Final stores for an agent, without calling anything:
+
+```bash
+npx final-agents print ./agent.ts
+```
+
+The module may export the agent under any name; pass `--export <name>` if it exports more than one. The document holds the instructions and skills as text, the requirements, each tool's name and input schema, and the source of each serverless tool and hook. It's stored by its content hash, so any change to these makes a new hash, while an in-process tool's body never leaves your process and never affects the hash.
+
+In code, `documentOf(agent)` from `@finalai/agents` returns the same document.
 
 ## Code that runs on Final
 
-Tools, hooks, channel routes, and other callbacks run on Final, not on your machine. They have Web-standard APIs like `fetch`, `Request`, `Response`, and `crypto`, but not Node.js APIs such as `fs` or `process.env`. Read stored values with [`ctx.secrets`](/operate/authentication#use-secrets-in-your-code), and reach files and commands through the [sandbox](/build/sandboxes#use-the-sandbox-from-a-tool).
+[Serverless tools and hooks](/build/tools#in-process-or-serverless) run on Final's runtime from their own source, which the SDK captures. They can't import modules or use variables defined outside them: everything they use must be inside the function, a parameter, or a runtime global such as `fetch`, `crypto`, or `URL`. `print` fails and names anything a serverless function reaches outside itself.
 
-## Source control
+In-process tools and hooks run in the process that created the session and can import anything. See [where code and compute run](/build/where-code-runs).
 
-Commit `agent/`, `package.json`, and your lockfile. Ignore dependencies, local environment files, and `.final/`, where `build` writes its output:
+## Run your scripts
 
-```text .gitignore
-node_modules/
-.final/
-.env*
+The examples run TypeScript with `tsx`, which also resolves the `.js` import specifiers TypeScript uses for local files:
+
+```bash
+npm install --save-dev tsx
+npx tsx run.ts
 ```
 
-`final-agents publish` uploads every file Git would commit from the agent directory, including new files you haven't committed yet. Files that Git ignores stay on your machine.
+`final-agents print` and `publish` import your agent module with Node. If the module imports other local TypeScript files, load it through tsx:
+
+```bash
+NODE_OPTIONS='--import tsx' npx final-agents print ./agent.ts
+```
 
 ## Several agents in one repository
 
-Put each agent in its own directory, such as `agents/release-assistant/` and `agents/triage-bot/`, and register and publish each one separately:
+Export each agent from its own module, or several from one module, and pass the one you mean:
 
 ```bash
-npx final-agents publish ./agents/release-assistant --agent release-assistant
-npx final-agents publish ./agents/triage-bot --agent triage-bot
+npx final-agents publish ./agents/release.ts --name release-assistant
+npx final-agents publish ./agents/triage.ts --name triage-bot
 ```

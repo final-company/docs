@@ -1,0 +1,108 @@
+---
+title: "Final's ACP extensions"
+sidebarTitle: "ACP extensions"
+description: "What an ACP adapter, or an agent reached at a URL, must implement beyond ACP v2."
+---
+
+Final talks to every harness over [ACP](https://agentclientprotocol.com) v2. Beyond the standard protocol, it relies on a small set of extensions: methods under `_final/`, and fields under `_meta["final.ai"]` on ACP messages. Every ACP adapter, and every agent Final reaches with `atUrl`, must implement the required ones. The catalogue lives in `@finalai/acp-session`, which both Final and adapters use.
+
+## What an adapter must implement
+
+| Extension | Advertised as | What it does |
+| --- | --- | --- |
+| Observe | `supports.observe` | `_final/session/observe` adds content to the session's history without a model call. |
+| Author metadata | `supports.authorMeta` | Renders `_meta["final.ai"].author` on prompt content so the model knows who wrote each message. |
+| Resume with replay | `supports.resumeReplay` | `session/resume` replays the session's updates from the start. |
+| Replay after a sequence number | `supports.afterSeqReplay` | `session/resume` with `replayFrom: { type: '_final/after_seq', seq }` replays only what came after `seq`. |
+| Live text | (always) | `_final/live_text` notifications carry provisional text as the model produces it, and streamed chunks carry `emittedAtMs`. |
+
+Fork (`supports.fork`) is optional: implement it where the harness can fork a session.
+
+An adapter declares the extensions it implements in its definition's `extensions`, and advertises them in its `initialize` response. When a session opens, Final reads the advertisement and refuses an adapter or URL endpoint that doesn't advertise every required extension, naming the missing ones. Off-the-shelf adapters that implement plain ACP don't qualify.
+
+## The `initialize` advertisement
+
+An agent advertises the extensions under `_meta["final.ai"]` in its `initialize` response, beside the standard fields:
+
+```json
+{
+  "_meta": {
+    "final.ai": {
+      "supports": { "observe": true, "authorMeta": true, "resumeReplay": true, "afterSeqReplay": true, "fork": false },
+      "consumes": ["mcp"],
+      "privateMethods": [],
+      "program": "my-cli",
+      "runtime": { "name": "my-cli-acp", "version": "1.0.0" }
+    }
+  }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `supports` | The extension flags above. |
+| `consumes` | How the agent reaches a provided sandbox: `handle-rpc` (Final's sandbox protocol, with endpoints in `_meta["final.ai"].sandboxes` on `session/new`) or `mcp` (the sandbox's tools as an MCP server in `mcpServers`). |
+| `privateMethods` | Implementation-specific `_final/*` methods it accepts beyond the catalogue. |
+| `program`, `runtime` | Diagnostics: the harness program and what hosts it. |
+
+A client sends a `_final/*` method or cursor only to an agent that advertised it.
+
+## Methods
+
+**`_final/session/observe`** (client to agent, notification). Appends content to the harness's history without running a turn:
+
+```json
+{ "jsonrpc": "2.0", "method": "_final/session/observe", "params": { "sessionId": "...", "content": [{ "type": "text", "text": "The release owner changed to Morgan." }] } }
+```
+
+**`_final/live_text`** (agent to client, notification). Provisional text of agent message `messageId`, starting at character `offset`, sent as soon as the model produces it. It's never part of the history: the message's `agent_message_chunk` updates are the record, and a client shows live text only while it extends that record exactly.
+
+```json
+{ "jsonrpc": "2.0", "method": "_final/live_text", "params": { "sessionId": "...", "messageId": "msg_1", "offset": 0, "text": "Two of the three", "emittedAtMs": 1762900000000 } }
+```
+
+**`session/resume` with `_final/after_seq`.** Standard `session/resume` with a custom replay cursor: replay every update after Final's log sequence number `seq`, so Final doesn't receive updates it already holds.
+
+## `_meta["final.ai"]` fields
+
+Everything under `_meta["final.ai"]` is informational: a harness that ignores a field must still work. These are the fields and where each travels:
+
+| Field | Where it travels | Meaning |
+| --- | --- | --- |
+| `author` | User content blocks, `session/prompt` | Who wrote the message: `kind` (`user`, `agent`, `service`), `displayName`, and the participant or principal. |
+| `context` | User content blocks | The message it replies to, its thread, and quoted messages. |
+| `role` | Synthesized content blocks | `context` or `instruction` for blocks Final added rather than the author. |
+| `replyExpected` | `session/prompt` | `false` when the prompt is context only, for harnesses without observe. |
+| `idempotencyKey` | `_final/session/observe`, `session/prompt` | The caller's key; a harness that dedupes on it ignores redelivery. |
+| `promptToInference` | `session/prompt` | Timing marks from the person's submit to the model call. |
+| `sandboxes` | `session/new`, `session/resume` | The provided sandboxes' endpoints, by sandbox id, for harnesses that consume `handle-rpc`. |
+| `baseTools` | `session/new`, `session/resume` | Which sandbox serves each capability. |
+| `program` | `session/new` | Private configuration for Final's own harness programs. |
+| `agent`, `provide` | `session/new` over Final's ACP endpoint | The agent and provide document an ACP client opens a session with. |
+| `emittedAtMs` | `agent_message_chunk`, `agent_thought_chunk` | When the harness emitted the chunk. Informational only, never ordering. |
+| `segmentEnd`, `finishReason` | `agent_message` | Marks a committed assistant message and why it ended. |
+| `turnStatus` | `session_info_update` | What a running turn is doing, in a few words. |
+| `stopReason` | The idle `state_update` that ends a turn | A stop reason outside ACP's set. |
+| `providerError` | The idle `state_update` of a turn that stopped with `error` | The model provider's error: `code`, `message`, `retryable`. |
+| `subscription` | `usage_update` | Which vendor subscription a turn counted against. |
+| `card` | `tools/call` results, `elicitation/create` | A card for clients to render. |
+| `entityLinks` | `elicitation/create` | What an approval request is about. |
+| `audience` | Pending requests as Final republishes them | Which participants a request is for. |
+| `respondingUserId` | Request outcomes Final resolves | Who answered. |
+| `patchResource` | `diff` tool call content | A large patch moved to storage, as a resource link. |
+| `lifecycle` | `notice` updates | Session lifecycle events Final records. |
+| `worker` | An MCP server of the agent's tools | The tools' document hash. |
+
+## Build an adapter
+
+`@finalai/acp-session/agent` is the agent side of these extensions. `createAdapterAgent` takes a native program that runs one model turn at a time and serves it as an ACP v2 agent that advertises and implements every extension: observe, live text with `emittedAtMs`, author lines, replay from the start or after a sequence number, provider errors on error stops, fork where the program supports it, and session config options. A prompt sent while a turn runs joins it when the program can take it mid-turn, and is queued otherwise.
+
+`@finalai/acp-session/agent/node` keeps sessions in a state directory, so a new process resumes a session, and serves the agent on stdio. `startMcpProxy` gives the program the session's MCP servers as local HTTP endpoints and keeps each tool call's full result, so ACP clients get the whole result even when the program shortens it.
+
+Then define the adapter, [publish it](/harnesses/overview#publish-and-use-them), and certify it:
+
+```bash
+npx final-agents conformance ./my-harness.ts --profile final-required
+```
+
+`@finalai/acp-adapter-claude-code` and `@finalai/acp-adapter-codex` are complete adapters built this way.

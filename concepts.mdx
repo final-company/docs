@@ -1,65 +1,70 @@
 ---
 title: "How agents work"
-description: "A mental model for agents, revisions, sessions, turns, and decisions."
+description: "A mental model for agent documents, requirements, provide, sessions, turns, and decisions."
 icon: "layer-group"
 ---
 
-An agent on Final goes through the same path every time: you write it as files, publish a snapshot, and your app or a trigger starts sessions with it. Once you know the handful of objects along that path, the rest of the SDK follows.
+An agent on Final is data that says what it needs. Whoever starts it provides what it needs, and Final runs the orchestration in between. Once you know the handful of objects along that path, the rest of the SDK follows.
 
 ```mermaid
 flowchart LR
-  Files["Agent files<br/>agent.ts, tools/, ..."] -->|publish| Revision["Revision<br/>(snapshot)"]
-  Revision --> Session["Session"]
+  Agent["Agent document<br/>instructions, tools, require"] --> Session["Session"]
+  Provide["provide<br/>harness, compute, integrations"] --> Session
   App["Your app"] -->|message| Session
-  Triggers["Schedules<br/>and webhooks"] -->|prompt| Session
+  Triggers["Schedules<br/>and channels"] -->|prompt| Session
   Session -->|turn| Output["Streamed text,<br/>tool calls, decisions"]
 ```
 
-## From files to a published agent
+## An agent is a document
 
-You write an agent as a directory of files. `agent.ts` names it and picks the harness, `instructions.md` says how it should behave, and folders like `tools/` and `schedules/` add capabilities. The compiler finds each file by its location, so there's no registry to keep in sync. See [project structure](/build/project-structure).
+You define an agent with `defineAgent` in one module that lists every part explicitly: instructions, skills, tools, hooks, schedules, and its requirements. The SDK turns that value into the agent's **document**, plain JSON that includes each tool's name and schema and the source of each serverless tool. Final stores a document by its content hash, so the same agent always has the same identity. See [the agent module](/build/project-structure).
 
-The **agent** itself is a record in your Final project with a name, a **slug** you call it by, and a Git repository that holds its source. You register it once.
+Nothing is built or deployed. Starting a session sends the document with the call. To let others fetch the agent, you **publish** it under a name, which points the name at a hash. See [publishing](/operate/publishing).
 
-When you publish, Final compiles the source into a **revision**: an immutable, numbered snapshot of the agent. The newest revision becomes current, and new sessions start on it. Sessions that are already running keep the revision they started with, so a deploy never changes an agent in the middle of a conversation. See [testing and publishing](/operate/publishing).
+## Requirements and provide
 
-## The harness runs the agent loop
+An agent never names the things that run it. It states requirements instead:
 
-The **harness** is the program that actually runs your agent. It sends the conversation to the model, runs the tools the model asks for, feeds the results back, and repeats until the model has an answer. You pick a harness in `agent.ts`, for example `serverlessFinal`, which Final hosts for you.
+| The agent requires | The caller provides |
+| --- | --- |
+| A harness, held to a permission ceiling | [Harness settings](/harnesses/settings): which harness, which model, how inference is paid for |
+| Compute, by capability: `files`, `shell`, `computerUse`, `browserUse` | A [sandbox](/build/sandboxes) for each capability, such as a cloud computer or a Final Device |
+| Integration slots, each with a description and a tool policy | An [integration](/build/integrations) for each slot: an MCP server and how it authenticates |
 
-The harness also needs **model credentials**: the account the model calls are made and billed with. You can use model access provided by Final, your organization's own provider API key, or a connected subscription. See [configuration](/build/configuration).
+Every call that starts work takes a `provide` object. If something required is missing or unsuitable, the call fails with `requirements_unmet`, lists what's wrong, and creates nothing. A running agent therefore always has everything it requires. See [requirements and providing](/build/requirements).
+
+## The harness runs the model loop
+
+The **harness** is the program that sends the conversation to the model, runs the tools it asks for, and repeats until it has an answer. Final's harnesses include its own loop (`final`), Pi, nanocode engines for Claude and Codex models, and Claude Code and Codex themselves. Harness settings also carry **inference**: where model access comes from and who's charged, such as a person's own subscription, a project API key, or Final's metered inference. See [harness settings](/harnesses/settings) and [harnesses, adapters, and environments](/harnesses/overview).
+
+## Where code and compute run
+
+- **The model's files and shell** run on the sandbox provided for them. If the caller leaves them out, they run in the caller's own process, on its machine.
+- **Serverless tools and hooks** are self-contained and run on Final's runtime, whether or not your process is running.
+- **In-process tools and hooks** run in the process that created the session and can use anything that process holds, like a database connection.
+
+See [where code and compute run](/build/where-code-runs).
 
 ## Sessions, turns, and stop reasons
 
-A **session** is one ongoing thread with one agent, like a single chat. It keeps the full history, so follow-up messages have context.
+A **session** is one ongoing thread with one agent. It pins one agent hash and keeps the full history, so follow-up messages have context.
 
-Each message you send starts a **turn**. During a turn the agent may think, call several tools, and write text, and you can watch all of it stream in as **events**. A turn ends with a **stop reason** such as `end_turn` (the agent finished) or `cancelled` (someone stopped it). Read the stop reason even when the reply text is empty, because it tells you why the turn ended. See [sessions and streaming](/client/sessions).
+Each message starts a **turn**. During a turn the agent may think, call tools, and write text, and you watch it stream in as **events**. A turn ends with a **stop reason** such as `end_turn` or `cancelled`. Read the stop reason even when the reply is empty. See [sessions and streaming](/client/sessions).
 
 ## Decisions pause a turn for a person
 
-Some actions shouldn't happen without a person's OK, like publishing a release or running a shell command. When the agent reaches one, the turn pauses and Final records a **decision**: a request with the options a person can choose. Your app shows it, the person answers, and the turn continues. You choose which actions need approval when you define [tools](/build/tools#ask-before-a-tool-runs) and [connections](/build/connections).
-
-## Capabilities: what the agent can do
-
-| Capability | What it gives the agent |
-| --- | --- |
-| [Tools](/build/tools) | TypeScript functions you write, such as "look up release status." |
-| [Connections](/build/connections) | Tools from an MCP server, such as your issue tracker or Final's connected accounts. |
-| [Sandboxes](/build/sandboxes) | A cloud computer with a shell and files, for running code and editing repositories. |
-| [Instructions and skills](/build/instructions-and-skills) | Standing guidance, plus step-by-step procedures the agent loads when it needs them. |
+Some steps wait for a person: approving a tool call, answering a question, or signing in to an integration for the first time. Final records a **decision** with the options a person can choose; your app shows it, the person answers, and the turn continues. You choose which actions need approval when you define [tools](/build/tools#ask-before-a-tool-runs) and [integration slots](/build/integrations).
 
 ## Triggers: how work arrives
 
 Most sessions start because your app sends a message. Two other triggers start work on their own:
 
-- [Schedules](/build/schedules) send the agent a prompt on a cron schedule, like a daily digest.
-- [Channels](/build/channels) turn an HTTP request, like a webhook from your deploy system, into a message for the agent.
+- [Schedules](/build/schedules) send the agent a prompt on a cron schedule, with a `provide` set up once.
+- [Channels](/build/channels) turn events from an outside surface, like a webhook or a chat app, into messages in Final's chats.
 
-[Hooks](/build/hooks) run your code when something happens in a session, such as a turn ending, without changing what the agent does.
+[Hooks](/build/hooks) run your code when something happens in a session, without changing what the agent does.
 
 ## Sessions or conversations
 
-Your app uses sessions to talk to an agent. People can also chat with agents in Final:
-
 - **Sessions** are the direct line: you send a message and stream the agent's work. Use them for tasks, or when your app stores its own chat history.
-- **[Conversations](/client/conversations)** are chats in Final's signed-in web and mobile apps, with people and agents as participants, message history, and read state. Final delivers each message to the right agent's session for you. Conversation management requires a signed-in person; project API keys use sessions instead.
+- **[Conversations](/client/conversations)** are chats Final stores, with people and agents as participants, message history, and read state. Each agent participant has its own `provide`, and Final delivers each message to the right agent's session.

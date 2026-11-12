@@ -1,161 +1,167 @@
 ---
-title: "Sandboxes and working files"
-sidebarTitle: "Sandboxes"
-description: "Give your agent a cloud computer with a shell and files, so it can run code and edit repositories."
+title: "Compute and sandboxes"
+sidebarTitle: "Compute and sandboxes"
+description: "Require files, a shell, or a screen by capability, and provide a cloud computer, a Final Device, or another provider's sandbox."
 ---
 
-A sandbox is a cloud computer your agent works on. With one, the agent can run shell commands, read and write files, and run your tests, the way a developer would in a terminal. Reach for a sandbox when the agent has to do real work on code or data, not only call APIs.
+With compute, the agent can run shell commands, read and write files, and run your tests, the way a developer would in a terminal. The agent requires compute by **capability**; the caller provides a **sandbox** for each capability: a Final computer, a person's own machine running Final Device, a Daytona sandbox, or the caller's own process.
 
-## Give the agent a computer
+## Require compute
 
-Export a computer from `agent/sandbox.ts`:
+```ts agent.ts
+import { defineAgent } from '@finalai/agents';
 
-```ts agent/sandbox.ts
-import { computer as finalComputer } from '@finalai/agents/sandboxes';
-
-export const computer = finalComputer({ workspace: 'session' });
-```
-
-Then bind the agent's built-in shell and file tools to it in `agent.ts`. They're off until you do:
-
-```ts agent/agent.ts
-import { baseTools, credentials, defineAgent } from '@finalai/agents';
-import { serverlessFinal } from '@finalai/agents/harnesses';
-import { computer } from './sandbox.js';
-
-export default defineAgent({
+export const agent = defineAgent({
   name: 'Test Runner',
   description: 'Runs the test suite and explains failures.',
-  tools: baseTools({ shell: computer, files: computer }),
-  harness: serverlessFinal({
-    credentials: credentials.chain({
-      payer: 'organization',
-      tryInOrder: [credentials.platform()],
-    }),
-    permissionMode: 'ask',
-  }),
-});
-```
-
-The computer starts the first time the agent uses it. From then on, the agent can run commands like `npm test` and edit files with its built-in tools. `npx final-agents build` shows this as `base tools: shell → computer, files → computer`.
-
-## Ask before commands run
-
-`permissionMode` on the harness controls the built-in shell and file tools:
-
-| Mode | What happens |
-| --- | --- |
-| `ask` | The agent asks before running a command or changing a file. Reading is allowed. |
-| `auto` | Commands and edits run without asking. Use this once you trust the agent's setup. |
-| `readonly` | Commands and edits are refused. The agent can only read. |
-
-When the agent asks, the turn pauses until a person answers in your app. See [handle approvals](/client/sessions#handle-approvals).
-
-For finer control, `toolPolicy` in `agent.ts` overrides the mode for one capability. With `permissionMode: 'auto'`, this agent runs commands freely but still asks before it changes a file:
-
-```ts agent/agent.ts
-toolPolicy: { 'files.write': 'ask' },
-```
-
-A common pattern is to keep `ask` for the built-in shell and give the agent a dedicated tool for the commands it runs often, like the `run_tests` tool [below](#use-the-sandbox-from-a-tool). Your own tools run without asking unless you give them an [approval policy](/build/tools#ask-before-a-tool-runs).
-
-## Choose how long files last
-
-The `workspace` option decides how long the computer's disk lives:
-
-| Workspace | The disk lasts | Good for |
-| --- | --- | --- |
-| `ephemeral` | Until the computer is released. This is the default. | One-off commands with nothing to keep. |
-| `session` | As long as the session. | A task that spans several messages, like fixing a bug. |
-| `conversation` | As long as the conversation. Every agent in it shares the disk. | A team chat where several agents work on the same files. |
-
-Files never carry over between sessions in `session` mode. To start every session from the same prepared state, use a [setup guide](#use-a-saved-setup-guide).
-
-## Use the sandbox from a tool
-
-Your own tools can use the same computer through `ctx.getSandbox()`, passing the name of the export from `sandbox.ts`. This tool runs the test suite and returns a short summary instead of the full log:
-
-```ts agent/tools/run_tests.ts
-import { defineTool } from '@finalai/agents';
-import { z } from 'zod';
-
-export default defineTool({
-  description: 'Run the test suite and report whether it passed.',
-  inputSchema: z.object({ filter: z.string().optional().describe('Only run matching tests') }),
-  async execute({ filter }, ctx) {
-    const sandbox = await ctx.getSandbox('computer');
-    const result = await sandbox.run({
-      command: 'npm',
-      args: filter ? ['test', '--', filter] : ['test'],
-      timeoutMs: 10 * 60_000,
-      abortSignal: ctx.abortSignal,
-    });
-    return {
-      passed: result.exitCode === 0,
-      output: result.stdout.slice(-4000) + result.stderr.slice(-2000),
-    };
+  instructions: 'Run the tests, read the failures, and explain the likely cause of each.',
+  require: {
+    harness: { permissionMode: 'ask' },
+    compute: { files: 'write', shell: 'execute' },
   },
 });
 ```
 
-The sandbox also has `readTextFile`, `writeTextFile`, `readDir`, `stat`, `removePath`, and `spawn` for long-running processes.
+| Capability | Access | What the model does with it |
+| --- | --- | --- |
+| `files` | `read`, `write` | Reads and edits files with the harness's file tools. |
+| `shell` | `execute` | Runs commands, manages the processes they start, and gets a URL for a port one listens on. |
+| `computerUse` | `view`, `control` | Sees and operates a desktop. |
+| `browserUse` | `view`, `control` | Sees and operates a browser. |
 
-## Use a saved setup guide
+The agent never names a machine. The same agent works on any sandbox that serves those capabilities.
 
-A setup guide is a saved recipe for a computer: a base image plus setup steps, prepared ahead of time so sessions start quickly with your tools installed. Create one under **Developer** > **Computer Setup Guides** in the dashboard. When it shows **Ready**, click **Use in agent** to copy its configuration, or reference it by slug:
+## Provide a sandbox
 
-```ts agent/sandbox.ts
-import { computerSetupGuide } from '@finalai/agents/sandboxes';
+Create a sandbox in the project, then provide it for each capability. `files` and `shell` must be the same sandbox:
 
-export const computer = computerSetupGuide({
-  ref: 'acme-web-dev',
-  version: 'latest',
-  workspace: 'session',
+```ts run.ts
+import { createClient } from '@finalai/agents/client';
+import { finalCredits, serverlessPi } from '@finalai/agents/harnesses';
+import { computer, defineSandboxSetup, workers } from '@finalai/agents/sandboxes';
+import { agent } from './agent.js';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+
+const sessionId = crypto.randomUUID();
+const box = await project.sandboxes.create(computer({ image: 'docker.io/library/node:26-bookworm' }), {
+  setup: defineSandboxSetup({
+    repositories: [{ alias: 'web', repository: 'acme/web', ref: 'main' }],
+    steps: [{ cwd: 'web', run: 'npm ci' }],
+  }),
+  ownedBy: { session: sessionId },
 });
+
+const { response } = await project.sessions.create({
+  id: sessionId,
+  agent,
+  provide: {
+    harness: serverlessPi({ model: 'gpt-6.1-sol', inference: finalCredits(), environment: runtime.id }),
+    compute: { files: box, shell: box },
+  },
+  message: 'Run the tests and explain the first failure.',
+});
+console.log(await response!.text());
 ```
 
-`ref` is the guide's slug in Final, not a local path. `version` can be a version number to pin the guide, or `'latest'`. Options you pass here override the guide's saved defaults.
+- **Creating a sandbox boots nothing.** The machine starts the first time the agent or your code uses it.
+- **A [sandbox setup](/build/sandbox-setups)** says what should be on the machine: repositories, variables, setup steps, services, and named commands. It works on any provider.
+- **`ownedBy`** ties the sandbox to a session or conversation, and it's deleted with its owner. Choosing the session's `id` up front lets you create the sandbox first. Without an owner, the sandbox lives until you call `box.delete()`.
+- **`idempotencyKey`** makes a retried create return the sandbox the first call made.
+
+Leave `compute` out and the model's files and shell run in the calling process, in its working directory. See [where code and compute run](/build/where-code-runs).
+
+## Choose how long files last
+
+A sandbox's disk lasts as long as the sandbox does, so you choose by what you provide:
+
+| You want | Provide |
+| --- | --- |
+| A fresh machine per task | A new sandbox owned by the session. |
+| One machine shared by every agent in a chat | A sandbox owned by the conversation, in the conversation's `provide`. |
+| A long-lived machine for a team or a schedule | A sandbox with no owner, provided by id to every session that should use it. |
+
+A computer pauses when it has been idle for its `idleTimeoutSeconds`, keeping its disk and processes, and resumes on next use.
+
+## Ask before commands run
+
+The agent's `require.harness.permissionMode` is the most its harness may do unasked. The caller can hold it stricter with `permissionMode` in the [harness settings](/harnesses/settings):
+
+| Mode | What happens |
+| --- | --- |
+| `ask` | The agent asks before running a command or changing a file. Reading is allowed. |
+| `review` | Edits proceed. Commands and outside actions wait for a person. |
+| `auto` | Commands and edits run without asking. |
+
+When the agent asks, the turn pauses until a person answers in your app. See [handle approvals](/client/sessions#handle-approvals). For finer control, the agent's `toolPolicy` asks before one capability even when the mode allows it, like `toolPolicy: { 'files.write': 'ask' }`.
+
+A common pattern is to keep `ask` for the built-in shell and give the agent a dedicated tool for the commands it runs often, like a [`run_tests` tool](/build/tools#use-the-agents-sandbox-from-a-tool) that calls `ctx.sandbox('shell')`.
+
+## Use the sandbox from your own code
+
+A sandbox handle runs commands and reads what's known about the machine, outside any session:
+
+```ts
+const result = await box.run({ command: 'git log -1 --oneline', cwd: 'web' });
+console.log(result.exitCode, result.stdout);
+
+const description = await box.description();
+console.log(description.checkouts); // [{ alias: 'web', path: '/.../web', ... }]
+```
+
+`box.description()` lists real checkout paths, service URLs, named commands, and the setup's notes. The same description is a file in the sandbox, but Final doesn't put it in the agent's context; add what the agent should know to its message or the chat's instructions.
 
 ## Run on a Final Device
 
-To have the agent work on a machine you own instead of a cloud computer, use `device` in place of `computer`. The machine needs [Final Device](/device/overview) installed and connected:
+To have the agent work on a person's own computer, create a sandbox from `device`. The machine needs [Final Device](/device/overview) installed and connected:
 
-```ts agent/sandbox.ts
+```ts
 import { device } from '@finalai/agents/sandboxes';
 
-export const workstation = device({ deviceId: '6f1c2a7e-3b4d-4e8f-9a21-7c5d0e1b2f34' });
+const laptop = await project.sandboxes.create(device({ deviceId: '6f1c2a7e-3b4d-4e8f-9a21-7c5d0e1b2f34' }));
 ```
 
-Bind it the same way, with `baseTools({ shell: workstation, files: workstation })`. Leave out `deviceId` to use the only device owned by the person the session acts for. The session fails if that person has none or has several. You can also pass `pairing` with an approved pairing code instead of an ID.
+Pass `pairing` with a pairing code the owner approved instead of `deviceId`. A device takes no sandbox setup. If it's paused or offline, the agent can't reach it; Final never moves the work to another machine. Commands run as the machine's operating system account with all of its access, so keep the permission mode on `ask` until you trust the agent.
 
-The definition chooses the device, and starting a session doesn't override it. If the device is paused or offline, the session fails instead of moving to the cloud. Commands run as the machine's operating system account with all of its access, so keep `permissionMode` on `ask` until you trust the agent.
+## Use another provider
+
+Any sandbox provider works the same way. Daytona sandboxes run in your own Daytona account:
+
+```ts
+import { daytona } from '@finalai/daytona-agent-provider/sandboxes';
+
+const box = await project.sandboxes.create(
+  daytona({ credential: { secretRef: 'DAYTONA_API_KEY' }, image: 'node:26' }),
+  { setup },
+);
+```
+
+`project.sandboxes.providers()` lists the providers your project can create sandboxes on, each with the JSON Schema of its options.
 
 ## Computer options
 
-`computer()` and `computerSetupGuide()` both accept these options:
-
-<ParamField path="workspace" type="'ephemeral' | 'session' | 'conversation'" default="'ephemeral'">
-  How long the disk lasts. See [choose how long files last](#choose-how-long-files-last).
-</ParamField>
-
-<ParamField path="repositories" type="{ alias, repository, ref? }[]">
-  Repositories to check out on the computer, such as `{ alias: 'web', repository: 'acme/web', ref: 'main' }`.
-</ParamField>
-
-<ParamField path="variables" type="string[]">
-  Names of secrets to set as environment variables when the computer starts, such as `NPM_TOKEN`.
-</ParamField>
-
-<ParamField path="env" type="Record<string, string>">
-  Plain environment variables. Use `variables` for anything secret.
-</ParamField>
-
-<ParamField path="networkPolicy" type="'allow-all' | 'deny-all' | { mode: 'allowlist', allow }">
-  Which hosts the computer can reach.
-</ParamField>
+`computer()` holds only what Final's computers control. What goes on the machine is the [sandbox setup](/build/sandbox-setups).
 
 <ParamField path="image" type="string">
-  `computer()` only. A container image to start from instead of your organization's default guide.
+  An OCI image reference such as `docker.io/library/node:26-bookworm`. Defaults to Final's sandbox image.
+</ParamField>
+
+<ParamField path="build" type="{ steps, verify }">
+  Commands baked into a base image once, before any sandbox uses it, such as installing toolchains. `verify` commands fail the build if they fail. Each step takes `run` and `timeoutMinutes` (default 20).
+</ParamField>
+
+<ParamField path="machine" type="{ vcpu?, memoryMb?, diskGb? }">
+  The machine's size.
+</ParamField>
+
+<ParamField path="region" type="string">
+  Where the computer runs.
+</ParamField>
+
+<ParamField path="idleTimeoutSeconds" type="number">
+  Idle time before the computer pauses, keeping its disk and processes. Between 60 seconds and 7 days.
 </ParamField>
 
 To create, snapshot, or manage VMs directly from your own code, see [Final VMs](/vm-platform/overview).

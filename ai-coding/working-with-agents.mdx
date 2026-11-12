@@ -43,7 +43,7 @@ If something's off, reply in the same session with what you saw. The agent still
 
 Agents are most useful when several work at once. Give each task its own space so they never collide:
 
-- **One computer per task.** Two agents editing the same checkout, or migrating the same database, will undo each other's work. With a Final agent, each new session gets its own computer when its workspace is **Kept for the session**.
+- **One computer per task.** Two agents editing the same checkout, or migrating the same database, will undo each other's work. With a Final agent, each new chat gets its own computer from the project's sandbox for new chats.
 - **One branch per task.** Name it after the task, such as `fix/empty-signup-email`, so reviews stay small.
 - **One setup for all of them.** Every computer runs the same [setup script](/ai-coding/cloud-environments#write-a-setup-script), so a fix to the environment reaches every task.
 
@@ -55,21 +55,21 @@ Push the branch before you're done with a computer. The pull request, not the co
 Deleting a computer deletes its workspace, including any commits you haven't pushed.
 </Warning>
 
-When a task uncovers a missing dependency or a flaky setup step, fix `scripts/setup.sh` or the setup guide in the same pull request. To keep idle computers from running, set **Stop after** on the computer's **Settings** tab. When the change is ready to ship, use your normal release process or [Final Cloud Apps](/cloud-apps/overview).
+When a task uncovers a missing dependency or a flaky setup step, fix `scripts/setup.sh` or the sandbox setup in the same pull request. To keep idle computers from running, set **Stop after** on the computer's **Settings** tab. When the change is ready to ship, use your normal release process or [Final Cloud Apps](/cloud-apps/overview).
 
 ## Troubleshooting
 
 <AccordionGroup>
   <Accordion title="The agent edits the wrong directory or package">
-    Start Claude Code or Codex from the repository root, and name the package in the task for a monorepo. For a Final agent, check the repository alias in the setup guide; checkouts live at `/workspaces/<alias>`.
+    Start Claude Code or Codex from the repository root, and name the package in the task for a monorepo. For a Final agent, check the repository alias in the sandbox setup; the sandbox description lists each checkout's real path.
   </Accordion>
   <Accordion title="Tests pass on the computer but fail in CI">
-    The computer and CI are set up differently. Compare runtime versions and environment variables, and run the same command CI runs. Pin tool versions in your setup guide's `build.steps` or your container image so both match.
+    The computer and CI are set up differently. Compare runtime versions and environment variables, and run the same command CI runs. Pin tool versions in the computer's `build` steps or your container image so both match.
   </Accordion>
   <Accordion title="The agent keeps stopping to ask for approval">
     Claude Code and Codex ask before running commands by default. Approve commands you trust for the rest of the session when prompted, or configure their permission settings in the repository so every computer gets the same rules.
   </Accordion>
   <Accordion title="The agent says it can't reach a service or package registry">
-    Check **Allow internet access** on the computer's **Settings** tab, and that any network allowlist includes the host. For a Final agent, check that the service starts in the setup guide's `services` and answers its `ready.url`.
+    Check **Allow internet access** on the computer's **Settings** tab, and that any network allowlist includes the host. For a Final agent, check that the service in the sandbox setup's `services` starts and listens on its `port`.
   </Accordion>
 </AccordionGroup>

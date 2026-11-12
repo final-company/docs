@@ -51,11 +51,11 @@ The `final-agents` and `final-cloud` CLIs read `FINAL_API_KEY` automatically. SD
 ```ts
 import { createClient } from '@finalai/agents/client';
 
-const client = createClient({
-  host: 'https://agent-session.final.ai/api',
-  auth: { apiKey: process.env.FINAL_API_KEY! },
-});
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: 'prj_your_project' });
 ```
+
+A key belongs to a project. Agent SDK calls name the project explicitly with `client.project({ id })`, and the `final-agents` CLI reads it from `FINAL_PROJECT_ID`.
 
 In CI, save the key as a secret (for example, a GitHub Actions secret named `FINAL_API_KEY`) and expose it to the job as an environment variable.
 

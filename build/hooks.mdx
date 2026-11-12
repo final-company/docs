@@ -1,77 +1,69 @@
 ---
 title: "Lifecycle hooks"
 sidebarTitle: "Hooks"
-description: "Run your own code when a session starts, a turn ends, or a tool finishes."
+description: "Run your own code when a session opens, a turn ends, or a tool finishes."
 ---
 
 A hook runs your code when something happens in a session: a turn ends, a tool call completes, a decision is created. Hooks watch the session without changing what the agent does, which makes them the right place for audit logs, metrics, and notifications.
 
-## Add a hook
+Like [tools](/build/tools#in-process-or-serverless), a hook runs where its definition says: `defineServerlessHook` on Final's runtime from its own self-contained source, `defineInProcessHook` in the process that created the session.
 
-Add a file to `agent/hooks/` that default-exports `defineHook(...)`. Each key in `events` is an event name, and its function runs every time that event happens:
+## Add a serverless hook
 
-```ts agent/hooks/audit.ts
-import { defineHook } from '@finalai/agents/hooks';
+`events` lists the events the hook receives, and `execute` runs for each one:
 
-export default defineHook({
-  events: {
-    async 'turn.ended'(event, ctx) {
-      await fetch('https://audit.example.com/agent-events', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          eventId: event.meta.id,
-          session: ctx.session.id,
-          stopReason: event.data.stopReason,
-        }),
-      });
-    },
+```ts hooks.ts
+import { defineServerlessHook } from '@finalai/agents';
+
+export const audit = defineServerlessHook({
+  events: ['turn.ended'],
+  execute: async (event, ctx) => {
+    const token = await ctx.secrets.get('AUDIT_TOKEN');
+    await fetch('https://audit.example.com/agent-events', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        eventId: event.meta.id,
+        session: ctx.sessionId,
+        stopReason: event.data.stopReason,
+      }),
+    });
   },
 });
+```
+
+Add it to the agent under a name, and list the secrets it reads:
+
+```ts
+hooks: { audit },
+secrets: ['AUDIT_TOKEN'],
 ```
 
 `event.meta.id` is unique to the event and stays the same if the hook is delivered more than once. Send it along so the receiving system can drop duplicates.
 
-## Tell people when something goes wrong
-
-Hooks can post to the session's conversation with `ctx.final.post`. This one lets people know when a turn fails, instead of leaving them waiting:
-
-```ts agent/hooks/notify-errors.ts
-import { defineHook } from '@finalai/agents/hooks';
-
-export default defineHook({
-  events: {
-    async 'turn.ended'(event, ctx) {
-      if (event.data.stopReason === 'error') {
-        await ctx.final.post({ text: 'Something went wrong on my side. I have logged it.' });
-      }
-    },
-  },
-});
-```
+A serverless hook keeps running whether or not your process is, which makes it the choice for anything that must not miss events. The same rules as serverless tools apply: everything it uses must be inside the function, a parameter, or a runtime global, or you pass a bundled module as `source`.
 
 ## React to a specific tool's result
 
-`toolResultFrom` reads the typed result of one of your tools from a `tool_call_update` event. It returns `undefined` for other tools, calls still in progress, and failed calls:
+`toolResultFrom` reads the typed result of one of your tools from a `tool_call_update` event. It returns `undefined` for other tools, calls still in progress, and failed calls. Because it needs the tool value, use it from an in-process hook:
 
-```ts agent/hooks/release-metrics.ts
-import { defineHook } from '@finalai/agents/hooks';
+```ts
+import { defineInProcessHook } from '@finalai/agents';
 import { toolResultFrom } from '@finalai/agents/tools';
-import releaseStatus from '../tools/release_status.js';
+import { releaseStatus } from './tools.js';
 
-export default defineHook({
-  events: {
-    async tool_call_update(event) {
-      const status = toolResultFrom(event, releaseStatus);
-      if (status && !status.ciPassing) {
-        console.log('release blocked by CI', { version: status.version });
-      }
-    },
+export const releaseMetrics = defineInProcessHook({
+  events: ['tool_call_update'],
+  execute: (event) => {
+    const status = toolResultFrom(event, releaseStatus);
+    if (status != null && !status.ciPassing) {
+      console.log('release blocked by CI', { version: status.version });
+    }
   },
 });
 ```
 
-This imports the `release_status` tool from [tools](/build/tools#write-a-tool), so `status` has that tool's output type.
+`status` has the tool's output type when the tool declares an `outputSchema`. An in-process hook runs only while the process that created the session is connected.
 
 ## Events you can handle
 
@@ -79,10 +71,25 @@ This imports the `release_status` tool from [tools](/build/tools#write-a-tool), 
 | --- | --- |
 | `session.opened` | A session starts. |
 | `turn.started`, `turn.ended` | A turn begins or ends. `turn.ended` includes the `stopReason`. |
+| `sandbox.attached` | A provided sandbox was attached to the session. `fresh` says its disk is new, `booted` that the machine just started. |
 | `tool_call`, `tool_call_update` | The agent calls a tool, and the call's status or result changes. |
-| `decision.created`, `decision.resolved` | A [decision](/client/sessions#handle-approvals) is created or answered. |
-| `agent_message`, `agent_message_chunk` | The agent writes text. |
+| `decision.created`, `decision.resolved` | A [decision](/client/sessions#handle-approvals) is created or answered: a permission, an elicitation, a sign-in, or a `bind` request. |
+| `agent_message`, `agent_message_chunk`, `agent_thought_chunk` | The agent writes text or reasoning. |
+| `usage_update` | Token usage changed. |
 | `session.failed`, `session.closed` | The session fails or closes. |
 | `*` | Every event. |
 
-Hooks can't stop or change a tool call, so use [approvals](/build/tools#ask-before-a-tool-runs) to require a person's OK. A hook can cancel the running turn with `ctx.cancel()`. Hooks run on Final like tools do, so they can use `fetch` and [`ctx.secrets`](/operate/authentication#use-secrets-in-your-code). Log IDs and outcomes, never secret values.
+Lifecycle events name objects by the API's IDs; ACP update events carry the ACP payload as is.
+
+## What a hook gets
+
+| Field | What it is |
+| --- | --- |
+| `event.type`, `event.data` | The event name and its data. |
+| `event.meta` | `id` (stable across redelivery), `at`, and `seq`. |
+| `ctx.sessionId`, `ctx.actingUserId` | The session and the person the turn acts for. |
+| `ctx.secrets.get(name)` | Reads a project secret the agent lists in `secrets`. |
+| `ctx.sandbox(capability)` | Opens the sandbox provided for a capability. |
+| `ctx.signal` | Fires when delivery is cancelled. |
+
+Hooks can't stop or change a tool call, so use [approvals](/build/tools#ask-before-a-tool-runs) to require a person's OK. Log IDs and outcomes, never secret values.

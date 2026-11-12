@@ -1,0 +1,178 @@
+---
+title: "Harnesses, ACP adapters, and environments"
+sidebarTitle: "Harnesses and adapters"
+description: "How Final composes a harness, an ACP adapter, and a compute environment, and how to publish your own."
+---
+
+Three independent pieces reach a model loop, and Final composes them per session:
+
+1. **A harness** is the agent program: Pi, Codex, Claude Code, nanocode, or your own. It knows nothing about Final and need not speak ACP.
+2. **An ACP adapter** maps one harness's native interface (an RPC protocol, an SDK, an app server) to [ACP](https://agentclientprotocol.com) v2 plus [Final's ACP extensions](/harnesses/acp-extensions). It's reusable across harnesses that share an interface. A harness that already speaks ACP v2 with the extensions needs none.
+3. **A compute environment** is where they run: a sandbox from any provider, or an ACP endpoint already running at a URL.
+
+Final speaks only ACP v2. For each session it starts the adapter wrapping the harness in the environment, and talks to the result over ACP. Harness settings name the three: `{ harness, adapter?, configuration, environment? }`.
+
+## Environments run programs
+
+Environments differ in what they can run:
+
+| Environment | Runs | Offers the model |
+| --- | --- | --- |
+| A machine: a Final computer, a Final Device, a Daytona sandbox, your own process | Processes: any command | Files and a shell |
+| Final's Workers runtime (`workers()`) | Worker programs built for it | Nothing of its own |
+| `atUrl({ url, hop })` | Nothing; the endpoint is already running | Whatever that agent does |
+
+A harness and its adapter each declare how they can run (a `process` command, a `worker` program, or both). Final picks a kind the environment, the harness, and the adapter all have, and refuses settings with none in common.
+
+A harness that uses files or a shell with its own tools, like Claude Code, works on the machine it runs on, so that machine must be the sandbox provided for `files` and `shell`. A harness on the Workers runtime drives whichever sandbox is provided for them, over Final's sandbox protocol.
+
+## Final's pieces
+
+| Harness | Interface | Default adapter | Runs as |
+| --- | --- | --- | --- |
+| `final`, `pi` | `pi-agent` | `pi-acp` | Worker program |
+| `nanocode-claude`, `nanocode-codex` | `nanocode` | `nanocode-acp` | Worker program |
+| `claude-code` | `claude-agent-sdk` | `claude-code-acp` | Process (`claude`) |
+| `codex` | `codex-app-server` | `codex-acp` | Process (`codex app-server`) |
+| `acp-agent` | ACP v2 | None | At a URL |
+
+The process adapters are public packages: `@finalai/acp-adapter-claude-code` runs Claude Code through the Claude Agent SDK, and `@finalai/acp-adapter-codex` runs the Codex app server. Both speak ACP v2 with Final's extensions on stdio, and each runs with `npx` on the machine, which needs Node.js and the harness's CLI installed. You can also run either adapter yourself and reach it with `atUrl`.
+
+`FINAL_HARNESS_DEFINITIONS` and `FINAL_ACP_ADAPTERS` from `@finalai/agents/harnesses` are the definitions Final publishes, useful as references for your own.
+
+## Define your own harness
+
+A harness definition is data: what its configuration looks like, what it supports, and how to start it. `defineHarness` validates it:
+
+```ts harness.ts
+import {
+  CredentialDelivery,
+  defineHarness,
+  HarnessFeature,
+  InferenceSourceKind,
+  PermissionLevel,
+} from '@finalai/agents';
+
+export const harness = defineHarness({
+  title: 'My CLI',
+  configurationSchema: {
+    type: 'object',
+    properties: { model: { type: 'string' } },
+    required: ['model'],
+  },
+  features: [HarnessFeature.McpTools, HarnessFeature.SystemInstructions],
+  lowestPermission: PermissionLevel.Ask,
+  inference: { kinds: [InferenceSourceKind.ApiKey], delivery: CredentialDelivery.AtOpen },
+  native: { files: {}, shell: {} },
+  interface: 'my-cli-rpc',
+  adapter: 'my-cli-acp',
+  run: {
+    process: {
+      command: 'my-cli',
+      args: ['--rpc', { when: 'configuration.model', args: ['--model', '{{configuration.model}}'] }],
+    },
+  },
+});
+```
+
+<ParamField path="configurationSchema" type="JSON Schema" required>
+  Everything a caller can configure: model, reasoning, inference, permission mode, and anything harness-specific. Final validates settings against it, and pickers render it without running your code.
+</ParamField>
+
+<ParamField path="features" type="HarnessFeature[]" required>
+  What it supports of an agent: `skills`, `mcpTools`, `nativeToolPolicy`, `systemInstructions`. An agent that uses a feature you don't list can't run on it unless it marks the feature optional.
+</ParamField>
+
+<ParamField path="lowestPermission" type="'ask' | 'review' | 'auto'" required>
+  The strictest level it can be held to. A harness that can't ask before acting is `auto`, and can only run agents whose ceiling is `auto`.
+</ParamField>
+
+<ParamField path="inference" type="{ kinds, delivery, vendors? }" required>
+  The [inference sources](/harnesses/settings#inference-sources) it can use, and whether credentials are delivered when it opens (`at-open`) or per request (`per-request`).
+</ParamField>
+
+<ParamField path="native" type="{ files?, shell? }">
+  The capabilities it uses with its own tools on the machine it runs on. That machine then serves them.
+</ParamField>
+
+<ParamField path="interface" type="string" default="acp-v2">
+  The native interface an ACP adapter maps.
+</ParamField>
+
+<ParamField path="adapter" type="string | null">
+  The ACP adapter it runs behind unless settings name another.
+</ParamField>
+
+<ParamField path="run" type="{ process?, worker? }">
+  How to start it. A `process` entry is a command whose `args` and `env` are templates over the settings' configuration: `{{configuration.model}}` inserts a value, and `{ when, args }` includes a group only when a value is set. A `worker` entry names a program built for a worker runtime.
+</ParamField>
+
+Definitions also carry ACP behaviour Final relies on: `supports` (`observe`, `resumeReplay`, `fork`, `authorMeta`, `deferredToolSearch`), `promptWhileRunning`, `sessionSurvivesDisconnect`, and the MCP transports it accepts (`mcp`).
+
+## Define an ACP adapter
+
+An adapter definition names the interfaces it adapts, how to start it, and the Final extensions it implements:
+
+```ts adapter.ts
+import { defineAcpAdapter, FinalExtension } from '@finalai/agents';
+
+export const adapter = defineAcpAdapter({
+  title: 'My CLI ACP adapter',
+  adapts: ['my-cli-rpc'],
+  run: {
+    process: {
+      command: 'my-cli-acp',
+      args: ['--', '{{harness.command}}', { spread: 'harness.args' }],
+    },
+  },
+  extensions: [
+    FinalExtension.Observe,
+    FinalExtension.AuthorMeta,
+    FinalExtension.ResumeReplay,
+    FinalExtension.AfterSeqReplay,
+  ],
+});
+```
+
+An adapter's process entry wraps the harness's: `{{harness.command}}` is the harness command and `{ spread: 'harness.args' }` its arguments. The process speaks ACP v2 on stdio. `configuration` says whether settings reach the harness through launch arguments (`launch`, the default) or as ACP session config options (`config-options`).
+
+`extensions` must include every [required extension](/harnesses/acp-extensions#what-an-adapter-must-implement). Final reads the adapter's `initialize` advertisement when a session opens and refuses one that doesn't advertise them.
+
+The fastest way to write an adapter is `createAdapterAgent` from `@finalai/acp-session/agent`: it takes a program that runs one model turn at a time and serves it as an ACP v2 agent with every extension implemented. See [Final's ACP extensions](/harnesses/acp-extensions).
+
+## Publish and use them
+
+Publish a harness or adapter by name, like an agent. Each is stored by content hash:
+
+```bash
+npx final-agents publish ./adapter.ts --name my-cli-acp
+npx final-agents publish ./harness.ts --name my-cli
+```
+
+Or from code with `project.acpAdapters.publish({ adapter, name })` and `project.harnesses.publish({ harness, name })`. Then name it in harness settings:
+
+```ts
+import { apiKey, type HarnessSettingsIface } from '@finalai/agents/harnesses';
+
+const settings: HarnessSettingsIface = {
+  harness: 'my-cli',
+  configuration: { model: 'my-model', inference: [apiKey('MY_CLI_KEY')] },
+  environment: box.id,
+};
+```
+
+A project can name its own harnesses, its parent projects', and Final's public catalog. For a subscription to reach your harness, allow it with `project.harnesses.allowances.allow({ harness: 'my-cli' })`.
+
+## Test conformance
+
+`final-agents conformance` runs the conformance kit against a harness implementation. Certify an adapter with the `final-required` profile, which fails every Final extension the adapter doesn't implement:
+
+```bash
+npx final-agents conformance ./my-harness.ts --profile final-required
+```
+
+The module exports the harness as its default export, or pass `--export <name>`. `--json` prints the report as JSON.
+
+## Reach a harness some other way
+
+A harness that isn't a program its environment runs, like a hosted fleet or a vendor's API, carries the code that reaches it: `defineHarness({ ..., provider: defineHarnessProvider({ open, resume, park, close, health }) })`. `open` and `resume` return an ACP endpoint; `park`, `close`, and `health` follow its lifecycle. The provider runs on Final's serverless runtime, so it's self-contained like a [serverless tool](/build/tools#keep-it-self-contained), or a bundled module passed as `{ source }`.
