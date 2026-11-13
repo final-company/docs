@@ -27,6 +27,7 @@ Final doesn't replace your coding agent. It gives the agent a computer to work o
 
         ```ts agent.ts
         import { defineAgent, markdown } from '@finalai/agents';
+        import { FinalHarness } from '@finalai/agents/harnesses';
 
         export const agent = defineAgent({
           name: 'Storefront Coder',
@@ -34,7 +35,7 @@ Final doesn't replace your coding agent. It gives the agent a computer to work o
           require: {
             harness: {
               permissionMode: 'review',
-              recommended: { harness: 'nanocode-claude', model: 'claude-opus-5-5' },
+              recommended: { harness: FinalHarness.NanocodeClaude, model: 'claude-opus-5-5' },
             },
             compute: { files: 'write', shell: 'execute' },
           },

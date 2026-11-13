@@ -99,7 +99,7 @@ export const agent = defineAgent({
     ```
   </Step>
   <Step title="Let Final reach the repository">
-    The sandbox setup clones `acme/acme-web` from the git host connected to your project. Replace it with your repository, and make sure Final's GitHub App can reach it.
+    The sandbox setup clones `https://github.com/acme/acme-web.git` inside the computer. Replace it with your repository's HTTPS URL. A public repository needs nothing more. For a private one, create an [egress integration](/build/integrations#credentials-for-a-sandboxs-traffic) that holds a token for `github.com`, and name it on the repository's entry with `integration`.
   </Step>
 </Steps>
 
@@ -121,7 +121,7 @@ const terminal = createInterface({ input: process.stdin, output: process.stdout 
 
 // What should be on the machine. Paths are relative to the sandbox's working directory.
 const setup = defineSandboxSetup({
-  repositories: [{ alias: 'acme-web', repository: 'acme/acme-web', ref: 'main' }],
+  repositories: [{ alias: 'acme-web', url: 'https://github.com/acme/acme-web.git', ref: 'main' }],
   steps: [{ name: 'Install dependencies', cwd: 'acme-web', run: 'npm ci' }],
   notes: 'The repository is checked out in acme-web. Run tests from there.',
 });

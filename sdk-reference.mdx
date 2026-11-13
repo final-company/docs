@@ -4,23 +4,27 @@ description: "Imports, client methods, CLI commands, and environment variables i
 icon: "book"
 ---
 
-`@finalai/agents` contains three things: helpers for defining agents, a client for starting and talking to them, and the `final-agents` CLI. Install it with `npm install @finalai/agents zod`. It requires Node.js 26 or later for the CLI and local compute; the authoring helpers and client also run in browser-compatible runtimes. Full signatures are in the package's TypeScript declarations.
+`@finalai/agents` contains three things: helpers for defining agents, a client for starting and talking to them, and the `final-agents` CLI. Install it with `npm install @finalai/agents zod`. It requires Node.js 26 or later for the CLI and local compute; the authoring helpers and client also run in browsers, React Native, and Workers. Full signatures are in the package's TypeScript declarations.
 
 ## Imports
 
 | Import | Use it for | Main exports |
 | --- | --- | --- |
 | `@finalai/agents` | Defining agents, harnesses, and adapters | `defineAgent`, `defineServerlessTool`, `defineInProcessTool`, `defineServerlessHook`, `defineInProcessHook`, `markdown`, `skill`, `files`, `documentOf`, `defineHarness`, `defineAcpAdapter`, `defineHarnessProvider`, `HarnessFeature`, `PermissionLevel`, `FinalExtension` |
-| `@finalai/agents/harnesses` | [Harness settings](/harnesses/settings) and inference | `serverlessFinal`, `serverlessPi`, `serverlessNanocodeClaude`, `serverlessNanocodeCodex`, `claudeCode`, `codex`, `acpAgent`, `atUrl`, `FinalHarness`, `subscription`, `apiKey`, `finalCredits`, `harnessLogin` |
+| `@finalai/agents/harnesses` | [Harness settings](/harnesses/settings) and inference | `serverlessFinal`, `serverlessPi`, `serverlessNanocodeClaude`, `serverlessNanocodeCodex`, `claudeCode`, `codex`, `acpAgent`, `atUrl`, `FinalHarness`, `subscription`, `apiKey`, `finalCredits`, `harnessLogin`, `FINAL_HARNESS_DEFINITIONS`, `FINAL_ACP_ADAPTERS` |
 | `@finalai/agents/sandboxes` | [Sandbox](/build/sandboxes) environments and [setups](/build/sandbox-setups) | `computer`, `device`, `workers`, `defineSandboxSetup` |
 | `@finalai/agents/integrations` | [Integration](/build/integrations) auth | `oauth`, `secret`, `platformIdentity`, `noAuth`, `finalGateway` |
 | `@finalai/agents/approval` | [Approval policies](/build/tools#ask-before-a-tool-runs) | `always`, `never`, `whenInput` |
 | `@finalai/agents/tools` | Tools and their results | `defineServerlessTool`, `defineInProcessTool`, `toolResultFrom` |
 | `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineServerlessHook`, `defineInProcessHook`, `HookEvent` |
-| `@finalai/agents/channels` | [Channels](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS` |
-| `@finalai/agents/channels/final` | Final's own chat surface | `finalChannel` |
-| `@finalai/agents/client` | Starting and talking to agents | `createClient`, `sessionUpdateOf`, `textOf`, `isRequirementsUnmetError`, `isClientError`, `Capability`, and the API's types and enums |
+| `@finalai/agents/channels` | [Channels](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS`, `ChannelSigningAlgorithm`, `ChannelSignatureEncoding`, `ChannelCredentialKind` |
+| `@finalai/agents/client` | Starting and talking to agents, in Node, browsers, React Native, and Workers | `createClient`, `sessionUpdateOf`, `textOf`, `isRequirementsUnmetError`, `isClientError`, `Capability`, and the API's types and enums |
+| `@finalai/agents/verify` | [Verifying tokens Final signs](/build/integrations#verify-calls-from-final) | `verifyPlatformIdentity`, `verifyAccessToken`, `verifyHumanInput` |
+| `@finalai/agents/webhooks` | [Event webhooks](/operate/events#receive-webhooks) | `verifyWebhook` |
+| `@finalai/agents/testing` | Testing code that uses the client | `createFakeFetch`, `createFakeTransport` |
 | `@finalai/daytona-agent-provider/sandboxes` | Daytona sandboxes | `daytona` |
+
+Lower-level packages are public too, each with its own README: [`@finalai/agent-provider`](https://www.npmjs.com/package/@finalai/agent-provider) (the provider contracts and conformance kits), [`@finalai/acp-session`](https://www.npmjs.com/package/@finalai/acp-session) (ACP validation, Final's extensions, and the adapter toolkit), [`@finalai/agent-protocol`](https://www.npmjs.com/package/@finalai/agent-protocol) (the API's wire contracts), and the [`@finalai/acp-adapter-claude-code`](https://www.npmjs.com/package/@finalai/acp-adapter-claude-code) and [`@finalai/acp-adapter-codex`](https://www.npmjs.com/package/@finalai/acp-adapter-codex) adapters. The [`@finalai/agents` README](https://www.npmjs.com/package/@finalai/agents) summarizes the SDK.
 
 ## Client
 
@@ -31,14 +35,19 @@ icon: "book"
 | Property | What it does |
 | --- | --- |
 | `sessions` | `create({ agent, provide, id?, actor?, message? })` starts a session; `attach(id)` returns a handle by ID. A handle sends messages, streams events, lists and answers decisions, reads `requirements()` and `provide()`, and cancels or closes. See [sessions](/client/sessions). |
-| `conversations` | `create`, `direct`, and `home` take `provide`; `findDirect` and `findHome` look up without creating. A handle's `addParticipant` and `participants.provide` set each agent's settings. See [conversations](/client/conversations). |
-| `agents` | `publish({ agent, name })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent })`, and `parse(json)`. See [publishing](/operate/publishing). |
+| `conversations` | `create` and `direct` take `provide`; `findDirect` looks up without creating. A handle's `addParticipant` and `participants.provide` set each agent's settings, and it has `inputs`, `context`, `labels`, and schedules. See [conversations](/client/conversations). |
+| `agents` | `publish({ agent, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent })`, and `parse(json)`. See [publishing](/operate/publishing). |
 | `sandboxes` | `create(environment, { setup?, ownedBy?, idempotencyKey? })`, `get`, `list`, and `providers()`. A handle runs commands, reads its `description()`, and deletes the sandbox. |
 | `sandboxSetups` | `publish({ name, setup })`, `get`, and `list`. See [sandbox setups](/build/sandbox-setups). |
-| `integrations` | `create`, `get`, `list`, `delete`, and a person's `signIn`, `completeSignIn`, and `signOut`. See [integrations](/build/integrations). |
+| `sandboxProviders` | `register({ name, url })`, `list`, `get`, `update`, `refresh`, and `remove` for providers you run. See [run your own provider](/build/sandboxes#run-your-own-provider). |
+| `integrations` | `create`, `get`, `list`, `update`, `delete`, and a person's `signIn`, `completeSignIn`, and `signOut`. See [integrations](/build/integrations). |
 | `harnesses` | `check({ agent, harness })`, `publish({ harness, name })`, `get`, `list`, and `allowances`. See [harness settings](/harnesses/settings). |
 | `acpAdapters` | `publish({ adapter, name })`, `get`, and `list`. See [harnesses and adapters](/harnesses/overview). |
-| `channels` | `publish({ name, source })`, `get`, and `install({ channel, connectorInstallId, agents: { provide } })`. See [channels](/build/channels). |
+| `channels` | `publish({ name, source })`, `get`, `install({ channel, agent, app?, agents: { provide } })`, and `installs()`. See [channels](/build/channels). |
+| `channelApps` | `create`, `list`, `update`, and `delete` for provider app credentials. |
+| `schedules` | `list()` every schedule in the project's conversations. See [schedules](/build/schedules). |
+| `events`, `eventSubscriptions` | The project's event feed and webhooks. See [events and webhooks](/operate/events). |
+| `publisher`, `publicNames` | Claim a publisher handle and make names public. See [make a name public](/operate/publishing#make-a-name-public). |
 
 The client itself also has:
 
@@ -46,8 +55,13 @@ The client itself also has:
 | --- | --- |
 | `sessions` | `attach`, `get`, and `fork` for existing sessions by ID. |
 | `conversations` | The signed-in person's conversations: `list`, `get`, `search`, and `decisions`. |
-| `schedules` | `list`, `update` (including `provide`), and `runNow`. See [schedules](/build/schedules). |
-| `agents` | `list` the agents the caller can use. |
+| `channelBindings`, `channelTickets` | Channel installs by ID, and the tickets an installer's link and connect pages complete. |
+| `agents` | `list` the agents the caller can use, and `get({ id })` one in whichever project owns it. |
+| `publishers` | `get(handle)` reads a publisher's public agents, harnesses, adapters, and channels. |
+| `organization` | Model credentials and their grants, budgets, and spending restrictions. See [subscriptions and keys](/harnesses/settings#subscriptions-and-keys). |
+| `inference` | `offering()` lists the models Final's metered inference serves, with prices. |
+| `events` | The event feed across everything the caller can see. |
+| `projects` | List and create projects. |
 | `people` | List your organization's members, for adding people to conversations. |
 | `close()` | End the client's open streams and local connections. |
 

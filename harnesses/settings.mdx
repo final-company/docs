@@ -8,8 +8,8 @@ The harness is the program that runs the model loop: it sends the conversation t
 
 ```js
 {
-  harness: 'pi',                       // a published harness name
-  adapter: 'pi-acp',                   // optional: the ACP adapter, if not the harness's default
+  harness: 'final/pi',                 // a published harness name
+  adapter: 'final/pi-acp',             // optional: the ACP adapter, if not the harness's default
   configuration: {                     // validated against the harness's configuration schema
     model: 'gpt-6.1-sol',
     reasoning: 'high',
@@ -33,9 +33,11 @@ The builders in `@finalai/agents/harnesses` return exactly this shape for Final'
 | `codex` | `codex`: the Codex CLI itself | A process on a machine | `minimal`, `low`, `medium`, `high` |
 | `acpAgent` | `acp-agent`: any agent that already speaks ACP v2 with [Final's extensions](/harnesses/acp-extensions) | Already running, at its URL | Its own |
 
-Every builder takes `model`, `inference`, `permissionMode`, and `environment`; the serverless ones require `model`. The model is a string the harness validates, so a provider-qualified ID such as `openrouter/deepseek/deepseek-v4.1-flash` works where the harness accepts it.
+Final can't hold an agent reached with `acpAgent` to `ask` or `review`, so it runs only agents whose permission ceiling is `auto`.
 
-`project.harnesses.list()` returns every harness your project can name: its own, its parent projects', and Final's public catalog.
+Every builder takes `model`, `inference`, `permissionMode`, and `environment`; the serverless ones require `model`. The model is a string the harness validates, so a provider-qualified ID such as `openrouter/deepseek/deepseek-v4.1-flash` works where the harness accepts it. There's no default model.
+
+Settings name Final's harnesses by Final's publisher handle and the harness's name, like `final/pi`, so they resolve from any project. `FinalHarness` from `@finalai/agents/harnesses` has every one of them. `project.harnesses.list()` returns the harnesses your project can name without a handle, its own and its parent projects', and `client.publishers.get('final').harnesses.list()` lists Final's public ones.
 
 ## Where the harness runs
 
@@ -51,7 +53,7 @@ Every builder takes `model`, `inference`, `permissionMode`, and `environment`; t
 
   The Workers runtime runs only programs built for it and gives the model no files or shell of its own. A harness there drives the sandboxes provided for `files` and `shell`, wherever they are.
 
-  Schedules and channel installs store their settings for runs that start later, so they name the sandbox: create one with `project.sandboxes.create(workers(), { idempotencyKey: 'workers' })` and pass its `id` as `environment`.
+  A channel install stores its settings for turns that start later, so it names the sandbox: create one with `project.sandboxes.create(workers(), { idempotencyKey: 'workers' })` and pass its `id` as `environment`.
 
 - **A machine sandbox** for Claude Code and Codex: a computer, a Final Device, or another provider's machine. They use their own file and shell tools on the machine they run on, so that machine is also what's provided for `files` and `shell`. Leave `environment` out and they run on the sandbox provided for `shell`:
 
@@ -120,9 +122,15 @@ A source the harness can't use is skipped. A personal subscription that isn't co
 | `claude-code`, `codex` | `harnessLogin`, `subscription`, `apiKey`, `finalCredits` |
 | `acp-agent` | `harnessLogin` |
 
-Each person connects their own subscriptions in Final. A project chooses which harnesses subscriptions may reach: `project.harnesses.allowances.list()`, `.allow({ harness })`, and `.revoke({ harness })`. Final's own harnesses are allowed by default.
+When a vendor refuses a request because a subscription or API key hit its usage or rate limit, Final sends that request again on the next source in the list, such as `finalCredits()`, and tries the subscription first again once its limit resets. A model that Final's metered inference doesn't serve can't fall through to `finalCredits()`; `client.inference.offering()` lists the vendors and models it serves, with prices.
 
 Your Final API key is never used for model calls. Model calls always follow the `inference` the caller provides.
+
+### Subscriptions and keys
+
+Subscriptions and vendor API keys are **model credentials**, connected in Final's apps or with `client.organization.modelCredentials` (`connectApiKey`, `connectClaudeSubscription`, and `startChatGptSubscription`). Each belongs to a project: a credential in a person's own project is theirs, and one in a shared project is usable by that project's members and the projects below it. `modelCredentials.grants.create({ credentialId, granteeKind, granteeId })` shares one with another project or member, and nothing is shared organization-wide.
+
+A project chooses which harnesses subscriptions may reach: `project.harnesses.allowances.list()`, `.allow({ harness })`, and `.revoke({ harness })`. Final's own harnesses are allowed by default. Spending limits on model use are set with `client.organization.budgets` and `client.organization.spendingRestrictions`.
 
 ## Permission mode
 

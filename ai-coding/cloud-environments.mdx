@@ -78,7 +78,7 @@ export const environment = computer({
 
 // Applied to every new computer.
 export const setup = defineSandboxSetup({
-  repositories: [{ alias: 'storefront', repository: 'acme/storefront', ref: 'main' }],
+  repositories: [{ alias: 'storefront', url: 'https://github.com/acme/storefront.git', ref: 'main' }],
   steps: [{ cwd: 'storefront', run: './scripts/setup.sh' }],
   services: [{ name: 'web', cwd: 'storefront', run: 'npm run dev -- --port 3000', port: 3000 }],
   commands: {
@@ -173,7 +173,7 @@ To share a preview with someone else, open the computer's **Settings** tab, ente
     A `build.steps` or `build.verify` command exited with an error. Run the same commands on a computer created from the same image to see the output, fix the step, and try again. Final retries temporary failures on its own before it marks a build failed.
   </Accordion>
   <Accordion title="A setup step fails because a checkout is missing">
-    A step uses a repository alias as `cwd`, but no repository with that alias was checked out. Check that the alias in `repositories` matches the `cwd` exactly, and that the project can reach the repository.
+    A step uses a repository alias as `cwd`, but no repository with that alias was checked out. Check that the alias in `repositories` matches the `cwd` exactly. A private repository also needs an `integration` on its entry that holds a credential for its host; see [sandbox setups](/build/sandbox-setups#setup-reference).
   </Accordion>
   <Accordion title="A setup step fails">
     The computer isn't used until required steps succeed. Run the step by hand on the computer to see its output, fix your setup script, and try again; steps that already finished aren't run again.

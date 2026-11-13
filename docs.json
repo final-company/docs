@@ -114,6 +114,7 @@
             "pages": [
               "operate/authentication",
               "operate/publishing",
+              "operate/events",
               "operate/troubleshooting"
             ]
           },

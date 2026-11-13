@@ -5,9 +5,9 @@ description: "Send signed deployment events from CI to a shared Final chat."
 icon: "rocket"
 ---
 
-This agent explains deployment events and log excerpts that CI sends. A channel verifies each signed event and hands it to a Shared chat in Final, where the agent replies and suggests a next check. The agent has no rollback tool, so it can't change your deployment.
+This agent explains deployment events and log excerpts that CI sends. A channel verifies each signed event and hands it to a Shared chat in Final as an input, and the agent replies there and suggests a next check. The agent has no rollback tool, so it can't change your deployment.
 
-**What it shows:** a [channel](/build/channels) with an authenticated webhook route, a project [secret](/operate/authentication#use-secrets-in-your-code), idempotent delivery, and [publishing and installing](/build/channels#publish-and-install) a channel with what its chats are provided.
+**What it shows:** a [channel](/build/channels) with an authenticated webhook route, a provider app requirement met by a channel app and a project [secret](/operate/authentication#use-secrets-in-your-code), idempotent delivery, and [publishing and installing](/build/channels#publish-and-install) a channel with the agent that answers and what it's provided.
 
 ## Files
 
@@ -29,13 +29,17 @@ The agent needs only a harness:
 
 ```ts agent.ts
 import { defineAgent, markdown } from '@finalai/agents';
+import { FinalHarness } from '@finalai/agents/harnesses';
 
 export const agent = defineAgent({
   name: 'Deployment watcher',
   description: 'Explains deployment events and log excerpts from CI.',
   instructions: markdown('./instructions.md', { from: import.meta.url }),
   require: {
-    harness: { permissionMode: 'ask', recommended: { harness: 'final', model: 'deepseek-v4.1-flash' } },
+    harness: {
+      permissionMode: 'ask',
+      recommended: { harness: FinalHarness.Final, model: 'deepseek-v4.1-flash' },
+    },
   },
 });
 ```
@@ -49,10 +53,15 @@ Do not attempt a rollback or other change.
 
 ### The channel
 
-The channel exposes `POST /webhook`. It checks the HMAC signature against the `DEPLOY_WEBHOOK_SECRET` project secret, validates the event, and passes it into the chat its place is connected to. A place that isn't connected yet gets a refusal with a link to connect it:
+The channel exposes `POST /webhook`. It declares one secret slot, `signing_secret`, has Final check each event's HMAC signature with it, validates the event, and passes it into the chat its place is connected to. A place that isn't connected yet gets a refusal:
 
 ```ts channels/deploys.ts
-import { defineChannel, POST } from '@finalai/agents/channels';
+import {
+  ChannelSignatureEncoding,
+  ChannelSigningAlgorithm,
+  defineChannel,
+  POST,
+} from '@finalai/agents/channels';
 import * as z from 'zod';
 
 const eventSchema = z.object({
@@ -62,28 +71,27 @@ const eventSchema = z.object({
   idempotencyKey: z.string(),
 });
 
-const verifySignature = async (secret: string, signature: string, body: string) => {
-  if (!/^[a-f0-9]{64}$/i.test(signature)) return false;
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey('raw', encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-  const bytes = new Uint8Array(Array.from({ length: 32 }, (_, i) =>
-    Number.parseInt(signature.slice(i * 2, i * 2 + 2), 16)));
-  return crypto.subtle.verify('HMAC', key, bytes, encoder.encode(body));
-};
-
 export default defineChannel({
   name: 'deploys',
-  credentials: { app: null, secrets: ['DEPLOY_WEBHOOK_SECRET'] },
+  require: {
+    app: {
+      description: 'Your CI system',
+      secrets: { signing_secret: { description: 'The secret CI signs deployment events with' } },
+    },
+  },
   identity: { kind: 'none' },
   places: { kinds: ['webhook'] },
   routes: [
     POST('/webhook', async (ctx) => {
       const body = await ctx.request.text();
-      const secret = await ctx.credentials.secret('DEPLOY_WEBHOOK_SECRET');
-      const signature = (ctx.request.headers.get('x-signature') ?? '').replace(/^sha256=/, '');
-      if (secret == null || !(await verifySignature(secret, signature, body)))
-        return new Response('Invalid signature', { status: 401 });
+      const valid = await ctx.credentials.verify({
+        secret: 'signing_secret',
+        algorithm: ChannelSigningAlgorithm.HmacSha256,
+        encoding: ChannelSignatureEncoding.Hex,
+        data: body,
+        signature: (ctx.request.headers.get('x-signature') ?? '').replace(/^sha256=/, ''),
+      });
+      if (!valid) return new Response('Invalid signature', { status: 401 });
       let event: z.infer<typeof eventSchema>;
       try {
         event = eventSchema.parse(JSON.parse(body));
@@ -102,8 +110,7 @@ export default defineChannel({
         accepted: false,
         refusal: {
           refused: 'unconnected',
-          message: 'Connect this deployment feed to a chat.',
-          connectUrl: route.connectUrl,
+          message: 'Connect this deployment feed to a chat in Final.',
         },
       };
     const result = await ctx.conversation(route.conversation).input({
@@ -135,7 +142,7 @@ A channel's handlers always run on Final's serverless runtime, and a channel is 
     Add the files above. Export your [API key](/api-keys) as `FINAL_API_KEY` and the project's ID as `FINAL_PROJECT_ID`.
   </Step>
   <Step title="Create the webhook secret">
-    Generate a random value. In Final, add it under **Developer** > **Secrets** as `DEPLOY_WEBHOOK_SECRET`, and store the same value in your CI secret store. The channel names the secret; its value never appears in source.
+    Generate a random value. In Final, add it under **Developer** > **Secrets** as `DEPLOY_WEBHOOK_SECRET`, and store the same value in your CI secret store. The channel names only its slot; a channel app fills the slot with this secret, and the value never reaches channel code.
   </Step>
   <Step title="Publish the agent">
     ```bash
@@ -143,7 +150,7 @@ A channel's handlers always run on Final's serverless runtime, and a channel is 
     ```
   </Step>
   <Step title="Create a Shared chat with the agent">
-    In the Final web app, open the project, choose **+** > **New Chat**, select **your own name and Deployment watcher**, and choose **Start chat**. The first agent in a chat answers by default, so events reach it without a mention. Do this signed in as yourself; see [create a Shared chat](/build/channels#create-a-shared-chat-in-final).
+    In the Final web app, open the project, choose **+** > **New Chat**, select **your own name and Deployment watcher**, and choose **Start chat**. Selecting the agent alone opens your direct chat instead, so include yourself. The first agent in a chat answers by default, so events reach it without a mention.
   </Step>
   <Step title="Bundle, publish, and install the channel">
     Bundle the channel into one file:
@@ -152,7 +159,7 @@ A channel's handlers always run on Final's serverless runtime, and a channel is 
     npx esbuild channels/deploys.ts --bundle --format=esm --platform=browser --outfile=dist/deploys.js
     ```
 
-    Then publish it by name and install it. `install` takes the ID of the connection the install belongs to, from the project's **Connectors** page in Final, and `agents.provide`: what the project's agent gets in any chat the install creates. The call fails with `requirements_unmet`, creating nothing, unless that meets the agent's requirements.
+    Then publish it by name, create the channel app that fills its `signing_secret` slot, and install it. `install` takes the agent that answers, the channel app, and `agents.provide`: what the agent gets in the chats the install reaches. The call fails with `requirements_unmet`, creating nothing, unless that meets the agent's requirements and the app meets the channel's.
 
     ```ts client.ts
     import { createClient } from '@finalai/agents/client';
@@ -171,19 +178,21 @@ A channel's handlers always run on Final's serverless runtime, and a channel is 
     import { workers } from '@finalai/agents/sandboxes';
     import { client, project } from './client.js';
 
-    const connectorInstallId = process.argv[2];
-    if (connectorInstallId == null) throw new Error('Usage: npx tsx install-channel.ts CONNECTOR_INSTALL_ID');
-
     await project.channels.publish({
       name: 'deploys',
       source: await readFile('dist/deploys.js', 'utf8'),
     });
 
+    const app = await project.channelApps.create({
+      name: 'deploys',
+      secrets: { signing_secret: 'DEPLOY_WEBHOOK_SECRET' },
+    });
     const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
-    const binding = await project.channels.install({
+    const installed = await project.channels.install({
       channel: { name: 'deploys' },
-      connectorInstallId,
-      // What the project's agent gets in each chat this install creates.
+      agent: { name: 'deployment-watcher' },
+      app: app.id,
+      // What the agent gets in the chats this install reaches.
       agents: {
         provide: {
           harness: serverlessFinal({
@@ -194,13 +203,13 @@ A channel's handlers always run on Final's serverless runtime, and a channel is 
         },
       },
     });
-    for (const route of binding.routes) console.log(route.method, route.path, route.aliasUrl ?? route.url);
+    for (const route of installed.routes) console.log(route.method, route.path, route.aliasUrl ?? route.url);
 
     client.close();
     ```
 
     ```bash
-    npx tsx install-channel.ts YOUR_CONNECTOR_INSTALL_ID
+    npx tsx install-channel.ts
     ```
 
     Copy the URL printed for `POST /webhook` to CI as `CHANNEL_WEBHOOK_URL`. Prefer the alias URL, which stays the same if names change.
@@ -241,7 +250,7 @@ console.log('Deployment event accepted.');
 node send-deploy.mjs
 ```
 
-The first event discovers the `production-deploys` place, which isn't connected yet, so the route returns `403` with `refusal.connectUrl`. Open that link while signed in to Final, connect the place to the Shared chat you created, and run the sender again with the same `idempotencyKey`.
+The first event discovers the `production-deploys` place, which isn't connected yet, so the route returns `403`. In Final, open the Shared chat you created, choose **Connect a place…** under **Connected** in the chat's details, pick the `deploys` install, and choose **Production deploys**. Then run the sender again with the same `idempotencyKey`. From code, a manager of the chat does the same with `chat.channelRoutes.connect({ bindingId, place, policy })`.
 
 Use the real CI run ID in `idempotencyKey`, and keep it unchanged when retrying an event, so the agent never sees it twice. `401` means the signature or the stored secret differs; `400` means the body doesn't match the event shape.
 
@@ -250,5 +259,5 @@ The chat receives a captioned deployment input and the agent's answer. For examp
 ## Extend it
 
 - **Give the agent more to read.** Add read-only [serverless tools](/build/tools) for deployment logs or service status, and say when to use them in the instructions. Keep remediation tools behind [approval](/build/tools#ask-before-a-tool-runs).
-- **Update the channel.** An install runs the version the name pointed at when you installed it. Bundle and publish `deploys` again, then install it again with `replace: true` to move the install to the new version.
+- **Update the channel.** Bundle and publish `deploys` again, then move the install to the new version with `client.channelBindings.update({ bindingId, revision, channel: { name: 'deploys' } })`, passing the `revision` you last read.
 - **Stop delivery.** Disconnect the place from the chat's **Connected** section. This channel is inbound-only; it doesn't mirror chat replies to CI.

@@ -85,8 +85,8 @@ Everything under `_meta["final.ai"]` is informational: a harness that ignores a 
 | `stopReason` | The idle `state_update` that ends a turn | A stop reason outside ACP's set. |
 | `providerError` | The idle `state_update` of a turn that stopped with `error` | The model provider's error: `code`, `message`, `retryable`. |
 | `subscription` | `usage_update` | Which vendor subscription a turn counted against. |
-| `card` | `tools/call` results, `elicitation/create` | A card for clients to render. |
-| `entityLinks` | `elicitation/create` | What an approval request is about. |
+| `card` | `tools/call` results, `elicitation/create` | A card for clients to render: `{ title, spec }`, a [json-render](https://json-render.dev/) spec using only the catalogue's components. |
+| `entityLinks` | `elicitation/create` | Pages about what an approval request asks to approve, each `{ url }`. |
 | `audience` | Pending requests as Final republishes them | Which participants a request is for. |
 | `respondingUserId` | Request outcomes Final resolves | Who answered. |
 | `patchResource` | `diff` tool call content | A large patch moved to storage, as a resource link. |
@@ -106,3 +106,7 @@ npx final-agents conformance ./my-harness.ts --profile final-required
 ```
 
 `@finalai/acp-adapter-claude-code` and `@finalai/acp-adapter-codex` are complete adapters built this way.
+
+## Cards
+
+`@finalai/acp-session/cards` is the card contract. `validateCard` parses a card and returns it, or issues with exact JSON Pointer paths that `cardIssuesText` turns into text a model can repair the card from. `CARD_GUIDANCE` describes the catalogue to a model, and `cardFixtures` cover every component and action for testing a renderer. See the [`@finalai/acp-session` README](https://www.npmjs.com/package/@finalai/acp-session).

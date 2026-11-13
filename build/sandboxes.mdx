@@ -47,7 +47,7 @@ const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
 const sessionId = crypto.randomUUID();
 const box = await project.sandboxes.create(computer({ image: 'docker.io/library/node:26-bookworm' }), {
   setup: defineSandboxSetup({
-    repositories: [{ alias: 'web', repository: 'acme/web', ref: 'main' }],
+    repositories: [{ alias: 'web', url: 'https://github.com/acme/web.git', ref: 'main' }],
     steps: [{ cwd: 'web', run: 'npm ci' }],
   }),
   ownedBy: { session: sessionId },
@@ -110,7 +110,7 @@ const description = await box.description();
 console.log(description.checkouts); // [{ alias: 'web', path: '/.../web', ... }]
 ```
 
-`box.description()` lists real checkout paths, service URLs, named commands, and the setup's notes. The same description is a file in the sandbox, but Final doesn't put it in the agent's context; add what the agent should know to its message or the chat's instructions.
+`box.description()` lists real checkout paths, service URLs, named commands, and the setup's notes. The same description is a file in the sandbox, but Final doesn't put it in the agent's context; add what the agent should know to its message or the conversation's [standing context](/client/conversations#give-agents-standing-context).
 
 ## Run on a Final Device
 
@@ -137,7 +137,23 @@ const box = await project.sandboxes.create(
 );
 ```
 
-`project.sandboxes.providers()` lists the providers your project can create sandboxes on, each with the JSON Schema of its options.
+`daytona(...)` holds only Daytona's own options, like `snapshot`, `resources`, `region`, and `autoStopMinutes`; see the [`@finalai/daytona-agent-provider` README](https://www.npmjs.com/package/@finalai/daytona-agent-provider). `project.sandboxes.providers()` lists the providers your project can create sandboxes on, each with the JSON Schema of its options.
+
+### Run your own provider
+
+A sandbox provider is code that creates, attaches, parks, and deletes machines, written against the provider contract in `@finalai/agent-provider`. Serve it at a URL with `serveSandboxProvider` from `@finalai/agent-provider/sandbox/remote`, then register that URL in your project:
+
+```ts
+await project.sandboxProviders.register({
+  name: 'acme-vms',
+  url: 'https://sandboxes.example.com',
+  forwardSecrets: ['ACME_VMS_TOKEN'],
+});
+
+const box = await project.sandboxes.create({ provider: 'acme-vms', environment: { size: 'large' } });
+```
+
+Final reads the provider's discovery document when you register it, and authenticates every call with a [platform identity assertion](/build/integrations#verify-calls-from-final), which `serveSandboxProvider` verifies. `forwardSecrets` names project secrets the provider receives, resolved in the sandbox's project. Registrations in a parent project are available to the projects below it. The [`@finalai/agent-provider` README](https://www.npmjs.com/package/@finalai/agent-provider) covers the contract, the wire, and the conformance kit that checks a provider; `@finalai/agent-provider/testing/mcp` has an in-process harness for testing a provider's MCP channels.
 
 ## Computer options
 

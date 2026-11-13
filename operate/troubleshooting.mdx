@@ -26,7 +26,7 @@ Find the symptom that matches what you're seeing. Each entry explains the cause,
     Something the agent requires wasn't provided or can't meet the requirement, and nothing was created. Read `cause.requirements`: each item has a `kind`, `name`, and `problem`. Provide what's missing, or mark requirements the agent can do without `optional: true`. See [requirements and providing](/build/requirements#nothing-starts-with-something-missing).
   </Accordion>
   <Accordion title="The harness is unsuitable or &quot;needs an environment&quot;">
-    Final's serverless harnesses run in a Workers sandbox. When you start a session or conversation, the SDK creates one for settings that leave `environment` out. Schedules and channel installs need it named: create one with `project.sandboxes.create(workers(), { idempotencyKey: 'workers' })` and pass its `id`. Claude Code and Codex run on a machine, by default the one provided for `shell`. A harness is also unsuitable when its lowest permission level is above the agent's ceiling or it lacks a feature the agent uses. Run `project.harnesses.check({ agent, harness })` to see the problems. See [harness settings](/harnesses/settings).
+    Final's serverless harnesses run in a Workers sandbox. When you start a session or conversation, the SDK creates one for settings that leave `environment` out. Channel installs need it named: create one with `project.sandboxes.create(workers(), { idempotencyKey: 'workers' })` and pass its `id`. Claude Code and Codex run on a machine, by default the one provided for `shell`. A harness is also unsuitable when its lowest permission level is above the agent's ceiling or it lacks a feature the agent uses. Run `project.harnesses.check({ agent, harness })` to see the problems. See [harness settings](/harnesses/settings).
   </Accordion>
   <Accordion title="files and shell are rejected as different_sandboxes">
     `files` and `shell` must be the same sandbox. Provide one sandbox for both.
@@ -76,12 +76,12 @@ Find the symptom that matches what you're seeing. Each entry explains the cause,
     A channel is published as one module that imports nothing. Bundle it with `esbuild --bundle --format=esm` and publish the output. See [publish and install](/build/channels#publish-and-install).
   </Accordion>
   <Accordion title="A channel refuses an unconnected place">
-    Connect the provider place to a chat you can manage, using the returned Connect link or the chat's Connected section. A shared place needs a Shared chat. See [link and connect](/build/channels#link-a-person-and-connect-a-place).
+    Connect the provider place to a chat you manage: through the install's `connectUrl` page if it has one, or with `chat.channelRoutes.connect({ bindingId, place, policy })`. A shared place needs a group chat. See [link and connect](/build/channels#link-a-person-and-connect-a-place).
+  </Accordion>
+  <Accordion title="A channel install fails with requirements_unmet for its app">
+    The channel declares provider app credentials in `require.app`, and the install's channel app doesn't fill every required slot. Create a channel app with the project secrets for each slot and pass its ID as `app`, or use the one the channel's publisher attached. See [provider app credentials](/build/channels#provider-app-credentials).
   </Accordion>
   <Accordion title="A schedule doesn't run">
-    Schedules exist only once the agent is published, and runs need the schedule's `provide`. Publish, set `provide` with `client.schedules.update`, then check `nextRunAt` with `client.schedules.list`. Use `runNow` to test it right away. See [schedules](/build/schedules#provide-what-runs-need).
-  </Accordion>
-  <Accordion title="A schedule in a Shared project is refused">
-    The default `owner-direct` target needs a person's own project. In a Shared project, set `target: 'bound-conversation'`, publish, and connect exactly one chat. See [where replies go](/build/schedules#where-replies-go).
+    A schedule fires in its conversation, for one agent participant, with what that participant is provided there. Check `enabled` and `nextRunAt` with `chat.schedules()`, and fire it with `chat.runSchedule({ scheduleId })` to test it right away. If the run fails, check that the participant's `provide` still meets the agent's requirements without a person present: shared or secret-based integrations, a specific sandbox, and inference that ends with `finalCredits()` or a project key. See [schedules](/build/schedules).
   </Accordion>
 </AccordionGroup>

@@ -35,6 +35,7 @@ This agent answers developer questions about an API, the Acme Pay API in this ex
 
 ```ts agent.ts
 import { defineAgent, markdown, skill } from '@finalai/agents';
+import { FinalHarness } from '@finalai/agents/harnesses';
 
 export const agent = defineAgent({
   name: 'Docs Assistant',
@@ -52,7 +53,7 @@ export const agent = defineAgent({
   require: {
     harness: {
       permissionMode: 'ask',
-      recommended: { harness: 'pi', model: 'gpt-6.1-sol', reasoning: 'low' },
+      recommended: { harness: FinalHarness.Pi, model: 'gpt-6.1-sol', reasoning: 'low' },
     },
   },
 });

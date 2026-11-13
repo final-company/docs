@@ -26,6 +26,7 @@ This agent reviews a public pull request. It reads the diff with one read-only t
 
 ```ts agent.ts
 import { defineAgent, defineServerlessTool, markdown } from '@finalai/agents';
+import { FinalHarness } from '@finalai/agents/harnesses';
 import * as z from 'zod';
 
 const readPullRequest = defineServerlessTool({
@@ -59,7 +60,7 @@ export const agent = defineAgent({
   instructions: markdown('./instructions.md', { from: import.meta.url }),
   tools: { read_pull_request: readPullRequest },
   require: {
-    harness: { permissionMode: 'ask', recommended: { harness: 'final', model: 'deepseek-v4.1-flash' } },
+    harness: { permissionMode: 'ask', recommended: { harness: FinalHarness.Final, model: 'deepseek-v4.1-flash' } },
   },
 });
 ```

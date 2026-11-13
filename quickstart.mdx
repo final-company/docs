@@ -33,6 +33,7 @@ Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let
 
     ```ts agent.ts
     import { defineAgent, defineServerlessTool, markdown } from '@finalai/agents';
+    import { FinalHarness } from '@finalai/agents/harnesses';
     import * as z from 'zod';
 
     const releaseChecklist = defineServerlessTool({
@@ -50,13 +51,16 @@ Want your coding agent to do this for you? Use the [setup prompt](/agent-sdk#let
       instructions: markdown('./instructions.md', { from: import.meta.url }),
       tools: { release_checklist: releaseChecklist },
       require: {
-        harness: { permissionMode: 'ask', recommended: { harness: 'final', model: 'deepseek-v4.1-flash' } },
+        harness: {
+          permissionMode: 'ask',
+          recommended: { harness: FinalHarness.Final, model: 'deepseek-v4.1-flash' },
+        },
       },
     });
     ```
 
     - **The tool** is `release_checklist`, the key in `tools`. It's a **serverless** tool: self-contained, so its source becomes part of the agent and runs on Final's runtime. [Tools](/build/tools) covers the other kind, in-process tools that run in your own process.
-    - **`require.harness`** says the agent needs a harness, the program that runs the model loop, held to `ask`: anything that changes something waits for a person. `recommended` is a hint for whoever starts it; it binds nobody.
+    - **`require.harness`** says the agent needs a harness, the program that runs the model loop, held to `ask`: anything that changes something waits for a person. `recommended` is a hint for whoever starts it, naming one of [Final's harnesses](/harnesses/settings#finals-harnesses); it binds nobody.
 
     Then write the instructions beside it:
 

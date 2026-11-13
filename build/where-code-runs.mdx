@@ -45,6 +45,10 @@ const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! }, loca
 
 With `localCompute: false`, a capability you leave out fails with `requirements_unmet` instead of running locally. In-process tools still run in the process that created the session.
 
+## Browsers, React Native, and Workers
+
+`@finalai/agents/client` has a build for runtimes without Node, which bundlers pick through the `browser` and `react-native` export conditions; no bundler configuration is needed. It imports nothing Node-only and serves no compute: `localCompute` defaults to `false` there, so every capability the agent requires must be provided. Serving in-process tools from such a runtime needs your own `localHosts.dial` connection. Authenticate as the signed-in person with `{ bearer }` or `{ cookies: true }`, never with an API key.
+
 ## Serverless or in-process code
 
 Choose per tool and per hook, by how you define it:

@@ -30,15 +30,21 @@ A harness that uses files or a shell with its own tools, like Claude Code, works
 
 | Harness | Interface | Default adapter | Runs as |
 | --- | --- | --- | --- |
-| `final`, `pi` | `pi-agent` | `pi-acp` | Worker program |
-| `nanocode-claude`, `nanocode-codex` | `nanocode` | `nanocode-acp` | Worker program |
-| `claude-code` | `claude-agent-sdk` | `claude-code-acp` | Process (`claude`) |
-| `codex` | `codex-app-server` | `codex-acp` | Process (`codex app-server`) |
-| `acp-agent` | ACP v2 | None | At a URL |
+| `final/final`, `final/pi` | `pi-agent` | `pi-acp` | Worker program |
+| `final/nanocode-claude`, `final/nanocode-codex` | `nanocode` | `nanocode-acp` | Worker program |
+| `final/claude-code` | `claude-agent-sdk` | `claude-code-acp` | Process (`claude`) |
+| `final/codex` | `codex-app-server` | `codex-acp` | Process (`codex app-server`) |
+| `final/acp-agent` | ACP v2 | None | At a URL |
 
-The process adapters are public packages: `@finalai/acp-adapter-claude-code` runs Claude Code through the Claude Agent SDK, and `@finalai/acp-adapter-codex` runs the Codex app server. Both speak ACP v2 with Final's extensions on stdio, and each runs with `npx` on the machine, which needs Node.js and the harness's CLI installed. You can also run either adapter yourself and reach it with `atUrl`.
+Final publishes them under its publisher handle, `final`, so settings name them as `final/<name>` from any project.
 
-`FINAL_HARNESS_DEFINITIONS` and `FINAL_ACP_ADAPTERS` from `@finalai/agents/harnesses` are the definitions Final publishes, useful as references for your own.
+The process adapters are public packages: `@finalai/acp-adapter-claude-code` runs Claude Code through the Claude Agent SDK, and `@finalai/acp-adapter-codex` runs the Codex app server. Both speak ACP v2 with Final's extensions on stdio, and each runs with `npx` on the machine at the exact release its definition names, which needs Node.js and the harness's CLI on the machine. A harness command that isn't installed ends each turn with the error `harness_not_installed`. You can also run either adapter yourself, with your own login, and reach it with `atUrl`; their READMEs list their options and session config options.
+
+`FINAL_HARNESS_DEFINITIONS` and `FINAL_ACP_ADAPTERS` from `@finalai/agents/harnesses` are the definitions Final publishes, useful as references for your own. One general harness provider runs all of them: it starts the adapter wrapping the harness in the environment, as a process or a worker program, and refuses an adapter that doesn't implement Final's [required extensions](/harnesses/acp-extensions#what-an-adapter-must-implement).
+
+### Model credentials for process harnesses
+
+A harness that runs as a process on a machine, like Claude Code or Codex, never gets a model credential in its environment. Final starts its adapter with a short-lived grant for Final's credential broker. The adapter redeems it for the credential the [inference sources](/harnesses/settings#inference-sources) resolve, renews it before it expires, and serves it to the harness through a local proxy, so the harness holds only the proxy's address and a local key. When a vendor refuses a subscription or key for its limit, the adapter reports it and retries the request on the next source. `@finalai/agent-provider/model-credentials` has both sides of this for your own adapters.
 
 ## Define your own harness
 
@@ -107,7 +113,7 @@ export const harness = defineHarness({
   How to start it. A `process` entry is a command whose `args` and `env` are templates over the settings' configuration: `{{configuration.model}}` inserts a value, and `{ when, args }` includes a group only when a value is set. A `worker` entry names a program built for a worker runtime.
 </ParamField>
 
-Definitions also carry ACP behaviour Final relies on: `supports` (`observe`, `resumeReplay`, `fork`, `authorMeta`, `deferredToolSearch`), `promptWhileRunning`, `sessionSurvivesDisconnect`, and the MCP transports it accepts (`mcp`).
+Definitions also say which `models` the harness offers (or `open: true` for any the harness validates itself), the platform `services` it uses during a session, and the ACP behaviour Final relies on: `supports` (`observe`, `resumeReplay`, `fork`, `authorMeta`, `deferredToolSearch`), `promptWhileRunning`, `sessionSurvivesDisconnect`, and the MCP transports it accepts (`mcp`).
 
 ## Define an ACP adapter
 
@@ -161,7 +167,7 @@ const settings: HarnessSettingsIface = {
 };
 ```
 
-A project can name its own harnesses, its parent projects', and Final's public catalog. For a subscription to reach your harness, allow it with `project.harnesses.allowances.allow({ harness: 'my-cli' })`.
+A project names its own harnesses and its parent projects' by name, and any publisher's public ones as `handle/name`. Pass `visibility: 'public'` when publishing to make a name public under your project's [publisher handle](/operate/publishing#make-a-name-public). For a subscription to reach your harness, allow it with `project.harnesses.allowances.allow({ harness: 'my-cli' })`.
 
 ## Test conformance
 

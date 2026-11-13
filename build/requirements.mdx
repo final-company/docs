@@ -14,6 +14,7 @@ An agent states what it needs; whoever starts it provides it. The agent never na
 
 ```ts agent.ts
 import { defineAgent } from '@finalai/agents';
+import { FinalHarness } from '@finalai/agents/harnesses';
 
 export const agent = defineAgent({
   name: 'Release Captain',
@@ -21,7 +22,7 @@ export const agent = defineAgent({
   require: {
     harness: {
       permissionMode: 'review',
-      recommended: { harness: 'pi', model: 'gpt-6.1-sol', reasoning: 'high' },
+      recommended: { harness: FinalHarness.Pi, model: 'gpt-6.1-sol', reasoning: 'high' },
     },
     compute: {
       files: 'write',
@@ -103,7 +104,7 @@ On the wire, `provide` is JSON that names only things that exist:
 ```json
 {
   "harness": {
-    "harness": "pi",
+    "harness": "final/pi",
     "configuration": { "model": "gpt-6.1-sol", "inference": [{ "source": "final", "billTo": "project" }] },
     "environment": "asbx_01J..."
   },
@@ -120,12 +121,11 @@ Every sandbox and integration must belong to the project the call is made in.
 | --- | --- |
 | `project.sessions.create({ agent, provide })` | The agent's. |
 | `project.conversations.create({ participants, provide })` | Each agent participant's, against its own `provide` layered over the conversation's. |
-| `project.conversations.direct(...)`, `.home(...)`, `handle.addParticipant(...)` | The agent's. |
+| `project.conversations.direct(...)`, `handle.addParticipant(...)` | The agent's. |
 | `handle.participants.provide(participantId, patch)` | The result must still meet the agent's requirements. |
-| `project.channels.install({ agents: { provide } })` | The project agent that answers in the chats the install creates. |
-| `client.schedules.update({ scheduleId, provide })` | The schedule's agent. |
+| `project.channels.install({ agent, agents: { provide } })`, `client.channelBindings.update(...)` | The agent that answers in the chats the install creates. |
 
-In a conversation, each top-level key (`harness`, `compute`, `integrations`) comes whole from the nearest scope that sets it: the participant, then the conversation. Compute never mixes sandboxes from two scopes.
+In a conversation, each top-level key (`harness`, `compute`, `integrations`) comes whole from the nearest scope that sets it: the participant, then the conversation, then the channel install that created it. Compute never mixes sandboxes from two scopes. A conversation's [schedules](/build/schedules) run with what their agent participant is provided there.
 
 ## Nothing starts with something missing
 
@@ -187,4 +187,4 @@ An agent can acquire an optional requirement later only if it was provided [Fina
 
 ## Agents fetched by name are data
 
-An agent is always passed as an object: the value you defined, or one you fetched with `project.agents.get({ name })`, `{ id }`, or `{ hash }`. A string is rejected. A fetched agent carries its document but none of your code, so its serverless tools run as usual while an in-process tool can't run for a caller that doesn't hold it. Starting such an agent fails with `code_unavailable`, naming the tool. Agents meant to be started by callers who only fetch them, including Final's own chats, use serverless tools.
+An agent is always passed as an object: the value you defined, or one you fetched with `project.agents.get({ name })`, `{ id }`, or `{ hash }`. A bare name resolves in the project and its parent projects; `handle/name` names an agent a publisher made [public](/operate/publishing#make-a-name-public). A string is rejected. A fetched agent carries its document but none of your code, so its serverless tools run as usual while an in-process tool can't run for a caller that doesn't hold it. Starting such an agent fails with `code_unavailable`, naming the tool. Agents meant to be started by callers who only fetch them, including Final's own chats, use serverless tools.

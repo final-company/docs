@@ -1,96 +1,141 @@
 ---
 title: "Channels: people, places, and events"
 sidebarTitle: "Channels"
-description: "Build a channel application with identity, routes, provider credentials, and conversation events."
+description: "Build a channel that brings an outside surface into Final's chats: its provider app, routes, people, places, and events."
 ---
 
-A channel application translates an outside surface, like a webhook, a chat app, or email, into people, places, and events in Final's chats. A channel is its own document, separate from any agent: one self-contained module, published by name and installed in a project. Its handlers always run on Final's serverless runtime. The SDK provides the same capabilities for your application regardless of provider; write the provider integration in your own channel source.
+A channel translates an outside surface, like a webhook, a chat app, or email, into people, places, and inputs in Final's chats, and carries the agent's replies back out. A channel is its own document, separate from any agent: one self-contained module, published by name and installed in a project. Its handlers always run on Final's serverless runtime.
 
-## Write a custom channel
+A channel declares the provider application it needs, such as an OAuth client and a signing secret, under `require.app`. A **channel app** in your project holds those credentials and meets the requirement. The channel's code never sees the secret values: it asks Final to verify a signature, exchange an OAuth code, or send an authorized request.
 
-Install the SDK with `npm install @finalai/agents zod`, then write the channel in its own module. This complete example accepts signed topic events. Create the project secret `topic-hook-secret` first and store the same value with the event producer.
+## Write a channel
+
+Install the SDK with `npm install @finalai/agents zod`, then write the channel in its own module. This complete example accepts signed topic events and hands each one to the agent of the chat its topic is connected to:
 
 ```ts channels/topics.ts
-import { defineChannel, POST } from '@finalai/agents/channels';
-import { z } from 'zod';
+import {
+  ChannelSignatureEncoding,
+  ChannelSigningAlgorithm,
+  defineChannel,
+  POST,
+} from '@finalai/agents/channels';
+import * as z from 'zod';
 
 const eventSchema = z.object({ id: z.string(), topic: z.string(), text: z.string() });
 
 export default defineChannel({
   name: 'topics',
-  credentials: { app: null, secrets: ['topic-hook-secret'] },
+  require: {
+    app: {
+      description: 'The system that sends topic events',
+      secrets: { signing_secret: { description: 'The secret events are signed with' } },
+    },
+  },
   identity: { kind: 'none' },
   places: { kinds: ['topic'] },
-  routes: [POST('/events', async (ctx) => {
-    const body = await ctx.request.text();
-    const secret = await ctx.credentials.secret('topic-hook-secret');
-    const signature = ctx.request.headers.get('x-topic-signature') ?? '';
-    if (secret == null || !/^[a-f0-9]{64}$/i.test(signature))
-      return new Response('Invalid signature', { status: 401 });
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
-    const bytes = new Uint8Array(Array.from({ length: 32 }, (_, i) =>
-      Number.parseInt(signature.slice(i * 2, i * 2 + 2), 16)));
-    if (!(await crypto.subtle.verify('HMAC', key, bytes, new TextEncoder().encode(body))))
-      return new Response('Invalid signature', { status: 401 });
-    let event: z.infer<typeof eventSchema>;
-    try { event = eventSchema.parse(JSON.parse(body)); }
-    catch { return new Response('Invalid event', { status: 400 }); }
-    const result = await ctx.receive(event);
-    return Response.json(result, { status: 'accepted' in result && !result.accepted ? 403 : 202 });
-  })],
+  routes: [
+    POST('/events', async (ctx) => {
+      const body = await ctx.request.text();
+      const valid = await ctx.credentials.verify({
+        secret: 'signing_secret',
+        algorithm: ChannelSigningAlgorithm.HmacSha256,
+        encoding: ChannelSignatureEncoding.Hex,
+        data: body,
+        signature: ctx.request.headers.get('x-topic-signature') ?? '',
+      });
+      if (!valid) return new Response('Invalid signature', { status: 401 });
+      const event = eventSchema.safeParse(JSON.parse(body));
+      if (!event.success) return new Response('Invalid event', { status: 400 });
+      const result = await ctx.receive(event.data);
+      return Response.json(result, { status: 'accepted' in result && !result.accepted ? 403 : 202 });
+    }),
+  ],
   receive: async (input, ctx) => {
     const event = eventSchema.parse(input);
     const place = { kind: 'topic', id: event.topic };
     const route = await ctx.places.resolve(place);
     if (route.kind !== 'connected')
-      return { accepted: false, refusal: { refused: 'unconnected',
-        message: 'Connect this topic to a chat.', connectUrl: route.connectUrl } };
+      return {
+        accepted: false,
+        refusal: { refused: 'unconnected', message: 'Connect this topic to a chat.', connectUrl: route.connectUrl },
+      };
     const result = await ctx.conversation(route.conversation).input({
-      label: 'Topic event', content: [{ type: 'text', text: event.text }],
-      origin: { place }, idempotencyKey: event.id,
+      label: 'Topic event',
+      content: [{ type: 'text', text: event.text }],
+      origin: { place },
+      idempotencyKey: event.id,
     });
     return 'refused' in result ? { accepted: false, refusal: result } : { accepted: true };
   },
   events: {
-    'turn.completed': async (event, ctx) => { ctx.log('Topic turn completed', { turnId: event.turnId }); },
+    'turn.completed': async (event, ctx) => {
+      ctx.log('Topic turn completed', { turnId: event.turnId });
+    },
   },
 });
 ```
 
-Once it's [published and installed](#publish-and-install), send JSON such as `{"id":"event-1042","topic":"deployments","text":"Release deployed"}` to its route. Set `x-topic-signature` to the hexadecimal HMAC-SHA256 of the exact body. A first event discovers the place and returns its Connect link; connect it to a chat, then retry the same event ID. This channel is inbound-only: replies stay in Final. See the complete [deployment watcher](/examples/deploy-watcher).
+- **`require.app`** declares a secret slot, `signing_secret`. `ctx.credentials.verify` checks the signature with it without the channel reading the value.
+- **`receive`** resolves the topic to a place. A place connected to a chat gets the event as an [input](/client/conversations#send-an-input-from-another-system): the agent acts on it and replies in the chat, captioned with `label`.
+- **`events`** hears what happens in the turns the channel started, so a channel can carry replies back to its surface. This one is inbound only and just logs.
 
-The example uses nonhuman `input`. To post as a member, implement a redirect or challenge identity mechanism, resolve the proven provider principal with `people.resolve`, and pass its returned member handle to `conversation(...).post({ from, ... })`. Never match members by email. Handles are invocation-scoped: store provider references and resolve fresh handles later.
+Once it's [published and installed](#publish-and-install), send JSON such as `{"id":"event-1042","topic":"deployments","text":"Release deployed"}` to its route, with `x-topic-signature` set to the hexadecimal HMAC-SHA256 of the exact body. The first event for a topic discovers the place and is refused as unconnected; [connect it](#link-a-person-and-connect-a-place) to a chat, then retry the same event ID. See the complete [deployment watcher](/examples/deploy-watcher).
 
-## Installed application credentials
+An `input` acts for nobody unless you pass `actingAs`, a linked person's handle, and then waits behind any running turn. Pass `replyExpected: false` when the agent should reply only if it has something to say. To post as a member instead, prove the provider account with a `redirect` or `challenge` identity, resolve it with `ctx.people.resolve`, and pass the returned member handle to `conversation(...).post({ from, ... })`. Never match members by email. Handles are scoped to one invocation: store provider references and resolve fresh handles later.
 
-Declare `credentials: { app: 'your-application' }` when a channel needs a connected application's credentials. The installation you install the channel on must match the declaration. Installed tokens and client secrets never reach channel code.
+## Provider app credentials
+
+`require.app` describes the application a provider knows your channel as:
+
+| Field | What it declares |
+| --- | --- |
+| `description` | What the app is, shown to whoever installs the channel. |
+| `oauthClient` | An OAuth client registered with the provider, `{ description, optional? }`. |
+| `secrets` | Named secret slots, such as a signing secret or an app-level token, each `{ description, optional? }`. |
+
+A channel app meets the declaration. Create one in the project with the project's OAuth client and the project secrets that fill each slot:
+
+```ts
+const app = await project.channelApps.create({
+  name: 'topics',
+  secrets: { signing_secret: 'TOPIC_SIGNING_SECRET' },
+  allowedHosts: ['api.example.com'],
+});
+```
+
+`allowedHosts` lists the hosts the app's credentials may be sent to. An install uses its own app, or the one the channel's publisher attached when publishing with `app`. An install whose app can't meet the channel's declaration is refused.
+
+The channel's code reaches the credentials only through `ctx.credentials`:
 
 | Operation | Purpose |
 | --- | --- |
-| `credentials.client()` | Read the public OAuth client ID. |
-| `credentials.verify(...)` | Verify signed bytes with installed signing material. |
-| `credentials.exchange(...)` | Exchange an OAuth grant for a short-lived opaque handle. |
-| `credentials.redirect({ path })` | Get the OAuth redirect URL and state for a `redirect: true` route. |
-| `credentials.fetch(url, { credential })` | Make an authorized provider request using an app credential, OAuth handle, or no credential. |
-| `credentials.connect({ url, signal })` | Open a provider socket; inject credentials only into specified JSON leaves when sending. |
-| `credentials.secret(name)` | Read an explicitly declared project secret. |
+| `client()` | Read the public OAuth client ID. |
+| `verify({ secret, algorithm, encoding, data, signature })` | Check signed data with a secret slot's key, without reading it. |
+| `exchange({ url, parameters, authentication, store? })` | Exchange an OAuth grant for a short-lived, opaque credential handle. |
+| `redirect({ path, ticket? })` | Get the OAuth redirect URL and state for a `redirect: true` route. |
+| `fetch(url, { credential })` | Send a provider request with a credential: an exchanged handle, a tenant's installed token (`{ kind: 'app', tenant }`), or a secret slot (`{ kind: 'secret', slot }`). Requests send no credential by default. |
+| `connect({ url, signal })` | Open a provider socket, injecting credentials only into the JSON fields you name when sending. |
+| `secret(slot)` | Read the value of a secret slot the channel declares, when it must be sent as-is. |
 
-Events a host receives for an installed app arrive unchanged at your channel's `POST /webhook` route, with their signature headers, so verify them as you would any other request. A provider app you run yourself can point straight at the route URL the install returns.
-
-`ChannelCredentialKind`, signing algorithms, signature encodings, and OAuth client authentication enums are exported by `@finalai/agents/channels`. Requests are restricted to the application's approved destinations. Opaque OAuth handles are temporary and cannot be reused across invocations. They do not provide persistent person-token storage or automatic refresh. Raw installed tokens, signing secrets, and OAuth client secrets are never returned to application code. Socket handshake-header authentication is not currently exposed; the socket API supports credential injection in JSON frames.
+`ChannelCredentialKind`, the signing algorithms, signature encodings, and OAuth client authentication enums are exported by `@finalai/agents/channels`. Exchanged handles expire and can't be reused across invocations; they aren't storage for a person's tokens.
 
 ### OAuth redirects
 
-A provider application stores its redirect URLs once, however many bindings it serves. Declare your callback with `redirect: true`, and ask the host for the values to send:
+A provider application stores its redirect URLs once, however many installs it serves. Declare your callback route with `redirect: true`, and ask for the values to send:
 
 ```ts
 const { url, state } = await ctx.credentials.redirect({ path: '/oauth/callback' });
 ```
 
-Send `url` as `redirect_uri` and `state` unchanged, and use the same `url` in the token exchange. `url` is the same for every binding, so register it once in your provider application. When the provider returns, `state` runs that route on the binding that started the flow. A `redirect` route must be a `GET`, and it is reachable only this way.
+Send `url` as `redirect_uri` and `state` unchanged, and use the same `url` in the token exchange. `url` is the same for every install, so register it once in your provider application. When the provider returns, `state` runs that route on the install that started the flow. A `redirect` route must be a `GET`, and it's reachable only this way.
 
-Use `ctx.binding.url` for URLs that belong to one binding. Do not hardcode a deployment origin in application source.
+Use `ctx.binding.url` for URLs that belong to one install. Don't hardcode a deployment origin in channel source.
+
+### Tenants and shared ingress
+
+A chat provider's app is installed per **tenant**: a workspace, a server, an organization. The channel installs it through its own code. `tenants.installPath` names a `GET` route that receives a single-use `ticket`; it redirects to the provider's consent page with `credentials.redirect({ path, ticket })`, and the callback stores the token as that tenant's install with `credentials.exchange({ ..., store: { tenant } })`. When the provider names the tenant only in its token response, `store: { tenantPath }` reads it from there. `client.channelBindings.tenantTicket({ bindingId })` returns the link that starts it.
+
+A provider that sends every tenant's events to one URL reaches the channel through the app's **shared ingress URL**, registered with the provider once. Routes marked `shared: true` are served there. The publication the app routes its ingress through declares `ingress.tenantOf(request, ctx)`, which verifies each request with the app's credentials and returns its `{ tenant }`, a `{ respond }` answer for app-level handshakes, or `null` to reject it. Final then runs the shared route of the install that holds that tenant. A tenant belongs to one install of an app at a time.
 
 ## Publish and install
 
@@ -100,7 +145,7 @@ A channel is published as one ES module that imports nothing, so bundle it first
 npx esbuild channels/topics.ts --bundle --format=esm --platform=browser --outfile=dist/topics.js
 ```
 
-Then publish the bundle under a name and install it in a project. The install connects the channel to one of the project's connected applications, and says what the project's agent gets in every chat the channel creates:
+Then publish the bundle under a name and install it in a project. The install names the agent that answers in the chats it reaches, and says what that agent gets in every one of them:
 
 ```ts install-channel.ts
 import { readFile } from 'node:fs/promises';
@@ -113,57 +158,53 @@ const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
 
 await project.channels.publish({ name: 'topics', source: await readFile('dist/topics.js', 'utf8') });
 
+const app = await project.channelApps.create({
+  name: 'topics',
+  secrets: { signing_secret: 'TOPIC_SIGNING_SECRET' },
+});
 const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
-const binding = await project.channels.install({
+
+const installed = await project.channels.install({
   channel: { name: 'topics' },
-  connectorInstallId: 'app_your_install',
+  agent: { name: 'release-assistant' },
+  app: app.id,
   agents: {
     provide: {
       harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id }),
     },
   },
 });
-for (const route of binding.routes) console.log(route.method, route.path, route.aliasUrl ?? route.url);
+for (const route of installed.routes) console.log(route.method, route.path, route.aliasUrl ?? route.url);
 client.close();
 ```
 
-- **`connectorInstallId`** is the connected application the channel runs for, from the project's **Connectors** page.
-- **`agents.provide`** is checked against the requirements of the project's agent, the one that answers in the chats this install creates. The install fails with `requirements_unmet`, and nothing is written, unless it meets them. Every chat the install creates gets the same settings, so provide shared integrations and specific sandboxes.
-- **`routes`** lists each route's public URL. Prefer `aliasUrl` for provider webhooks and OAuth callbacks.
+- **`agent`** is the agent that answers, by published name or `{ hash }`.
+- **`app`** is the channel app whose credentials the install uses. Leave it out to use the one the channel's publisher attached.
+- **`agents.provide`** is checked against the agent's requirements. The install fails with `requirements_unmet`, and nothing is written, unless it meets them. Every chat the install creates gets the same settings, so provide shared integrations and specific sandboxes. Name the Workers sandbox for a serverless harness yourself: an install stores its settings for turns that start later.
+- **`routes`** lists each route's public URL. Prefer `aliasUrl` for provider webhooks and OAuth callbacks. `ingressUrl` is the app's shared ingress URL when the channel has shared routes.
 
-An install is pinned to the channel's hash when it was installed. To update it, publish the new source, then install again with `replace: true`. Without `replace`, a different channel or configuration is rejected. Omitting `config` keeps the current configuration; `config: {}` resets it. Replacing keeps the binding's ID and base URL, so keep provider-facing route paths stable in your code.
+Installing again with the same `id` returns the same install. To change an install, such as moving it to newly published source or changing what the agent is provided, call `client.channelBindings.update({ bindingId, revision, ... })` with the `revision` you last read; a stale revision fails with `revision_conflict`. `project.channels.installs()` lists the project's installs, and `client.channelBindings.uninstall({ bindingId })` ends one along with its connected places, tenants, and links.
 
 ## Link a person and connect a place
 
-**Link** proves a provider account while the person is signed in to Final. Each application owns its OAuth or challenge protocol. **Connect** maps a provider place to a chat the person can manage. **Disconnect** removes that route. **Unlink** revokes account proof.
+**Link** proves a provider account belongs to a person in Final, through the channel's `redirect` or `challenge` identity. **Connect** maps a provider place to a chat the person manages. **Disconnect** removes that route, and **unlink** revokes the proof.
 
-Shared provider places connect to group chats. Direct messages may connect to the linked person's chat. `places.defaults` declares whether the application permits captioned unlinked input (`audience: 'anyone'`) and automatic group creation. Such input never receives member authority or personal credentials.
+When a channel refuses an unlinked person or an unconnected place, it can send them to the installer's own pages: pass `linkUrl` and `connectUrl` when installing, each an `https` URL containing `{ticket}`. Those pages read the ticket with `client.channelTickets.get({ ticket })` and finish with `channelTickets.link(...)` or `channelTickets.connect({ ticket, conversationId, policy })`. Without them, the channel explains linking in its own words. A conversation's managers can also connect a place the install has seen with `chat.channelRoutes.connect({ bindingId, place, policy })`, and `client.channelBindings.places({ bindingId })` lists the places it has seen.
 
-The `origin` reply policy sends replies to the place that started a turn. An explicit `all` policy shares future chat messages with that place. Applications decide which provider APIs can represent edits, removals, reactions, and streamed replies. Do not promise a mutation when the provider cannot perform it.
+Shared provider places connect to group chats. Direct messages may connect to the linked person's own chat. `places.defaults` declares whether the channel accepts captioned input from unlinked people (`audience: 'anyone'`) and may create a group chat automatically. Such input never receives a member's authority or personal credentials.
 
-**Follow** creates a resource observation without making that resource the chat's conversation. Implement both `resources.resolve({ url, principal }, ctx)` and `resources.authorize({ place, principal }, ctx)`. The first parses a resource into a canonical place; the second checks current provider access using an appropriate provider API. Choose an authorization mechanism your application can revalidate; account linking does not automatically supply a provider user token. The host rechecks authorization for later observation access, including cached handles. Use `places.follow(place, { by, conversation })` and `places.unfollow(...)` with a currently linked person.
+The `origin` reply policy sends replies to the place that started a turn. An explicit `all` policy shares future chat messages with that place. Channels decide which provider APIs can represent edits, removals, reactions, and streamed replies. Don't promise a change the provider can't make.
 
-## Create a Shared chat in Final
-
-Do this while signed in to the Final web app as a person with edit access to the agent's project:
-
-1. Open the project where you published the agent.
-2. Open the project's **+** menu and choose **New Chat**.
-3. Select **your own name and the published agent**, then choose **Start chat**. Selecting just one agent opens your direct chat instead, so include yourself to create a Shared group chat in this project.
-4. Keep this as the only agent for the examples below. The first selected agent uses `default` routing, so outside events reach it without a separate mention.
-
-You own the new chat and can select it on the Connect page. Create it before following a provider's Connect notice. The project API key used to publish an agent cannot create a person-owned Shared chat; use your signed-in Final session for this step.
+**Follow** observes a resource without making it the chat's place. Implement both `resources.resolve({ url, principal }, ctx)` and `resources.authorize({ place, principal }, ctx)`: the first parses a resource URL into a canonical place, and the second checks the person's current provider access. Final repeats that check for later observation. Use `places.follow(place, { by, conversation })` and `places.unfollow(...)` with a currently linked person.
 
 ## Routes, listeners, and events
 
-HTTP and binary `WS` routes receive `ctx.request` or `ctx.socket`. A `listeners: [{ key, run }]` entry maintains an outside connection for the binding. Close provider work and return when `ctx.signal` aborts. Pass the signal to credential and media operations.
+HTTP and binary `WS` routes receive `ctx.request` or `ctx.socket`. A `listeners: [{ key, run }]` entry keeps an outside connection open for the install; close provider work and return when `ctx.signal` aborts. Pass the signal to credential operations.
 
-Use `events` for messages, tools, plans, decisions, and turn completion. `message.posted` supports outward mirroring; edit, removal, and reaction events allow an application to update existing provider copies. Save delivery receipts in `ctx.store`, scope them to the actual provider destination, and preserve deletion tombstones to prevent retry resurrection. Acknowledge provider interactions promptly and perform slower work asynchronously when the provider protocol permits it.
+Use `events` for messages, tools, plans, decisions, and turn completion. `message.posted` supports outward mirroring, and edit, removal, and reaction events let a channel update the provider's copies. Save delivery receipts in `ctx.store`, scoped to the actual provider destination, and keep deletion tombstones so a retry doesn't bring a message back. Acknowledge provider interactions promptly, and do slower work afterwards when the provider protocol allows it.
 
-`conversation(...).attach` saves content without starting a turn. `edit`, `remove`, and `react` target an external key. `decisions.resolve` checks the responding person's authority. Never select between concurrent approvals using an ambiguous yes/no.
+`conversation(...).attach` saves content without starting a turn. `edit`, `remove`, and `react` target an external key. `decisions.resolve` checks the responding person's authority. Never pick between concurrent approvals from an ambiguous yes or no.
 
-Audio applications own capture, speech-provider connections, synthesis, cancellation, and playback. They connect to an agent through the same channel identity, message, observation, and socket capabilities as other applications; speech credentials remain with the application.
+Voice channels own capture, speech-provider connections, synthesis, cancellation, and playback. They reach an agent through the same identity, input, observation, and socket capabilities as other channels, and speech credentials stay with the channel.
 
-## Final's own chat surface
-
-Final's own room renderer is configured with `finalChannel({ onMessage, renderer, events })` from `@finalai/agents/channels/final`.
+The [`@finalai/agent-provider` README](https://www.npmjs.com/package/@finalai/agent-provider) has the full channel contract, including every rule hosts enforce.

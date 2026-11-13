@@ -61,13 +61,11 @@ export const agent = defineAgent({
   Code that runs on session events, made with `defineServerlessHook` or `defineInProcessHook`. The key is the hook's name. See [hooks](/build/hooks).
 </ParamField>
 
-<ParamField path="schedules" type="Record<string, { cron, timezone?, prompt, target? }>">
-  Prompts sent on a cron schedule once the agent is published. The key names the schedule. See [schedules](/build/schedules).
-</ParamField>
-
 <ParamField path="secrets" type="string[]">
   Project secrets the agent's own code may read with `ctx.secrets.get(name)`. Reading a secret that isn't listed fails. See [secrets](/operate/authentication#use-secrets-in-your-code).
 </ParamField>
+
+What starts work isn't part of the definition either: [schedules](/build/schedules) are timers in a conversation, and [channels](/build/channels) are installed in a project.
 
 ## What the agent requires
 
