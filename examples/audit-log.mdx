@@ -38,6 +38,7 @@ A hook watches the session without changing it. Both hooks here are serverless: 
 
 ```ts agent.ts
 import { defineAgent, defineServerlessHook, markdown } from '@finalai/agents';
+import { FinalHarness } from '@finalai/agents/harnesses';
 
 const audit = defineServerlessHook({
   events: ['tool_call_update', 'decision.created', 'decision.resolved', 'turn.ended'],
@@ -118,7 +119,7 @@ export const agent = defineAgent({
   secrets: ['DATADOG_API_KEY', 'INCIDENT_WEBHOOK_URL'],
   hooks: { audit, report_failures: reportFailures },
   require: {
-    harness: { permissionMode: 'auto', recommended: { harness: 'final', model: 'deepseek-v4.1-flash' } },
+    harness: { permissionMode: 'auto', recommended: { harness: FinalHarness.Final, model: 'deepseek-v4.1-flash' } },
     integrations: {
       final: { description: "Final's gateway: the services connected to this project" },
     },
@@ -174,15 +175,15 @@ export const project = client.project({ id: projectId });
 ```ts ask.ts
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
 import { finalGateway } from '@finalai/agents/integrations';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { client, project } from './client.js';
 
 // The project's Final gateway integration: created once, then found by name.
 const final = await project.integrations
   .get({ name: 'final' })
-  .catch(() => project.integrations.create(finalGateway()));
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
+  .catch(() =>
+    project.integrations.create(finalGateway({ url: 'https://api.final.ai/v1/connectors/mcp' })),
+  );
 
 const { handle, response } = await project.sessions.create({
   agent,
@@ -190,7 +191,6 @@ const { handle, response } = await project.sessions.create({
     harness: serverlessFinal({
       model: 'deepseek-v4.1-flash',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
     integrations: { final },
   },

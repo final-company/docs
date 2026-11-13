@@ -1,0 +1,83 @@
+---
+title: "Events and webhooks"
+description: "Read what changed in a project from its event feed, or have Final push it to your endpoint."
+---
+
+Final keeps an **event feed** of what changes in a project: conversations created and archived, people and agents joining, turns ending, decisions raised and resolved, agents published, and projects created or moved. Read it to keep your own systems in step, like a dashboard of open decisions or an audit trail of finished turns, instead of polling each conversation.
+
+Events carry IDs and state, not content. Read the details you need through the API.
+
+## Read the feed
+
+`project.events.list` returns a page of events for the project and the projects below it, oldest first. Pass the page's `cursor` as `after` to continue:
+
+```ts
+import { createClient, PlatformEventKind } from '@finalai/agents/client';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! }, localCompute: false });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+const page = await project.events.list({ kinds: [PlatformEventKind.TurnEnded], limit: 50 });
+for (const event of page.events) {
+  if (event.kind === PlatformEventKind.TurnEnded) console.log(event.data.sessionId, event.data.stopReason);
+}
+// Save page.cursor and pass it as `after` next time.
+```
+
+`project.events.stream({ after })` yields every event after a cursor and keeps polling once it catches up, until you abort it or close the client. Without `after`, both start at the head of the feed. An event may be delivered more than once, so deduplicate by its `id`. The feed keeps events for a limited time, and a cursor older than that fails with `cursor_expired`.
+
+`client.events` reads the same feed across everything the caller can see.
+
+## Receive webhooks
+
+An event subscription pushes the feed to your endpoint as it happens. Creating one needs a project admin's key with the `webhooks:write` permission:
+
+```ts
+import { PlatformEventKind } from '@finalai/agents/client';
+
+const { subscription, signingSecret } = await project.eventSubscriptions.create({
+  url: 'https://example.com/final/events',
+  kinds: [PlatformEventKind.TurnEnded, PlatformEventKind.DecisionRaised],
+});
+// Store signingSecret: it's shown only here.
+```
+
+Each delivery is a batch of events in feed order, signed per [Standard Webhooks](https://www.standardwebhooks.com/). Verify it with `verifyWebhook` from `@finalai/agents/webhooks`, which runs on WebCrypto alone, before you trust it:
+
+```ts
+import { verifyWebhook } from '@finalai/agents/webhooks';
+
+export async function POST(request: Request) {
+  const result = await verifyWebhook({
+    payload: await request.text(),
+    headers: request.headers,
+    secret: process.env.FINAL_WEBHOOK_SECRET!,
+  });
+  if (!result.ok) return new Response(null, { status: 400 });
+  for (const event of result.delivery.events) {
+    console.log(event.id, event.kind);
+  }
+  return new Response(null, { status: 204 });
+}
+```
+
+Pass the body exactly as received: parsing and re-serializing it breaks the signature. `verifyWebhook` refuses a delivery whose timestamp is more than five minutes from your clock, and any Standard Webhooks library works too.
+
+Failed deliveries are retried. A subscription that keeps failing is disabled; `eventSubscriptions.update({ id, state: EventSubscriptionState.Active })` resumes it from where it stopped, and `replay({ id, after })` delivers again from a cursor within the feed's retention.
+
+## Event kinds
+
+| Kind | When |
+| --- | --- |
+| `conversation.created`, `.archived`, `.unarchived`, `.deleted`, `.moved` | A conversation was created, archived, restored, deleted, or moved to another project. |
+| `participant.joined`, `participant.left` | A person, actor, or agent joined or left a conversation. |
+| `participant.replaced` | An agent participant now runs another agent document. |
+| `turn.ended` | An agent's turn ended, with its `stopReason`. |
+| `session.plan_updated` | An agent reported a new plan. |
+| `decision.raised`, `decision.resolved` | A decision is waiting for an answer, or was answered. |
+| `agent.published`, `agent.archived` | A name was pointed at a new agent hash, or archived. |
+| `project.created`, `.archived`, `.unarchived`, `.moved` | A project changed in the tree. |
+| `link.created`, `link.deleted` | A conversation was linked to another, or unlinked. |
+| `identity_link.created` | Someone linked a channel account. Only they see it. |
+
+An event of a kind your SDK version doesn't know arrives with `kind` set to `unrecognized` and the original in `rawKind`.

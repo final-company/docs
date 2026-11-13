@@ -17,7 +17,7 @@ flowchart LR
 
 ## An agent is a document
 
-You define an agent with `defineAgent` in one module that lists every part explicitly: instructions, skills, tools, hooks, schedules, and its requirements. The SDK turns that value into the agent's **document**, plain JSON that includes each tool's name and schema and the source of each serverless tool. Final stores a document by its content hash, so the same agent always has the same identity. See [the agent module](/build/project-structure).
+You define an agent with `defineAgent` in one module that lists every part explicitly: instructions, skills, tools, hooks, and its requirements. The SDK turns that value into the agent's **document**, plain JSON that includes each tool's name and schema and the source of each serverless tool. Final stores a document by its content hash, so the same agent always has the same identity. See [the agent module](/build/project-structure).
 
 Nothing is built or deployed. Starting a session sends the document with the call. To let others fetch the agent, you **publish** it under a name, which points the name at a hash. See [publishing](/operate/publishing).
 
@@ -57,12 +57,13 @@ Some steps wait for a person: approving a tool call, answering a question, or si
 
 ## Triggers: how work arrives
 
-Most sessions start because your app sends a message. Two other triggers start work on their own:
+Most sessions start because your app sends a message. Work can also arrive without one:
 
-- [Schedules](/build/schedules) send the agent a prompt on a cron schedule, with a `provide` set up once.
-- [Channels](/build/channels) turn events from an outside surface, like a webhook or a chat app, into messages in Final's chats.
+- **Inputs** hand a conversation's agent something to act on that isn't a member's message, like a finished build. See [send an input](/client/conversations#send-an-input-from-another-system).
+- [Schedules](/build/schedules) are timers in a conversation. Each firing prompts one agent participant, with what that participant was provided.
+- [Channels](/build/channels) turn an outside surface, like a webhook or a chat app, into people, places, and inputs in Final's chats.
 
-[Hooks](/build/hooks) run your code when something happens in a session, without changing what the agent does.
+[Hooks](/build/hooks) run your code when something happens in a session, without changing what the agent does. The [event feed](/operate/events) tells your systems what changed across a project.
 
 ## Sessions or conversations
 
