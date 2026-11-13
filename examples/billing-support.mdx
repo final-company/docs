@@ -239,12 +239,10 @@ This script plays the support agent: it starts a session, sends each line you ty
 import { createInterface } from 'node:readline/promises';
 import { sessionUpdateOf, textOf } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { client, project } from './client.js';
 
 const terminal = createInterface({ input: process.stdin, output: process.stdout });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const { handle } = await project.sessions.create({
   agent,
@@ -252,7 +250,6 @@ const { handle } = await project.sessions.create({
     harness: serverlessFinal({
       model: 'deepseek-v4.1-flash',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
   },
 });

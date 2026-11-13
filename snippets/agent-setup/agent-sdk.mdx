@@ -4,7 +4,7 @@ Look at the project first, then ask me what the agent should do if it isn't obvi
 Write one agent.ts module that exports the agent made with defineAgent, an instructions.md beside it, and one serverless tool (defineServerlessTool) that does the agent's core job. Declare what it requires under require: a harness with a permission ceiling, plus compute or integration slots only if it needs them.
 Run npx final-agents print ./agent.ts and fix every error before moving on.
 If FINAL_API_KEY or FINAL_PROJECT_ID isn't set, walk me through creating a key in the Final dashboard and exporting both in my shell. Never write the key to a file tracked by Git.
-Write a run.ts that creates a client and project, creates a Workers sandbox with project.sandboxes.create(workers()) and the idempotency key workers, and starts a session with provide.harness set to serverlessFinal with finalCredits() inference and that sandbox as its environment. Run it with npx tsx run.ts and show me the reply.
+Write a run.ts that creates a client and project and starts a session with provide.harness set to serverlessFinal with finalCredits() inference; the SDK creates the Workers sandbox it runs in. Run it with npx tsx run.ts and show me the reply.
 Then publish it with npx final-agents publish ./agent.ts followed by --name and a name we agree on.
 Finish by listing the files you created and how to send the next message.
 </Prompt>

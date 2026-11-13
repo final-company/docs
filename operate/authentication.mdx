@@ -52,7 +52,7 @@ await project.sessions.create({
 Inference is part of the harness settings, so whoever starts the agent decides how it's paid for, per call. The agent's author doesn't:
 
 ```ts
-serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() });
 ```
 
 This uses Final's metered inference and bills the project. To use a project API key or a person's own subscription, see [inference sources](/harnesses/settings#inference-sources).

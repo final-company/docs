@@ -28,6 +28,12 @@ import * as z from 'zod';
 export const releaseStatus = defineServerlessTool({
   description: 'Get the CI, changelog, and sign-off status of a release.',
   inputSchema: z.object({ version: z.string().describe('Semantic version, like 1.2.0') }),
+  outputSchema: z.object({
+    version: z.string(),
+    ciPassing: z.boolean(),
+    changelogUpdated: z.boolean(),
+    signedOff: z.boolean(),
+  }),
   annotations: { readOnlyHint: true },
   execute: async ({ version }, ctx) => {
     const token = await ctx.secrets.get('RELEASE_SERVICE_TOKEN');
@@ -50,6 +56,7 @@ secrets: ['RELEASE_SERVICE_TOKEN'],
 ```
 
 - **`description` and `inputSchema`** are what the model reads to decide when to call the tool and what to pass. Write them for the model: say what the tool returns, and describe each argument.
+- **`outputSchema`** describes the result, so your own code can read it typed with [`toolResultFrom`](/build/hooks#react-to-a-specific-tools-result).
 - **`ctx.secrets.get()`** reads a project secret listed in `secrets`, so the token never appears in your source. See [secrets](/operate/authentication#use-secrets-in-your-code).
 - **`ctx.signal`** fires when the call is cancelled. Pass it to `fetch` so the request stops too.
 - **Throwing an error** tells the agent the call failed, with your message. It can retry, try something else, or explain the problem.

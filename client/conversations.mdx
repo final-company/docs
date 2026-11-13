@@ -15,7 +15,7 @@ A conversation is a chat that Final stores for you. People and agents are its pa
 
 Under the hood, each agent in a conversation works in its own session. Final creates it the first time a message reaches that agent, from what that participant was provided.
 
-Conversations belong to people: the examples here use a client signed in as a person, created with `createClient({ auth: { bearer: getToken } })` or `{ cookies: true }` in a browser. A project API key has no person inbox, so use [sessions](/client/sessions) to build your own application with an API key.
+Conversations belong to people, or to your app's own users. The examples here use a client signed in as a person, created with `createClient({ auth: { bearer: getToken } })` or `{ cookies: true }` in a browser. With an API key, pass `actor: { externalId, displayName? }` to create a conversation as one of your app's users; a project API key has no inbox of its own.
 
 ## Send a message
 
@@ -24,14 +24,12 @@ Conversations belong to people: the examples here use a client signed in as a pe
 ```ts
 import { createClient } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 
 const client = createClient({ auth: { bearer: getToken } });
 const project = client.project({ id: 'prj_your_project' });
 
 const agent = await project.agents.get({ name: 'release-assistant' });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
-const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() });
 
 const chat = await project.conversations.direct({ agent, provide: { harness } });
 const sent = await chat.send('What is blocking 1.2.0?');
@@ -49,14 +47,13 @@ Save `chat.conversation.id` to reopen the same chat later with `client.conversat
 
 ### Find a chat without creating one
 
-`findDirect` and `findHome` look up the person's existing chats and create nothing:
+`findDirect` looks up the person's direct chat with an agent, by the agent's ID, and creates nothing:
 
 ```ts
 const existing = await project.conversations.findDirect({ agent: 'agt_your_agent' });
-const home = await project.conversations.findHome();
 ```
 
-`project.conversations.home({ provide })` opens the person's Home thread with the project's agent, creating it the first time.
+To find chats your app made, give them [labels](#label-conversations) and list by label.
 
 ## Show messages live
 
@@ -137,12 +134,12 @@ User IDs come from `client.people.all()`, which lists your organization's member
 
 ## Change an agent's settings
 
-An agent participant's settings are its stored `provide`, plus per-chat `instructions` and a narrower `tools` list. Read them, then change them with the revision you read:
+An agent participant's settings are its stored `provide`, plus a narrower `tools` list for this chat. Read them, then change them with the revision you read:
 
 ```ts
 const settings = await room.participants.settings(added.id);
 await room.participants.provide(added.id, {
-  harness: serverlessFinal({ model: 'gpt-6.1-sol', inference: finalCredits(), environment: runtime.id }),
+  harness: serverlessFinal({ model: 'gpt-6.1-sol', inference: finalCredits() }),
   revision: settings.revision,
 });
 ```
@@ -151,19 +148,63 @@ await room.participants.provide(added.id, {
 
 A change within one harness, like another model, applies to the running session. Switching to a different harness replaces the session after the current turn, keeping the transcript, sandboxes, and integrations.
 
-## Post an event from another system
-
-`postEvent` tells the conversation's default agent that something happened outside the chat, like a finished build. The agent receives it as input and replies in the conversation, with the source shown as the reply's caption:
+Only the conversation's managers, or editors of the channel install that made it, change settings directly. Anyone else, including the agent, proposes a change for a manager to decide:
 
 ```ts
-await room.postEvent({
-  source: { id: 'release-build', name: 'Release build' },
-  eventId: `build-${buildId}:completed`,
-  text: 'The release build for 1.2.0 completed. All 214 tests passed.',
+const view = await room.participants.configuration.get(added.id);
+if (!view.canConfigure) {
+  await room.participants.configuration.propose(added.id, {
+    requestKey: 'use-gpt-6.1',
+    expectedRevision: view.revision,
+    reason: 'The release notes need a stronger model.',
+    configuration: { harness: serverlessFinal({ model: 'gpt-6.1-sol', inference: finalCredits() }) },
+  });
+}
+```
+
+`view` also shows what the agent is provided once every scope is applied, each requirement's status, and the open proposals. A manager accepts or declines one with `configuration.decide(participantId, { proposalId, accept })`.
+
+## Give agents standing context
+
+Text an agent should keep in mind in this chat, like the release it's working on or how this team writes, is **standing context**. Each entry has a key you choose. The agent gets it at its next turn, again whenever you change it, and again after its context is compacted:
+
+```ts
+await room.context.set('release', {
+  role: 'context',
+  text: 'This room is for release 1.2.0. The release owner is Morgan Lee.',
+});
+await room.context.set('style', { role: 'instruction', text: 'Answer in short bullet lists.' });
+```
+
+`instruction` entries are guidance the agent follows; `context` entries are background it may use. Pass `participantId` to address one agent instead of all of them. `room.context.delete(key)` stops delivering an entry without telling the agent, so write replacement text when it should know something changed.
+
+## Label conversations
+
+Labels are tags your app puts on conversations to find them again, like the chat for ticket 42. Only your app sees its labels, and Final never interprets them:
+
+```ts
+await room.labels.set({ ticket: 'ENG-42' });
+const { conversations } = await client.conversations.list({ projectId: project.id, labels: { ticket: 'ENG-42' } });
+```
+
+You can also pass `labels` to `project.conversations.create`. Writing labels needs the `labels:write` permission.
+
+## Send an input from another system
+
+An input hands the conversation's agent something to act on that isn't a member's message, like a finished build. The agent replies in the conversation, and its reply is captioned with the input's `label`:
+
+```ts
+await room.inputs.send({
+  from: { id: 'release-build', name: 'Release build' },
+  label: 'Release build',
+  content: 'The release build for 1.2.0 completed. All 214 tests passed.',
+  idempotencyKey: `build-${buildId}:completed`,
 });
 ```
 
-Final accepts each `eventId` from a source once, so retrying a failed request never notifies the agent twice. To receive events from systems you don't control, like GitHub webhooks, use a [channel](/build/channels).
+`from` names the source, and sending the same `idempotencyKey` from the same source again returns the first receipt, so retrying a failed request never notifies the agent twice. `participantId` picks an agent other than the default one. Pass `replyExpected: false` when the agent should reply only if it has something to say, and `context` for quoted background. An input from an API key acts for nobody unless it names an `actor`, and an input that acts for nobody waits behind any running turn.
+
+To receive events from systems you don't control, like GitHub webhooks, use a [channel](/build/channels). For prompts on a timer, use a [schedule](/build/schedules).
 
 ## Approvals and stopping work
 

@@ -26,6 +26,7 @@ This agent reviews a public pull request. It reads the diff with one read-only t
 
 ```ts agent.ts
 import { defineAgent, defineServerlessTool, markdown } from '@finalai/agents';
+import { FinalHarness } from '@finalai/agents/harnesses';
 import * as z from 'zod';
 
 const readPullRequest = defineServerlessTool({
@@ -59,7 +60,7 @@ export const agent = defineAgent({
   instructions: markdown('./instructions.md', { from: import.meta.url }),
   tools: { read_pull_request: readPullRequest },
   require: {
-    harness: { permissionMode: 'ask', recommended: { harness: 'final', model: 'deepseek-v4.1-flash' } },
+    harness: { permissionMode: 'ask', recommended: { harness: FinalHarness.Final, model: 'deepseek-v4.1-flash' } },
   },
 });
 ```
@@ -116,12 +117,10 @@ export const project = client.project({ id: projectId });
 
 ```ts review.ts
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { client, project } from './client.js';
 
 // The published agent, as data. Its only tool is serverless, so it runs without this script.
 const agent = await project.agents.get({ name: 'pr-reviewer' });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const [owner, repo, number] = process.argv.slice(2);
 if (owner == null || repo == null || number == null)
@@ -133,7 +132,6 @@ const { handle, response } = await project.sessions.create({
     harness: serverlessFinal({
       model: 'deepseek-v4.1-flash',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
   },
   message: `Review ${owner}/${repo} pull request ${number}, including authorization checks and test coverage.`,

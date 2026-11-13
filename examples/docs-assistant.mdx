@@ -35,6 +35,7 @@ This agent answers developer questions about an API, the Acme Pay API in this ex
 
 ```ts agent.ts
 import { defineAgent, markdown, skill } from '@finalai/agents';
+import { FinalHarness } from '@finalai/agents/harnesses';
 
 export const agent = defineAgent({
   name: 'Docs Assistant',
@@ -52,7 +53,7 @@ export const agent = defineAgent({
   require: {
     harness: {
       permissionMode: 'ask',
-      recommended: { harness: 'pi', model: 'gpt-6.1-sol', reasoning: 'low' },
+      recommended: { harness: FinalHarness.Pi, model: 'gpt-6.1-sol', reasoning: 'low' },
     },
   },
 });
@@ -182,11 +183,8 @@ The output lists `webhooks`, `errors`, and `api-versions` under `skills`, with e
 
 ```ts ask.ts
 import { finalCredits, serverlessPi } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { client, project } from './client.js';
-
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 
 const { handle, response } = await project.sessions.create({
   agent,
@@ -195,7 +193,6 @@ const { handle, response } = await project.sessions.create({
       model: 'gpt-6.1-sol',
       reasoning: 'low',
       inference: finalCredits(),
-      environment: runtime.id,
     }),
   },
   message: 'Every webhook fails signature verification in my Express app. What am I doing wrong?',

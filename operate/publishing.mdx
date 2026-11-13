@@ -3,7 +3,7 @@ title: "Testing and publishing"
 description: "Try changes by starting sessions, publish an agent by name, and roll back by pointing the name at an earlier hash."
 ---
 
-An agent is a document stored by its content hash, and nothing is built or deployed. Starting a session sends the document with the call, so trying a change is just starting a session with the edited agent. **Publishing** gives a hash a name, so others in the project can fetch the agent and Final's chats, schedules, and channels can use it.
+An agent is a document stored by its content hash, and nothing is built or deployed. Starting a session sends the document with the call, so trying a change is just starting a session with the edited agent. **Publishing** gives a hash a name, so others in the project can fetch the agent, and Final's chats and channel installs can use it.
 
 ## Try a change
 
@@ -43,10 +43,7 @@ const published = await project.agents.publish({ agent, name: 'release-assistant
 console.log(published.name, published.hash);
 ```
 
-Publishing does two things:
-
-1. **Points the name at the hash.** New sessions that fetch the agent by name use it. Sessions already running keep the hash they started with, so a publish never changes an agent in the middle of a conversation.
-2. **Updates the agent's schedules.** Each schedule in the document is created or updated by its key, and schedules the document no longer has are turned off. See [schedules](/build/schedules).
+Publishing points the name at the hash. New sessions that fetch the agent by name use it, and so do channel installs that name the agent. Sessions already running keep the hash they started with, so a publish never changes an agent in the middle of a conversation.
 
 Names use lowercase letters, digits, `.`, `_`, and `-`, and are unique in a project.
 
@@ -83,9 +80,20 @@ Final doesn't watch your repository: an agent is published only when something c
 const agent = await project.agents.get({ name: 'release-assistant' });
 ```
 
-Fetch by `{ name }`, `{ id }`, or `{ hash }` for an exact version. A fetched agent is data: pass it to `project.sessions.create`, a conversation participant, or `publish` like the value you defined. Its serverless tools run as usual. An in-process tool can't run for a caller that doesn't hold its code, so `agent.inProcess` lists them and starting such an agent fails with `code_unavailable`. Agents meant for Final's chats, schedules, and teammates who fetch them use [serverless tools](/build/tools#in-process-or-serverless).
+Fetch by `{ name }`, `{ id }`, or `{ hash }` for an exact version. A fetched agent is data: pass it to `project.sessions.create`, a conversation participant, or `publish` like the value you defined. Its serverless tools run as usual. An in-process tool can't run for a caller that doesn't hold its code, so `agent.inProcess` lists them and starting such an agent fails with `code_unavailable`. Agents meant for Final's chats, channels, and teammates who fetch them use [serverless tools](/build/tools#in-process-or-serverless).
 
-`project.agents.list()` lists the agents published in the project and those it inherits from parent projects.
+`project.agents.list()` lists the agents published in the project and those it inherits from parent projects. `client.agents.get({ id })` reads one agent by ID in whichever project owns it.
+
+## Make a name public
+
+A name normally resolves only in its project and the projects below it. To let any organization use an agent, harness, ACP adapter, or channel, claim a publisher handle for your project once and publish with `visibility: 'public'`:
+
+```ts
+await project.publisher.claim({ handle: 'acme' });
+await project.agents.publish({ agent, name: 'release-assistant', visibility: 'public' });
+```
+
+Anyone can then name it as `acme/release-assistant`, such as `project.agents.get({ name: 'acme/release-assistant' })`, and `client.publishers.get('acme').agents.list()` lists a publisher's public agents. A project claims its handle once, and it never changes. `project.publicNames.publish({ kind, name })` makes a name you already published public, and `withdraw` takes it back.
 
 ## Review history and roll back
 

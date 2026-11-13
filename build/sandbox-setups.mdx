@@ -13,7 +13,7 @@ What the machine is built from (its image, preinstalled toolchains, size, and re
 import { defineSandboxSetup } from '@finalai/agents/sandboxes';
 
 export const setup = defineSandboxSetup({
-  repositories: [{ alias: 'storefront', repository: 'acme/storefront', ref: 'main' }],
+  repositories: [{ alias: 'storefront', url: 'https://github.com/acme/storefront.git', ref: 'main' }],
   variables: {
     NODE_ENV: { value: 'development' },
     NPM_TOKEN: { secret: 'NPM_TOKEN' },
@@ -42,7 +42,7 @@ Paths are relative to the sandbox's working directory: the `storefront` reposito
 
 Final applies the setup through the sandbox itself, after the provider reports the machine running:
 
-1. **Repositories** are checked out.
+1. **Repositories** are cloned, inside the sandbox, through its outbound network.
 2. **Commands** become named scripts the agent can run in its shell.
 3. **Steps** run once per sandbox, in order. A failing step stops the sandbox from attaching, unless it's `optional`.
 4. **Services** start after every boot.
@@ -55,8 +55,8 @@ Each phase is recorded, so a sandbox that resumes after a pause redoes only what
 
 ## Setup reference
 
-<ParamField path="repositories" type="{ alias, repository, ref? }[]">
-  `repository` is `owner/name` on the project's connected git host, or a clone URL. `ref` is a branch, tag, or commit; the default branch when absent. `alias` is the checkout's directory name, which steps and commands use as `cwd`. The project must be able to reach the repository.
+<ParamField path="repositories" type="{ alias, url, ref?, integration? }[]">
+  `url` is an `https://` git URL. `ref` is a branch, tag, or commit; the default branch when absent. `alias` is the checkout's directory name, which steps and commands use as `cwd`. The clone carries no credential of its own, so a private repository names `integration`: an [egress integration](/build/integrations#credentials-for-a-sandboxs-traffic) of the sandbox's project whose credential serves the URL's host. The sandbox's traffic may use that integration from the first boot.
 </ParamField>
 
 <ParamField path="variables" type="Record<string, { value } | { secret }>">

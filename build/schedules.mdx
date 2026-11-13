@@ -1,105 +1,103 @@
 ---
 title: "Schedules"
-description: "Send your agent a prompt on a cron schedule, like a daily digest."
+description: "Prompt an agent in a conversation on a timer: a weekday digest, an hourly check, or a one-time reminder."
 ---
 
-A schedule sends your agent the same prompt on a timer, so it can do recurring work without anyone asking: a morning summary of yesterday's releases, a weekly report, an hourly check. The agent's reply is posted to a conversation where you can read it.
+A schedule is a timer in a [conversation](/client/conversations). Each time it fires, it hands one agent participant its prompt, and the agent's reply is posted in the conversation. Use schedules for recurring work nobody asks for each time: a morning summary of yesterday's releases, a weekly report, an hourly check.
 
-## Add a schedule
+A schedule isn't part of the agent's definition. It belongs to a conversation and one agent participant in it, and each firing runs with what that participant is provided there, so there's nothing separate to set up for runs. People and your app create schedules through the API, and an agent provided [Final's gateway](/build/integrations#finals-gateway) can create its own: asking it "every weekday at 9, summarize yesterday's releases" is enough.
 
-Declare schedules on the agent. The key names the schedule:
+## Create a schedule
 
-```ts agent.ts
-import { defineAgent } from '@finalai/agents';
-
-export const agent = defineAgent({
-  name: 'Release Digest',
-  instructions: 'You summarize releases for the team.',
-  require: {
-    harness: { permissionMode: 'ask' },
-    integrations: { releases: { description: 'Where releases are tracked' } },
-  },
-  schedules: {
-    'daily-digest': {
-      cron: '0 9 * * 1-5',
-      timezone: 'America/Los_Angeles',
-      prompt: 'Summarize the releases that shipped in the last 24 hours. List anything blocking the next release, with an owner for each item.',
-    },
-  },
-});
-```
-
-This runs at 9:00 a.m. Los Angeles time, Monday through Friday. `prompt` can also be `markdown('./digest.md', { from: import.meta.url })`.
-
-Schedules exist once the agent is [published](/operate/publishing). Publishing creates or updates each schedule by its key and turns off schedules the new document no longer has. Sessions you start directly never trigger them.
-
-```bash
-npx final-agents publish ./agent.ts --name release-digest
-```
-
-## Provide what runs need
-
-Nobody is present when a schedule fires, so it carries its own `provide`, set up once. Each run is checked against the agent's requirements like any other call that starts work:
+Create the conversation with the agent and what it's provided, then add the schedule to it:
 
 ```ts schedule.ts
-import { createClient } from '@finalai/agents/client';
+import { createClient, ScheduleDelivery, ScheduleTriggerType } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 
 const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! }, localCompute: false });
 const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
 
 const agent = await project.agents.get({ name: 'release-digest' });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 const releases = await project.integrations.get({ name: 'github' });
 
-const [digest] = await client.schedules.list({ agent: agent.id! });
-if (digest == null) throw new Error('Publish the agent first');
-
-await client.schedules.update({
-  scheduleId: digest.id,
-  provide: {
-    harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id }),
-    integrations: { releases },
-  },
+const chat = await project.conversations.create({
+  kind: 'group',
+  title: 'Release digest',
+  actor: { externalId: 'release-team', displayName: 'Release team' },
+  participants: [
+    { user: 'usr_your_user_id' },
+    {
+      agent,
+      provide: {
+        harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() }),
+        integrations: { releases },
+      },
+    },
+  ],
 });
+
+const digest = await chat.createSchedule({
+  name: 'Weekday digest',
+  prompt: 'Summarize the releases that shipped in the last 24 hours. List anything blocking the next release, with an owner for each item.',
+  trigger: { type: ScheduleTriggerType.Cron, expression: '0 9 * * 1-5', timezone: 'America/Los_Angeles' },
+  delivery: ScheduleDelivery.Always,
+});
+console.log(chat.id, digest.nextRunAt);
 ```
 
-`update` fails with `requirements_unmet` unless the `provide` meets the agent's requirements. Keep in mind that no person is acting:
+This runs at 9:00 a.m. Los Angeles time, Monday through Friday, in the conversation the script created, and the person you added reads each digest there in Final. `client.people.all()` lists your organization's members and their IDs. A conversation created with an API key belongs to one of your app's own users, the `actor`; a client signed in as a person creates it as that person.
+
+Each firing acts for whoever created the schedule, and nobody is there to answer. Keep that in mind when you choose what the agent is provided:
 
 - **Integrations** should use a project secret or a shared sign-in (`oauth({ credential: 'shared' })`), since there's no one to show a sign-in card to.
-- **Compute** must be a specific sandbox. There's no calling process to lend its machine, and runs of one schedule share that sandbox's disk.
-- **Inference** can't rely on a personal subscription; use a project key or `finalCredits()`.
+- **Compute** must be a specific sandbox, provided in the conversation. There's no calling process to lend its machine, and every firing uses that sandbox's disk.
+- **Inference** should end with a source that doesn't need a person, like a project key or `finalCredits()`.
 
-## Where replies go
+## Schedule options
 
-<ParamField path="target" type="'owner-direct' | 'bound-conversation'" default="'owner-direct'">
-  `owner-direct` posts to the owner's direct conversation with the agent, for an agent in a person's own project. In a Shared project, set `target: 'bound-conversation'` and [connect a place](/build/channels#link-a-person-and-connect-a-place) to the chat that should receive runs; a run is refused unless exactly one chat is connected.
+<ParamField path="name" type="string" required>
+  What the schedule is, as people see it in the conversation.
 </ParamField>
 
-<ParamField path="cron" type="string" required>
-  A five-field cron expression: minute, hour, day of month, month, day of week. `0 9 * * 1-5` means 9:00 on weekdays.
+<ParamField path="prompt" type="string" required>
+  What the agent is asked each time the schedule fires.
 </ParamField>
 
-<ParamField path="timezone" type="string" default="UTC">
-  An IANA time zone such as `America/Los_Angeles` or `Europe/Berlin`. Set it explicitly so "9 a.m." means what you expect.
+<ParamField path="trigger" type="{ type: 'cron', expression, timezone } | { type: 'once', at }" required>
+  When it fires. A `cron` trigger takes a five-field expression (minute, hour, day of month, month, day of week) and an IANA time zone such as `Europe/Berlin`. A `once` trigger takes a future timestamp with `Z` or a UTC offset, and turns the schedule off after it fires.
+</ParamField>
+
+<ParamField path="delivery" type="'always' | 'if_needed'" required>
+  `always` posts a reply on every firing, as a reminder should. `if_needed` lets the agent stay silent when it has nothing to report, which suits checks like "tell me if the build is red".
+</ParamField>
+
+<ParamField path="agentParticipantId" type="string">
+  The agent participant the schedule belongs to. You can leave it out when the conversation has one agent.
+</ParamField>
+
+<ParamField path="enabled" type="boolean" default="true">
+  Whether the schedule fires.
 </ParamField>
 
 ## Run a schedule now
 
-`runNow` triggers a schedule immediately, which is handy for testing a new prompt. It returns as soon as the run starts:
+`runSchedule` fires a schedule immediately, which is handy for testing a new prompt. It returns as soon as the firing is handed to the agent:
 
 ```ts
-const run = await client.schedules.runNow({ scheduleId: digest.id });
-console.log(run.conversationId);
+const run = await chat.runSchedule({ scheduleId: digest.id });
+console.log(run.conversationId, run.inputId);
 ```
 
-Open that chat in Final to read the reply once the agent finishes.
+The reply arrives in the conversation as the agent's message, captioned with the schedule.
 
-## Pause or change a schedule
+## Pause, change, or delete a schedule
 
 ```ts
-await client.schedules.update({ scheduleId: digest.id, enabled: false });
+await chat.updateSchedule({ scheduleId: digest.id, enabled: false });
+await chat.deleteSchedule({ scheduleId: digest.id });
 ```
 
-`update` also accepts `cron`, `timezone`, `prompt`, and `provide`, so you can adjust a schedule without publishing again. Each schedule's `nextRunAt` and `provide` are on what `list` returns.
+`updateSchedule` also accepts `name`, `prompt`, `trigger`, and `delivery`. The schedule's agent, and the conversation's owners and admins, can change it. To change what runs get, change what the participant is provided with [`participants.provide`](/client/conversations#change-an-agents-settings).
+
+`chat.schedules()` lists a conversation's schedules, and `project.schedules.list()` lists every schedule in a project's conversations, each with its `nextRunAt` and `lastRunAt`.

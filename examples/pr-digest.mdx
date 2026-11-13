@@ -7,9 +7,7 @@ icon: "newspaper"
 
 Every weekday at 9 a.m., this agent reads your repository's pull requests and posts a short digest: what merged since the last one, what's been waiting on review, and which ready pull requests have failing checks. Use it to replace the "what happened yesterday?" part of standup, or to keep reviews from going stale.
 
-**What it shows:** a [schedule](/build/schedules) declared on the agent, an [integration requirement](/build/integrations) limited to read-only tools with an annotation selector, giving the schedule what its runs need, and triggering a run with `runNow`.
-
-Use your personal **My Work** project for this version. The schedule's default `owner-direct` target posts to your direct chat with the agent there. For a Shared project, see [make it yours](#make-it-yours).
+**What it shows:** an [integration requirement](/build/integrations) limited to read-only tools with an annotation selector, a conversation whose agent is provided what unattended runs need, a [schedule](/build/schedules) in that conversation, and firing it with `runSchedule`.
 
 ## Files
 
@@ -25,7 +23,7 @@ Use your personal **My Work** project for this version. The schedule's default `
 
 </Tree>
 
-The agent requires a `github` slot. `allowAnnotations: [{ readOnlyHint: true }]` exposes every tool the server marks as read-only, so whatever GitHub server fills the slot, the agent can search and read pull requests but can't comment, merge, or push. The schedule is a prompt with a timer: 9:00 a.m. New York time, Monday through Friday.
+The agent requires a `github` slot. `allowAnnotations: [{ readOnlyHint: true }]` exposes every tool the server marks as read-only, so whatever GitHub server fills the slot, the agent can search and read pull requests but can't comment, merge, or push. The agent says nothing about when it runs: the schedule belongs to the conversation it posts in.
 
 ```ts agent.ts
 import { defineAgent, markdown } from '@finalai/agents';
@@ -41,13 +39,6 @@ export const agent = defineAgent({
         description: 'GitHub, to read pull requests, reviews, and checks',
         tools: { allowAnnotations: [{ readOnlyHint: true }] },
       },
-    },
-  },
-  schedules: {
-    'morning-digest': {
-      cron: '0 9 * * 1-5',
-      timezone: 'America/New_York',
-      prompt: "Write this morning's pull request digest for acme/web.",
     },
   },
 });
@@ -71,7 +62,7 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
 
 <Steps>
   <Step title="Create the project">
-    Create the project the same way as in the [quickstart](/quickstart), add the files above, and export `FINAL_API_KEY` and `FINAL_PROJECT_ID` for your My Work project. `client.ts` is the same as in the quickstart.
+    Create the project the same way as in the [quickstart](/quickstart), add the files above, and export `FINAL_API_KEY` and `FINAL_PROJECT_ID`. `client.ts` is the same as in the quickstart.
 
     ```bash
     mkdir pr-digest && cd pr-digest
@@ -104,7 +95,7 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
     ```
   </Step>
   <Step title="Publish it">
-    Publishing gives the agent a name in the project and creates its schedules:
+    Publishing gives the agent a name in the project:
 
     ```bash
     npx final-agents publish ./agent.ts --name pr-digest
@@ -117,48 +108,58 @@ Keep the digest under 25 lines, and don't add a greeting or sign-off.
   </Step>
 </Steps>
 
-## Give the schedule what it needs
+## Schedule the digest
 
-A published schedule has no harness or integrations yet, so it can't run. Like every call that starts work, it needs a `provide` that meets the agent's requirements; an incomplete one is refused with `requirements_unmet`. This script sets it, then runs the schedule once so you don't have to wait for 9 a.m.:
+The schedule fires in a conversation, for the agent participant it belongs to, with what that participant is provided there. Nobody is present when it fires, so the agent gets the token-based integration and Final's metered inference. This script creates the chat with you and the agent in it, adds the schedule, and fires it once so you don't have to wait for 9 a.m.:
 
 ```ts schedule.ts
+import { ScheduleDelivery, ScheduleTriggerType } from '@finalai/agents/client';
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { client, project } from './client.js';
 
+const userId = process.argv[2];
+if (userId == null) throw new Error('Usage: npx tsx schedule.ts YOUR_USER_ID');
+
 const agent = await project.agents.get({ name: 'pr-digest' });
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
 const github = await project.integrations.get({ name: 'github' });
 
-const schedules = await client.schedules.list({ agent: agent.id ?? undefined });
-const digest = schedules.find((schedule) => schedule.key === 'morning-digest');
-if (digest == null) throw new Error('Publish the agent first: its schedules appear when it is published');
+const chat = await project.conversations.create({
+  kind: 'group',
+  title: 'PR digest',
+  actor: { externalId: 'pr-digest-setup', displayName: 'PR digest setup' },
+  participants: [
+    { user: userId },
+    {
+      agent,
+      provide: {
+        harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() }),
+        integrations: { github },
+      },
+    },
+  ],
+});
 
-// What every run of the schedule starts with.
-await client.schedules.update({
-  scheduleId: digest.id,
-  provide: {
-    harness: serverlessFinal({
-      model: 'deepseek-v4.1-flash',
-      inference: finalCredits(),
-      environment: runtime.id,
-    }),
-    integrations: { github },
-  },
+const digest = await chat.createSchedule({
+  name: 'Morning digest',
+  prompt: "Write this morning's pull request digest for acme/web.",
+  trigger: { type: ScheduleTriggerType.Cron, expression: '0 9 * * 1-5', timezone: 'America/New_York' },
+  delivery: ScheduleDelivery.Always,
 });
 console.log(`Next run: ${digest.nextRunAt}`);
 
 // Run it once now instead of waiting for 9 a.m.
-const run = await client.schedules.runNow({ scheduleId: digest.id });
+const run = await chat.runSchedule({ scheduleId: digest.id });
 console.log(JSON.stringify(run, null, 2));
 client.close();
 ```
 
+Pass your own user ID, which `client.people.all()` lists:
+
 ```bash
-npx tsx schedule.ts
+npx tsx schedule.ts usr_your_user_id
 ```
 
-After a minute or so, open your direct chat with **PR Digest** in Final to read a digest like:
+After a minute or so, open the **PR digest** chat in Final to read a digest like:
 
 ```text
 Merged
@@ -172,9 +173,10 @@ Failing checks
 - #1293 Bump the payments SDK to 4.2 (@renovate): e2e / checkout failed
 ```
 
-To change the time or pause it, use `client.schedules.update` with `cron`, `timezone`, or `enabled: false`. See [schedules](/build/schedules#provide-what-runs-need).
+The schedule runs at 9:00 a.m. New York time, Monday through Friday. To change the time or pause it, use `chat.updateSchedule` with a new `trigger` or `enabled: false`. See [schedules](/build/schedules#pause-change-or-delete-a-schedule).
 
 ## Make it yours
 
-- **Post it in a Shared chat.** Add `target: 'bound-conversation'` to the schedule and publish in the Shared project, then connect a provider place to the chat it should post in, as described in [channels](/build/channels). Runs are refused until exactly one chat is connected.
+- **Add your team.** Add each teammate as a `{ user }` participant, or add them to the chat in Final.
+- **Only post when something needs attention.** Use `delivery: ScheduleDelivery.IfNeeded` and ask in the prompt for failing checks only. The agent stays silent on quiet mornings.
 - **Cover more repositories.** List them in `instructions.md`, and give the token read access to each one.

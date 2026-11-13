@@ -22,7 +22,7 @@ export const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
 `client.project({ id })` scopes everything you create, and a session can only be provided sandboxes and integrations from its own project.
 
 <Warning>
-Create the client on your server, never in browser code. Your [API key](/api-keys) can run every agent in its project. Browsers should call your backend, which calls Final.
+Never put an [API key](/api-keys) in browser or app code: it can run every agent in its project. Create an API key client on your server and have browsers call your backend. A client that runs in a browser or a React Native app signs in as the person instead; see [browsers, React Native, and Workers](/build/where-code-runs#browsers-react-native-and-workers).
 </Warning>
 
 `localCompute: false` keeps your server from lending its own machine to agents: a `files` or `shell` requirement you leave out fails instead of running in the server. Leave it on for scripts and tools you run on your own machine. See [where code and compute run](/build/where-code-runs).
@@ -33,12 +33,10 @@ Create the client on your server, never in browser code. Your [API key](/api-key
 
 ```ts
 import { finalCredits, serverlessFinal } from '@finalai/agents/harnesses';
-import { workers } from '@finalai/agents/sandboxes';
 import { agent } from './agent.js';
 import { project } from './server/final.js';
 
-const runtime = await project.sandboxes.create(workers(), { idempotencyKey: 'workers' });
-const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtime.id });
+const harness = serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() });
 
 const { handle, response } = await project.sessions.create({
   agent,
@@ -104,7 +102,9 @@ for await (const event of response!.stream()) {
 }
 ```
 
-The loop ends when the turn ends. These are the updates you'll use most:
+The loop ends when the turn ends. `stream()` reads the session's saved record. For text that appears the moment the model writes it, `handle.textEvents()` streams the agent's text ahead of that record, live only; start from `handle.liveText()`, what the open turn has written so far.
+
+These are the updates you'll use most:
 
 | `sessionUpdate` | What it means | Show it as |
 | --- | --- | --- |
@@ -125,11 +125,11 @@ import { agent } from '../../../agent.js';
 import { project } from '../../../server/final.js';
 
 export async function POST(request: Request) {
-  const { message, runtimeId } = await request.json();
+  const { message } = await request.json();
   const { handle, response } = await project.sessions.create({
     agent,
     provide: {
-      harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits(), environment: runtimeId }),
+      harness: serverlessFinal({ model: 'deepseek-v4.1-flash', inference: finalCredits() }),
     },
     message,
   });
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
 }
 ```
 
-The browser reads the body as it arrives and keeps the session ID for follow-up messages. In your own app, keep the Workers sandbox ID in configuration rather than taking it from the request.
+The browser reads the body as it arrives and keeps the session ID for follow-up messages.
 
 ## Handle approvals
 
@@ -272,4 +272,5 @@ In-process tools and local compute need the process that created the session. Af
 | `session.provide()` | The provide document the session was resolved with. |
 | `session.manifest()` | The agent document the session pins and its provide document. |
 | `session.decisions()` | The session's open decisions. |
+| `session.plan()` | The latest plan the agent reported, with its history. |
 | `session.setConfigOption({ configId, value })` | Changes an option the harness advertises, like the model or reasoning level. |

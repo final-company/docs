@@ -6,6 +6,8 @@ description: "Require slots for MCP servers in the agent, create integrations in
 
 An integration gives the agent every tool an MCP server offers, without writing a tool for each one: your issue tracker, your code host, or Final's own gateway. The agent declares named **slots** with what each is for and the most it may expose. The caller fills each slot with an **integration**, a project resource that holds the server's URL and how calls to it authenticate. Each person's own sign-in happens at runtime, the first time a call needs it.
 
+An integration can also hold a credential for a sandbox's outbound traffic instead of, or as well as, an MCP server. See [credentials for a sandbox's traffic](#credentials-for-a-sandboxs-traffic).
+
 ## Require a slot
 
 ```ts agent.ts
@@ -79,7 +81,9 @@ const github = await project.integrations.create({
 });
 
 // Final's own tools and the services connected to the project.
-const final = await project.integrations.create(finalGateway());
+const final = await project.integrations.create(
+  finalGateway({ url: 'https://api.final.ai/v1/connectors/mcp' }),
+);
 
 console.log(linear.id, github.id, final.id);
 ```
@@ -100,8 +104,8 @@ await project.sessions.create({
   Lowercase letters, digits, `.`, `_`, and `-`. Unique in the project.
 </ParamField>
 
-<ParamField path="mcp.url" type="string" required>
-  The MCP server's HTTP endpoint.
+<ParamField path="mcp.url" type="string">
+  The MCP server's HTTP endpoint. An integration needs at least one of `mcp`, `egress`, and `exit`.
 </ParamField>
 
 <ParamField path="mcp.headers" type="Record<string, string>">
@@ -116,11 +120,15 @@ await project.sessions.create({
   | `oauth()` | Each person's own sign-in with the server's OAuth provider. Add `{ scopes }` to request specific scopes. |
   | `oauth({ credential: 'shared' })` | One sign-in that serves everyone in the project. |
   | `secret('NAME', { header? })` | A [project secret](/operate/authentication#use-secrets-in-your-code), sent as `Authorization: Bearer <secret>` or in `header`. |
-  | `platformIdentity(scopes)` | A short-lived signed assertion of the calling session, which your server verifies against Final's published keys. |
+  | `platformIdentity(scopes)` | A short-lived signed assertion of the calling session, which your server [verifies](#verify-calls-from-final) against Final's published keys. |
   | `noAuth()` | Nothing. |
+
+  An integration can also name a credential broker you run, `{ kind: 'broker', url, scopes }`: Final asks it for a credential with a platform identity assertion each time the integration is used.
 </ParamField>
 
 Secrets and tokens never reach the model or the harness. Integrations reach MCP servers over HTTP; servers that only run locally over stdio aren't supported.
+
+`project.integrations.update({ id, ... })` changes an integration in place. Its ID stays the same, so every `provide` that names it picks up the change.
 
 ## Sign-in
 
@@ -155,7 +163,7 @@ A shared integration (`oauth({ credential: 'shared' })`) is signed in once for e
 
 ## Final's gateway
 
-`finalGateway()` is an ordinary integration for Final's MCP gateway: the project's tasks, chats, agents, and search, plus the tools of every service connected under **Connectors**. It's the same set of tools the [MCP gateway](/mcp-gateway/overview) gives Claude Code or Codex. It authenticates with a platform identity assertion for the calling session, so it needs no token.
+`finalGateway({ url })` is an ordinary integration for Final's MCP gateway: the project's tasks, chats, agents, and search, plus the tools of every service connected under **Connectors**. It's the same set of tools the [MCP gateway](/mcp-gateway/overview) gives Claude Code or Codex. Pass the gateway's **Final MCP URL**, `https://api.final.ai/v1/connectors/mcp`. It authenticates with a platform identity assertion for the calling session, so it needs no token, and that assertion confines it to the session's own conversation and the chats linked from it.
 
 ```ts
 require: {
@@ -167,3 +175,52 @@ require: {
 ```
 
 Connected services can add many tools, so the agent searches for the ones it needs instead of seeing them all up front. An agent provided the gateway can also ask for an [optional requirement](/build/requirements#optional-requirements) it was started without.
+
+## Verify calls from Final
+
+An integration with `platformIdentity()` auth, or a credential broker, receives a short-lived signed assertion with every call: which organization, project, session, conversation, and person it's for. Verify it with `verifyPlatformIdentity` from `@finalai/agents/verify`, which runs on WebCrypto alone, in Node, Workers, Deno, or a browser:
+
+```ts
+import { PlatformIdentityVariant, verifyPlatformIdentity } from '@finalai/agents/verify';
+
+const token = request.headers.get('authorization')?.replace(/^Bearer /, '') ?? '';
+const result = await verifyPlatformIdentity({
+  token,
+  audience: 'https://mcp.example.com/mcp',
+  variant: PlatformIdentityVariant.Integration,
+  issuer: 'https://agent-session.final.ai',
+  jwksUrl: 'https://agent-session.final.ai/.well-known/jwks.json',
+});
+if (!result.ok) return new Response(null, { status: 401 });
+const { projectId, sessionId, userId, scopes } = result.claims;
+```
+
+`audience` is your server's own URL, the one the integration names, and the assertion must be for it. Read the IDs from the claims; don't parse `sub`. The scopes are the ones the integration was created with.
+
+## Credentials for a sandbox's traffic
+
+Some credentials belong to the machine rather than to an MCP server: a token for cloning private repositories, or for a package registry. An integration with `egress` holds one for a sandbox's outbound traffic. Final adds it to requests to the hosts you name, so the token is never on the machine and no other host ever sees it:
+
+```ts
+import { EgressHeaderFormat, EgressInjectKind, EgressPolicy } from '@finalai/agents/client';
+import { secret } from '@finalai/agents/integrations';
+
+// GITHUB_GIT_CREDENTIAL holds `x-access-token:<token>`, sent as HTTP Basic.
+const git = await project.integrations.create({
+  name: 'github-git',
+  egress: {
+    hosts: ['github.com'],
+    inject: { kind: EgressInjectKind.Header, format: EgressHeaderFormat.Basic },
+    policy: EgressPolicy.GitHub,
+  },
+  auth: secret('GITHUB_GIT_CREDENTIAL'),
+});
+```
+
+| Field | What it does |
+| --- | --- |
+| `egress.hosts` | Hosts, or `*.` patterns, whose requests get the credential. |
+| `egress.inject` | `{ kind: 'header', header?, format? }` sets a header, `authorization` by default, as `bearer` (the default), `basic` (a `user:password` credential), or `raw`. `{ kind: 'placeholder', env }` gives the machine placeholder values in the named environment variables, replaced with the real credential as requests leave. |
+| `egress.policy` | A protocol-aware policy for the traffic: `git-smart-http` refuses tag pushes and lets a sandbox delete only branches it created; `github` adds GitHub's REST and GraphQL rules for refs. |
+
+A [sandbox setup](/build/sandbox-setups) names an egress integration on each repository it clones, and that sandbox's traffic may use it from the first boot.
