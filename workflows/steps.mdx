@@ -44,7 +44,7 @@ const triage = await step.ai('classify', {
 });
 ```
 
-`step.ai(id, { prompt, system?, model?, output, timeout? })` makes one model call whose answer must match `output`, a Zod schema, and resolves to the parsed answer. It's billed to your project's inference sources. An answer that doesn't match fails the step with `invalid_output`. The timeout is one hour by default.
+`step.ai(id, { prompt, system?, model?, output, timeout? })` makes one model call whose answer must match `output`, a Zod schema, and resolves to the parsed answer. It runs on `deepseek-v4.1-flash` unless you name a `model`, and it's billed to the workflow's project in Final credits. An answer that doesn't match fails the step with `invalid_output`. The timeout is one hour by default.
 
 ## Run an agent
 
@@ -61,6 +61,7 @@ const review = await step.agent('review-pr', {
 
 - `provide` fills the agent's [integration requirements](/build/requirements) from the workflow's own integrations.
 - With `output`, it resolves to the agent's result parsed with that schema; without it, to `{ text }`.
+- The agent runs on the step's `model`, else the model it recommends, billed to the workflow's project in Final credits.
 - The run waits for as long as the agent takes, including while the agent waits on a person, up to `timeout` (24 hours by default). A timeout fails the step with `agent_timeout`.
 
 ## Ask a person
