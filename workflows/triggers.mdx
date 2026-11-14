@@ -1,0 +1,53 @@
+---
+title: "Triggers"
+description: "Start runs on a schedule, from a webhook, from your own events, or from an integration's events."
+---
+
+A published workflow starts a run whenever one of its triggers fires. You can also start a run by hand with **Run now**, and agents can start one when you [offer the workflow as a tool](/workflows/build-with-agents#offer-a-workflow-as-a-tool).
+
+```ts
+import { defineWorkflow, onEvent, onIntegrationEvent, schedule, webhook } from '@finalai/workflows';
+
+triggers: [
+  schedule('0 9 * * 1-5', { timezone: 'America/New_York' }),
+  webhook(),
+  onEvent('order.created', { match: { region: 'eu' } }),
+  onIntegrationEvent('inbox', 'message.received'),
+],
+```
+
+| Trigger | Starts a run when | The run's input |
+| --- | --- | --- |
+| `schedule(cron, { timezone? })` | The five-field cron expression matches, in UTC unless `timezone` is set. | `{ cron, timezone, scheduledAt }` |
+| `webhook()` | A JSON `POST` reaches the workflow's webhook URL. | The request body. |
+| `onEvent(name, { match? })` | An event with this name is [sent to your project](#send-an-event). | The event's data. |
+| `onIntegrationEvent(key, eventName, { match? })` | The integration chosen for `key` reports this event. | The event's payload. |
+
+`match` starts a run only for events whose data has the given top-level values. The input must still match the workflow's `input` schema.
+
+## Webhooks
+
+Publish the workflow, then copy its URL from **Settings** → **Webhook**. The URL carries its own secret, so treat it like a credential.
+
+```bash
+curl -X POST "$WORKFLOW_WEBHOOK_URL" \
+  -H 'content-type: application/json' \
+  -d '{"orderId": "ord_123"}'
+```
+
+## Integration events
+
+`onIntegrationEvent` names an integration key from `require.integrations` and an event that integration's connection reports, such as a new email or a merged pull request. In **Settings**, you choose which connection supplies the events. A payload that isn't a JSON object, or is too large to carry, arrives as `{ payload, payloadTruncated }`.
+
+## Send an event
+
+Send events to your project with a project [API key](/api-keys). An event starts every published workflow whose `onEvent` trigger matches it, and resumes every run waiting for it with [`step.waitForEvent`](/workflows/steps#sleep-and-wait-for-an-event).
+
+```bash
+curl -X POST https://api.final.ai/v1/durable-execution/namespaces/console-workflows/events \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H 'content-type: application/json' \
+  -d '{"id": "evt_8812", "name": "order.created", "data": {"orderId": "ord_123", "region": "eu"}}'
+```
+
+`id` is optional and deduplicates: sending the same id again has no further effect. You can send an array of events in one request.

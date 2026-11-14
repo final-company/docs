@@ -75,6 +75,10 @@ If the agent's requirements aren't met, `create` throws a `requirements_unmet` e
   The first message. Without it, the session waits for `handle.send`.
 </ParamField>
 
+<ParamField path="output" type="schema">
+  The result the first turn must end with: a zod 4 schema, or a JSON Schema whose root is `type: 'object'`. Requires `message`. See [get a structured result](#get-a-structured-result).
+</ParamField>
+
 <ParamField path="turnPolicy" type="'queue' | 'steer'">
   What a message sent during a running turn does. See [send follow-ups](#send-follow-ups).
 </ParamField>
@@ -86,6 +90,46 @@ If the agent's requirements aren't met, `create` throws a `requirements_unmet` e
 <ParamField path="title" type="string">
   A title for the session.
 </ParamField>
+
+## Get a structured result
+
+When your code needs data rather than prose, pass `output` with the message. The turn then has to end with a result that matches the schema, and `result()` returns it as `output`, typed by your schema:
+
+```ts
+import * as z from 'zod';
+
+const verdict = z.object({
+  ready: z.boolean(),
+  blockers: z.array(z.string()),
+});
+
+const { response } = await project.sessions.create({
+  agent,
+  provide: { harness },
+  message: 'Is 1.2.0 ready to ship?',
+  output: verdict,
+});
+
+const result = await response!.result();
+if (result.output != null) {
+  console.log(result.output.ready, result.output.blockers);
+} else {
+  console.log(result.stopReason); // "output_missing" when no valid result came back
+}
+```
+
+`handle.send(message, { output })` asks for a result on a later turn the same way. Each turn asks for its own result, so a follow-up without `output` returns plain text again.
+
+The agent returns its result by calling a `submit_result` tool that Final adds to the turn, with the result as the tool's input. Final checks it against the schema. If the agent ends the turn without a valid result, Final asks it once more; if it still has none, the turn ends with the stop reason `output_missing` and `output` is `null`. A cancelled or failed turn also has no `output`.
+
+`output` accepts:
+
+- a zod 4 schema, or another schema library with Standard JSON Schema support, which also parses the result in your process (a result it rejects throws an `invalid_response` error)
+- a plain JSON Schema object, whose result arrives as JSON
+
+The root must be an object schema, and the schema can be at most 65,536 characters of JSON. A message with `output` never steers into a running turn: it waits for that turn to end, whatever `turnPolicy` says.
+
+The `turn.ended` [event](/operate/events#event-kinds) carries the result too, for the API key or app that created the session. When the result is too large for the event, `outputTruncated` is `true`; read it with `session.response(turnId)` and `result()`.
 
 ## Stream the reply as it's written
 

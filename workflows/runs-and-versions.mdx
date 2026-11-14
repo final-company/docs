@@ -1,0 +1,42 @@
+---
+title: "Runs and versions"
+description: "Drafts, test runs, publishing, versions and rollbacks, and what each run records."
+---
+
+## Drafts
+
+The draft is the workflow's code as you and your agents edit it. Each save is a new revision, checked against the revision it started from: if someone else saved in between, you choose **Use theirs** or **Keep mine** instead of overwriting their work. An agent's edits arrive with a banner to **Keep**, **Undo** or **Review** them.
+
+## Test the draft
+
+From **More**, select **Test the draft** to run the current draft without publishing it. A test run is a dry run: each `step.call` asks the integration to validate the call without carrying it out, and `run.dryRun` is `true` in your code. Model and agent steps run for real.
+
+## Publish
+
+Select **Publish** to turn the draft into a new version. Publishing checks the code, type-checks it against the integrations you chose in **Settings**, builds and deploys it, and turns on its triggers. Versions are immutable and numbered.
+
+Open **Versions** to see each version's canvas and code, compare it with another, and promote an older one to roll back. A run always finishes on the version it started on.
+
+**Archive** stops a workflow's triggers and removes it from the list. Its runs and versions remain.
+
+## Runs
+
+**Runs** lists every run with what started it, its status and its duration. Open one to see:
+
+- the canvas, with each step's status;
+- for each step: its input, output, attempts, timing, and any error;
+- for model and agent steps, the agent's transcript;
+- the run's input and output;
+- a request waiting on a person, which [they can answer there](/workflows/approvals#where-they-answer).
+
+A run is `queued`, `running`, `waiting` (on a sleep, an event or a person), `completed`, `failed` or `cancelled`. You can cancel a run that hasn't finished, and retry one that failed.
+
+## Concurrency
+
+Limit how many runs execute at once with `concurrency` in the definition:
+
+```ts
+concurrency: [{ scope: 'workflow', limit: 1 }],
+```
+
+`'workflow'` limits this workflow's runs; `'tenant'` limits runs across your project.

@@ -1,0 +1,47 @@
+---
+title: "Reference"
+description: "Exports of @finalai/workflows, durations, defaults, and the error codes a run or step fails with."
+---
+
+## Exports
+
+| Export | What it is |
+| --- | --- |
+| `defineWorkflow` | Defines a workflow. See [Write a workflow](/workflows/write-a-workflow). |
+| `schedule`, `webhook`, `onEvent`, `onIntegrationEvent` | Triggers. See [Triggers](/workflows/triggers). |
+| `z` | Zod, for `input` and `output` schemas. |
+| `createNonRetryableError`, `isNonRetryableError` | Fail a step at once, and recognize that error. |
+| `isStepError` | Recognize a step that ran out of attempts (`stepId`, `code`). |
+| `RetryStrategy`, `ConcurrencyScope` | Values for `retries.strategy` and `concurrency[].scope`. |
+
+## Durations
+
+A duration is a string of one or more number-and-unit parts, such as `'90s'`, `'15m'`, `'1h30m'` or `'2d'`, or a number of milliseconds. `step.sleep` and `step.waitForEvent` also take a `Date`.
+
+## Defaults
+
+| Setting | Default |
+| --- | --- |
+| Step attempt timeout (`timeout`) | 5 minutes |
+| `step.ai` timeout | 1 hour |
+| `step.agent` timeout | 24 hours |
+| `step.call` approval or sign-in wait (`decisionTimeout`) | 24 hours |
+| `step.approval` timeout | 7 days |
+
+## Error codes
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_input` | The run's input doesn't match the workflow's `input` schema. |
+| `invalid_step_id` | A step id isn't a literal or template literal, or contains `~`. |
+| `duplicate_step_id` | A run reached the same step id twice. |
+| `tool_error` | The tool reported an error. |
+| `outcome_unknown` | A tool call's outcome is unknown; it isn't sent again. |
+| `step_outcome_unknown` | A step with `maxAttempts: 1` may or may not have run; it isn't run again. |
+| `decision_timeout` | Nobody answered a call's approval or sign-in in time. |
+| `too_many_decisions` | A tool call kept asking for approvals or sign-ins. |
+| `invalid_output` | A model's or agent's answer didn't match `output`. |
+| `agent_timeout` | An agent step didn't finish within its `timeout`. |
+| `conversation_required` | A call needed a person's answer, and the run acts for nobody. |
+
+A call that your project's policy refuses, or that a person declines, fails with the platform's own code for that refusal.

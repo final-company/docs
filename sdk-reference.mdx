@@ -34,13 +34,14 @@ Lower-level packages are public too, each with its own README: [`@finalai/agent-
 
 | Property | What it does |
 | --- | --- |
-| `sessions` | `create({ agent, provide, id?, actor?, message? })` starts a session; `attach(id)` returns a handle by ID. A handle sends messages, streams events, lists and answers decisions, reads `requirements()` and `provide()`, and cancels or closes. See [sessions](/client/sessions). |
+| `sessions` | `create({ agent, provide, id?, actor?, message?, output? })` starts a session; `attach(id)` returns a handle by ID. A handle sends messages, streams events, lists and answers decisions, reads `requirements()` and `provide()`, and cancels or closes. See [sessions](/client/sessions). |
 | `conversations` | `create` and `direct` take `provide`; `findDirect` looks up without creating. A handle's `addParticipant` and `participants.provide` set each agent's settings, and it has `inputs`, `context`, `labels`, and schedules. See [conversations](/client/conversations). |
 | `agents` | `publish({ agent, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent })`, and `parse(json)`. See [publishing](/operate/publishing). |
 | `sandboxes` | `create(environment, { setup?, ownedBy?, idempotencyKey? })`, `get`, `list`, and `providers()`. A handle runs commands, reads its `description()`, and deletes the sandbox. |
 | `sandboxSetups` | `publish({ name, setup })`, `get`, and `list`. See [sandbox setups](/build/sandbox-setups). |
 | `sandboxProviders` | `register({ name, url })`, `list`, `get`, `update`, `refresh`, and `remove` for providers you run. See [run your own provider](/build/sandboxes#run-your-own-provider). |
-| `integrations` | `create`, `get`, `list`, `update`, `delete`, and a person's `signIn`, `completeSignIn`, and `signOut`. See [integrations](/build/integrations). |
+| `integrations` | `create`, `get`, `list`, `update`, `delete`, and a person's `signIn`, `completeSignIn`, and `signOut`. `listTools` and `callTool` use an integration's tools without a session. See [integrations](/build/integrations). |
+| `decisions` | `raise`, `list`, `get`, `respond`, and `cancel` for decisions outside any conversation. See [decisions](/client/decisions). |
 | `harnesses` | `check({ agent, harness })`, `publish({ harness, name })`, `get`, `list`, and `allowances`. See [harness settings](/harnesses/settings). |
 | `acpAdapters` | `publish({ adapter, name })`, `get`, and `list`. See [harnesses and adapters](/harnesses/overview). |
 | `channels` | `publish({ name, source })`, `get`, `install({ channel, agent, app?, agents: { provide } })`, and `installs()`. See [channels](/build/channels). |

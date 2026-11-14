@@ -1,0 +1,76 @@
+---
+title: "Decisions in a project"
+sidebarTitle: "Decisions"
+description: "Ask people an approval or a question outside any conversation, and read their answer."
+---
+
+A decision is a request waiting for a person's answer. Agents raise them inside sessions and conversations (see [handle approvals](/client/sessions#handle-approvals)). Your own code can also ask people something that isn't part of any chat, like "Refund order 4821?", as a decision in a project. Only the people you ask can answer it. Your code reads the answer, or withdraws the question.
+
+Final also raises these decisions for you when an [integration call](/build/integrations#call-tools-without-a-session) without a conversation needs a person's approval or sign-in.
+
+## Raise a decision
+
+`project.decisions.raise` asks the people you name, or the person your app acts for when you name nobody:
+
+```ts
+const decision = await project.decisions.raise({
+  requestKey: 'refund-4821',
+  title: 'Refund order 4821?',
+  description: 'The customer reports the package never arrived. Amount: $84.',
+  audience: { userIds: [ownerUserId] },
+  requestedSchema: {
+    type: 'object',
+    properties: { reason: { type: 'string', title: 'Reason' } },
+  },
+  expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+});
+```
+
+| Field | What it does |
+| --- | --- |
+| `requestKey` | Your key for the decision. Raising again with the same key returns the same decision. |
+| `title`, `description` | What the person is asked. |
+| `audience.userIds` | Who may answer (`usr_...`). Each must be able to use the project. Leave `audience` out to ask the person your app acts for; an API key acts for nobody, so it must name the audience. |
+| `requestedSchema` | The answer's form, as a JSON Schema. |
+| `card` | A generative card to ask with, shown in place of the generic form. |
+| `entityLinks` | Pages the decision is about, as `{ url }` with an `https` URL. |
+| `expiresAt` | When the decision expires unanswered. |
+
+The caller that raises a decision owns it. An API key owns the decisions it raises as the project. An app owns the decisions it raises for every person using it.
+
+## Answer a decision
+
+People see the decisions waiting for them in Final's apps. To answer in your own app, list them as the person, through a client signed in as them:
+
+```ts
+const { decisions } = await project.decisions.list();
+for (const decision of decisions) {
+  const approved = await showApproval(decision.title, decision.description);
+  // A decision of a project below this one is answered in its own project.
+  await client.project({ id: decision.projectId }).decisions.respond({
+    decisionId: decision.id,
+    outcome: { action: approved ? 'accept' : 'decline', content: {} },
+  });
+}
+```
+
+`list` returns the open decisions waiting for the person in the project and the projects below it, newest first, and pages with `cursor`. A decision only appears while the person can still use its own project. Answer each in its own project, `decision.projectId`.
+
+The first answer wins: a decision that was already answered, withdrawn, or expired refuses another with `decision_already_resolved` or `decision_expired`. Only the people in its audience can answer it. Agents can't answer these decisions, and neither can an API key.
+
+A `sign_in` decision names the integration in `signIn`. The person accepts it by signing in, which resolves it (see [sign-in](/build/integrations#sign-in)), and can decline it with `respond`.
+
+## Read the answer
+
+The owner hears the answer from the `decision.resolved` [event](/operate/events), which carries the decision's `requestKey` for its owner. Read the decision itself with `get`:
+
+```ts
+import { ApiDecisionState } from '@finalai/agents/client';
+
+const current = await project.decisions.get({ decisionId: decision.id });
+if (current.state === ApiDecisionState.Answered) console.log(current.outcome);
+```
+
+`state` is `open`, `answered`, `cancelled`, or `expired`. `outcome` is the person's answer, and `resolvedByUserId` says who gave it. Its owner and the people in its audience can read a decision; `requestKey` is only set for its owner.
+
+`project.decisions.cancel({ decisionId })` withdraws an open decision. Only its owner can, and the decision then takes no answer.
