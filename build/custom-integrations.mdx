@@ -88,10 +88,11 @@ See [Functions](/cloud-apps/functions) for building and deploying.
 
 ## Private apps
 
-A function deployed with `public: false` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs or wakes. Final's authorization server issues those tokens only for the app's own project and the projects in `access.projects`, to Final's own calls on their behalf:
+A function deployed with `public: false` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs or wakes. Final's authorization server issues those tokens only for the app's own project and the projects in `access.projects`:
 
 - Calls through an integration that names the app's URL with `platformIdentity()` auth. Final exchanges the call's platform identity for a token.
 - [Workflow](/workflows/overview) steps. The workflow engine exchanges the step's token.
+- Your own apps registered with Final (OAuth clients) that an organization admin granted the `resource:invoke` scope: a project principal (`client_credentials` with `project`), or a person who can use the app's project. Request the token with `resource` set to the app's origin.
 
 Callers find the authorization server through standard OAuth discovery. The `401` points to the app's protected resource metadata ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)) at `https://<host>/.well-known/oauth-protected-resource`, which names the authorization server, and that server's metadata ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)) gives its token endpoint. Each token is issued for one origin, carries the scope `resource:invoke`, and expires within minutes.
 
