@@ -122,6 +122,8 @@ Each agent's **routing mode** decides which messages it answers:
 | `all` | Reads every message in the room. |
 | `mention` | Replies only when someone mentions it. |
 
+Leave `routingMode` out and the room picks one. An agent that is the room's only agent gets `default`, so it replies to everything people say. An agent created or added alongside other agents gets `mention`, so they don't all answer every message. An agent already in the room keeps its mode when another joins, and a mode you pass always wins.
+
 Add an agent later with its own `provide`, and mention it by participant ID:
 
 ```ts
