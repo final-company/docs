@@ -21,7 +21,7 @@ Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstar
 
 | Tool | What it does |
 | --- | --- |
-| `list_workflows` | Lists the project's workflows with their ids, published versions and latest runs. |
+| `list_workflows` | Lists a project's workflows with their ids, published versions and latest runs, optionally filtered by name or description. |
 | `create_workflow` | Creates a workflow in the project with a starter source. |
 | `read_workflow` | Reads the draft source and its revision, the requirements and the integrations filling them, the triggers, and the published version. |
 | `edit_workflow_source` | Changes the draft by exact text replacements against one revision, and returns the new revision's diagnostics. |
@@ -30,6 +30,8 @@ Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstar
 | `publish_workflow` | Publishes a draft revision as the next version, and can offer it to agents as a tool. Needs your approval. |
 | `list_workflow_runs` | Lists runs, newest first, with status, trigger, input, output and error. |
 | `read_workflow_run` | Reads one run step by step, including a request waiting on a person. |
+
+`list_workflows` and `create_workflow` work in the current project unless you name another with `projectId`. Through the MCP gateway the current project is your My Work, so ask your agent to name the project, or let it look up the project first. An agent inside a project stays in that project and the projects below it.
 
 Edits are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating and publishing need editor access to the project.
 
