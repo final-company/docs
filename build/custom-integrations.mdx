@@ -1,0 +1,139 @@
+---
+title: "Custom integrations"
+sidebarTitle: "Custom integrations"
+description: "Write your own integration as a private Final Cloud Function: MCP tools whose outbound requests carry credentials Final holds."
+---
+
+When no existing MCP server or connector fits, write the integration yourself. A custom integration is three ordinary pieces:
+
+1. A [Final Cloud Function](/cloud-apps/functions) that serves MCP tools, written with `@finalai/integrations` and deployed private.
+2. A tools integration whose MCP server is that function.
+3. One credential integration for each API the tools call, which holds the OAuth sign-in, API key, or website session.
+
+The function never holds a credential. When a tool calls one of a credential's hosts, Final puts the credential on the request on its way out, and only for those hosts. Each person's sign-in works exactly as it does for any [integration](/build/integrations#sign-in).
+
+## Write the tools
+
+```ts src/index.ts
+import { defineIntegration, oauth, tool, z } from '@finalai/integrations';
+
+export default defineIntegration({
+  name: 'acme',
+  credentials: {
+    acme: oauth({
+      hosts: ['api.acme.com'],
+      scopes: ['invoices.read'],
+      server: { issuer: 'https://login.acme.com' },
+    }),
+  },
+  tools: {
+    list_invoices: tool({
+      description: 'Invoices with a given status',
+      input: z.object({ status: z.enum(['open', 'paid']) }),
+      readOnly: true,
+      run: async ({ status }, ctx) => {
+        const response = await ctx.fetch(`https://api.acme.com/v1/invoices?status=${status}`);
+        return { invoices: await response.json() };
+      },
+    }),
+  },
+});
+```
+
+Each tool declares its input with Zod. Invalid input, a thrown error, or a result that doesn't match `output` comes back to the agent as a tool error. Mark tools `readOnly` or `destructive`: an agent's [approvals](/build/integrations#choose-which-tools-the-agent-gets) default to running read-only tools and asking before anything else.
+
+The tool's `ctx.fetch` sends requests to credential hosts with their credential. The function only answers calls from Final: every request must carry a valid platform identity assertion, and `ctx.caller` names the verified project, person, and session.
+
+## Choose the credentials
+
+| Helper | The credential |
+| --- | --- |
+| `oauth({ hosts, scopes?, server, credential? })` | An OAuth sign-in. `server` is the provider's `{ issuer }`, or its `{ authorizationEndpoint, tokenEndpoint }`. Providers that don't allow dynamic client registration need [your own OAuth client](#your-own-oauth-client). |
+| `apiKey({ hosts, secret, header?, format?, env? })` | A [project secret](/operate/authentication#use-secrets-in-your-code), sent as a header. With `env`, the function sees a placeholder in that variable instead, and Final replaces it with the real value wherever the request carries it. |
+| `browserSession({ hosts, signInUrl, credential? })` | A website session, for sites with no API. The person signs in to the site in a browser Final runs, and requests to `hosts` carry that session's cookies. |
+
+`credential` is `'personal'` (each person signs in, the default) or `'shared'` (one sign-in for the whole project).
+
+A host that refuses the credential Final put on a request (`401` or `403`, or a redirect to sign in for a website session) makes the tool call fail in a way that asks the person to sign in again. If your code catches errors, rethrow the ones `isCredentialRejectedError` matches.
+
+## Deploy it
+
+Deploy the function private, so only Final can call it:
+
+```yaml final-cloud.yaml
+name: acme-integration
+type: function
+entry: dist/index.js
+build:
+  command: npm install && npm run build
+  output: dist/index.js
+public: false
+```
+
+See [Functions](/cloud-apps/functions) for building and deploying.
+
+## Add it to the project
+
+`integrationRequests` returns the request bodies to create: the credential integrations first, then the tools integration that names them.
+
+```ts setup.ts
+import { createClient } from '@finalai/agents/client';
+import { integrationRequests } from '@finalai/integrations';
+import acme from './src/index';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+const requests = integrationRequests(acme, { cloudApp: 'capp_…', name: 'acme' });
+const ids: Record<string, string> = {};
+for (const { key, request } of requests.credentials) {
+  ids[key] = (await project.integrations.create(request)).id;
+}
+const tools = await project.integrations.create(requests.tools(ids));
+```
+
+The tools integration looks like any other: provide it for an agent's [slot](/build/integrations#require-a-slot), or reach its tools through Final's gateway.
+
+<ParamField path="mcp.cloudApp" type="string">
+  A Final Cloud app in the same project whose function serves MCP. Final calls it privately; deploy it with `public: false`.
+</ParamField>
+
+<ParamField path="mcp.path" type="string" default="/mcp">
+  Where the function serves MCP.
+</ParamField>
+
+<ParamField path="credentials" type="string[]">
+  Egress integrations in the same project whose credentials calls to this MCP server may carry.
+</ParamField>
+
+## Your own OAuth client
+
+Some providers only accept OAuth clients registered ahead of time. Register one in your project with the redirect URI Final shows, then name it in the credential's auth with `client`. Its secret is a project secret, which Final reads each time it calls the provider's token endpoint.
+
+## From a browser recording
+
+For a site with no API, record the task once with [agent-browser](https://github.com/vercel-labs/agent-browser) saved flows, then compile the flows into an integration:
+
+```bash
+agent-browser --capture flow open
+agent-browser open "https://portal.example.com/orders?status=open"
+agent-browser flow save orders --param status=open
+
+npx final-integrations from-flow ~/.agent-browser/flows/portal.example.com/orders.json --out src/index.ts
+```
+
+Each flow becomes one tool. Its params become inputs, its response is narrowed to the fields the flow recorded, and a flow that writes is marked destructive. A recording that was signed in declares a `browserSession` credential. Recorded cookies are never copied. The generated module is your integration's source from then on: edit it like any other.
+
+Generated tools send the recorded requests over HTTP. When a run gets an HTML page or a sign-in redirect where the recording got JSON, a signed-in flow asks the person to sign in again.
+
+## Servers you host yourself
+
+Credential integrations work for any MCP server, not only Final Cloud Functions. When an integration names `credentials`, each call to its server carries three headers:
+
+| Header | What it holds |
+| --- | --- |
+| `final-egress-token` | A token for this call only. |
+| `final-egress-relay` | The relay's origin. |
+| `final-egress-env` | Base64url JSON of placeholder values, for placeholder credentials. |
+
+Send a request meant for one of the credential hosts to `<relay>/v1/relay` instead, with the same method, headers, and body, plus the token in `final-egress-token` and the real destination in `final-egress-url`. The relay adds the credential, sends the request over HTTPS, and streams the response back without following redirects. `final-egress-credential` on the response names the credential integrations it used. `@finalai/integrations` does this for you when it runs outside Final Cloud.

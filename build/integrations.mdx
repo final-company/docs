@@ -105,7 +105,7 @@ await project.sessions.create({
 </ParamField>
 
 <ParamField path="mcp.url" type="string">
-  The MCP server's HTTP endpoint. An integration needs at least one of `mcp`, `egress`, and `exit`.
+  The MCP server's HTTP endpoint. An integration needs at least one of `mcp`, `egress`, and `exit`. To serve tools from your own Final Cloud Function instead, see [custom integrations](/build/custom-integrations).
 </ParamField>
 
 <ParamField path="mcp.headers" type="Record<string, string>">
@@ -119,6 +119,8 @@ await project.sessions.create({
   | --- | --- |
   | `oauth()` | Each person's own sign-in with the server's OAuth provider. Add `{ scopes }` to request specific scopes. |
   | `oauth({ credential: 'shared' })` | One sign-in that serves everyone in the project. |
+  | `oauth({ server, client? })` | OAuth against a named authorization server (`{ issuer }`, or `{ authorizationEndpoint, tokenEndpoint }`), for a credential that is no MCP server; `client` is your project's own OAuth client. |
+  | `browserSession({ signInUrl })` | A website session: the person signs in to the site in a browser Final runs, and requests to the integration's egress hosts carry its cookies. Use with `egress: { hosts, inject: { kind: 'header', header: 'cookie', format: 'raw' } }`. |
   | `secret('NAME', { header? })` | A [project secret](/operate/authentication#use-secrets-in-your-code), sent as `Authorization: Bearer <secret>` or in `header`. |
   | `platformIdentity(scopes)` | A short-lived signed assertion of the calling session, which your server [verifies](#verify-calls-from-final) against Final's published keys. |
   | `noAuth()` | Nothing. |
@@ -134,7 +136,7 @@ Secrets and tokens never reach the model or the harness. Integrations reach MCP 
 
 A personal sign-in isn't a requirement, and the agent never handles it. The first time a call needs a person's sign-in, Final holds the call and raises a `sign_in` decision for that person. When they finish signing in, the held call continues. Each person signs in once per integration in a project, and Final refreshes their token after that.
 
-In Final's web and mobile apps, the person sees a sign-in card in the chat. In your own app, list the session's open decisions, start the person's sign-in, and send them to the authorization URL:
+In Final's web and mobile apps, the person sees a sign-in card in the chat. For a `browserSession` integration, the card opens a live view of a browser Final runs; the person signs in to the site there, then confirms on the card. To ask ahead of the first call, use `project.integrations.requestSignIn({ id, conversationId })`. In your own app, list the session's open decisions, start the person's sign-in, and send them to the authorization URL:
 
 ```ts
 import { DecisionKind } from '@finalai/agents/client';
@@ -151,13 +153,21 @@ for (const decision of await session.decisions()) {
 }
 ```
 
-The provider redirects back to `returnUrl` with `state` and `code`. Complete the sign-in as the same person, and the decision resolves:
+The provider redirects back to `returnUrl` with `state` and `code`. Complete the sign-in as the same person, and the decision resolves (a browser sign-in, whose `signIn` response has `method: 'browser'`, completes with only its `state`):
 
 ```ts
 await project.integrations.completeSignIn({ state, code });
 ```
 
-`signIn` and `completeSignIn` act for the person the client is authenticated as. `project.integrations.signOut({ id })` forgets their sign-in.
+For a browser sign-in (`method: 'browser'` on the `signIn` response), `authorizationUrl` is your own `returnUrl` with `state`. That page gets the live view for the person who is signed in, sends them to it, and completes the sign-in with only `state` once they've signed in to the site:
+
+```ts
+const { url } = await project.integrations.browserSignInView({ state });
+// Send the person to url. It expires in minutes, and anyone holding it controls the sign-in browser: don't store or forward it.
+await project.integrations.completeSignIn({ state });
+```
+
+`signIn`, `browserSignInView`, and `completeSignIn` act for the person the client is authenticated as. `project.integrations.signOut({ id })` forgets their sign-in.
 
 A shared integration (`oauth({ credential: 'shared' })`) is signed in once for everyone. Use shared integrations for work no person is present for, such as [schedules](/build/schedules) and [channels](/build/channels).
 

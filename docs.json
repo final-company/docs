@@ -87,6 +87,7 @@
               "build/tools",
               "build/hooks",
               "build/integrations",
+              "build/custom-integrations",
               "build/sandboxes",
               "build/sandbox-setups",
               "build/where-code-runs",
