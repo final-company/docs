@@ -88,7 +88,7 @@ See [Functions](/cloud-apps/functions) for building and deploying.
 
 ## Private apps
 
-A function deployed with `public: false` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs or wakes. Final's authorization server issues those tokens only for the app's own project and the projects in `access.projects`:
+A function deployed with `public: false` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs. Final's authorization server issues those tokens only for the app's own project and the projects in `access.projects`:
 
 - Calls through an integration that names the app's URL with `platformIdentity()` auth. Final exchanges the call's platform identity for a token.
 - [Workflow](/workflows/overview) steps. The workflow engine exchanges the step's token.

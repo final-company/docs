@@ -193,7 +193,7 @@ Set `outboundPolicy.internet: false` to cut the function off from the internet e
 
 ## Private functions
 
-Functions are public by default: anyone with the URL can call them. Set `public: false` to make one private. It keeps its URL and custom domains, but only callers holding an access token for its origin reach it, and every other request gets `401` before the function runs or wakes:
+Functions are public by default: anyone with the URL can call them. Set `public: false` to make one private. It keeps its URL and custom domains, but only callers holding an access token for its origin reach it, and every other request gets `401` before the function runs:
 
 ```yaml final-cloud.yaml
 public: false
