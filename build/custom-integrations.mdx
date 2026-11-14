@@ -22,7 +22,7 @@ npm install @modelcontextprotocol/server @finalai/agents zod
 
 ```ts src/index.ts
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
-import { verifyIntegrationCall } from '@finalai/agents/integrations';
+import { credentialRejection, verifyIntegrationCall } from '@finalai/agents/integration-server';
 import * as z from 'zod';
 
 const handler = createMcpHandler(() => {
@@ -36,6 +36,9 @@ const handler = createMcpHandler(() => {
     },
     async ({ status }) => {
       const response = await fetch(`https://api.acme.com/v1/invoices?status=${status}`);
+      // A refused credential asks the person to sign in again.
+      const rejected = credentialRejection(response);
+      if (rejected != null) return rejected;
       return { content: [{ type: 'text', text: await response.text() }] };
     },
   );
@@ -43,21 +46,21 @@ const handler = createMcpHandler(() => {
 });
 
 export default {
-  async fetch(request: Request, env: Record<string, string>) {
-    const caller = await verifyIntegrationCall(request, env);
-    if (caller == null) return new Response(null, { status: 401 });
+  async fetch(request: Request, env: Record<string, unknown>) {
+    const verified = await verifyIntegrationCall({ request, env });
+    if (!verified.ok) return new Response(null, { status: 401 });
     return handler.fetch(request);
   },
 };
 ```
 
-`verifyIntegrationCall` from `@finalai/agents/integrations` checks the [platform identity](/build/integrations#verify-calls-from-final) assertion Final sends with every call and returns the verified caller: the project, person, and session the call is for. Answer anything it refuses with `401`, so the function only serves calls from Final.
+`verifyIntegrationCall` from `@finalai/agents/integration-server` checks the [platform identity](/build/integrations#verify-calls-from-final) assertion Final sends with every call and returns the verified caller (`verified.caller`): the project, person, and session the call is for. Inside Final Cloud it reads what to verify against from the function's environment (`FINAL_CLOUD_APP_ID`, `FINAL_PLATFORM_ISSUER`); elsewhere, pass `audience` and `issuer`. Answer anything it refuses with `401`, so the function only serves calls from Final.
 
 Mark tools with the `readOnlyHint` or `destructiveHint` annotation: an agent's [approvals](/build/integrations#choose-which-tools-the-agent-gets) default to running read-only tools and asking before anything else.
 
 Inside Final Cloud, plain `fetch` to a credential's hosts carries the credential. For a placeholder credential, the function's environment holds the placeholder in the variable the credential names; send it where the real value would go.
 
-A host can refuse the credential Final put on a request: `401` or `403`, or, for a website session, a redirect to its sign-in page. Pass that response to `credentialRejection` from `@finalai/agents/integrations`: it returns the MCP error data that makes Final ask the person to sign in again. Fail the tool call with an MCP error carrying that data.
+A host can refuse the credential Final put on a request: `401` or `403`, or, for a website session, a redirect to its sign-in page. `credentialRejection(response)` returns the tool result that makes Final ask the person to sign in again, or `null` when the response is no such refusal: return it from the tool. For a website session, send requests with `redirect: 'manual'` and pass `{ url, browserSessionHosts }` so a redirect to the sign-in page is recognised.
 
 ## Deploy it
 
@@ -145,4 +148,4 @@ Credential integrations work for any MCP server, not only Final Cloud Functions.
 | `final-egress-hosts` | The credential hosts, comma-separated (`*.example.com` covers its subdomains). |
 | `final-egress-env` | Base64url JSON of placeholder values, for placeholder credentials. |
 
-Treat the token as opaque. Send a request meant for one of the credential hosts to `<relay>/v1/relay` instead, with the same method, headers, and body, plus the token in `final-egress-token` and the real destination in `final-egress-url`. The relay adds the credential, sends the request over HTTPS, and streams the response back without following redirects. `final-egress-credential` on the response names the credential integrations it used. `relayFetch` from `@finalai/agents/integrations` does this for you; inside Final Cloud you don't need it.
+Treat the token as opaque. Send a request meant for one of the credential hosts to `<relay>/v1/relay` instead, with the same method, headers, and body, plus the token in `final-egress-token` and the real destination in `final-egress-url`. The relay adds the credential, sends the request over HTTPS, and streams the response back without following redirects. `final-egress-credential` on the response names the credential integrations it used. `relayFetch({ request })` from `@finalai/agents/integration-server` returns a `fetch` that does this for you, for a call `verifyIntegrationCall` accepted; inside Final Cloud you don't need it.
