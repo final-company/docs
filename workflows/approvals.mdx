@@ -1,0 +1,46 @@
+---
+title: "Approvals and sign-ins"
+description: "Who a workflow asks, where they answer, and what happens while it waits."
+---
+
+A workflow asks a person in two situations: a [`step.approval`](/workflows/steps#ask-a-person), and a [`step.call`](/workflows/steps#call-an-integration-tool) that needs an approval or a sign-in first. Either way the run waits, without holding any resources, until the person answers or the wait times out.
+
+## Who is asked
+
+| Request | Asked of |
+| --- | --- |
+| `step.approval` with `approvers.users` | Those people. They must be able to use the workflow's project. |
+| `step.approval` without `approvers` | The person the run acts for. |
+| A tool the integration's policy asks about (`approvals: { tool: 'ask' }`) | The person the run acts for. |
+| A sign-in to an integration that uses each person's own account | That person. A shared sign-in asks the person the run acts for. |
+
+A run acts for the person who started it: someone who selected **Run now** or tested the draft, or whose agent called the workflow as a tool. Runs started by a schedule, a webhook or an event act for nobody, so give their approvals `approvers`:
+
+```ts
+await step.approval('refund', {
+  title: `Refund ${input.amount}?`,
+  approvers: { users: ['usr_8YxZa2kQ'] },
+});
+```
+
+Without anyone to ask, the step fails instead of waiting.
+
+## Where they answer
+
+Only the people asked can answer, on web or mobile:
+
+- **On the run.** A run waiting on a person shows the request at the top of the run, with its answer controls. Anyone else who opens the run sees that it's waiting.
+- **In Home.** Requests appear under **Needs help** in your project's Home, with the requests from your chats, newest first.
+
+A sign-in request opens the integration's sign-in; once the person has signed in, the call runs. They can also decline it.
+
+Agents can read a waiting request, through the run, but can't answer it. If you want a model or an agent to decide, use [`step.ai`](/workflows/steps#ask-a-model) or [`step.agent`](/workflows/steps#run-an-agent) instead of an approval.
+
+## Timeouts
+
+| Wait | Default | When it passes |
+| --- | --- | --- |
+| `step.approval` | 7 days (`timeout`) | Resolves to `null`. |
+| An approval or sign-in for `step.call` | 24 hours (`decisionTimeout`) | Fails the step with `decision_timeout`. |
+
+The answer resolves the step: `step.approval` returns `{ approved, decidedBy, comment }`, and a call that was approved runs once.

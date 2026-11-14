@@ -1,0 +1,74 @@
+---
+title: "Quickstart"
+description: "Create a workflow, have your project's agent write it, then test, publish and run it."
+---
+
+This guide builds a workflow that summarizes new issues in your tracker every weekday morning and posts the summary to a channel. You need a Final project with two [integrations](/build/integrations): your issue tracker and your chat app.
+
+<Steps>
+  <Step title="Create the workflow">
+    Open **Workflows** in your project and select **New workflow**. Give it a name, such as `Morning issue digest`, and select **Create**. The editor opens on an empty canvas.
+  </Step>
+  <Step title="Ask an agent to write it">
+    Select **Ask an agent**. Your project's agent opens with the workflow already named in your message. Describe what it should do:
+
+    > Every weekday at 9:00 in New York, list the issues created in the last day, summarize them in a few bullets, and post the summary to #triage.
+
+    The agent writes the code with Final's workflow tools and checks it. Its edits appear on the canvas as it saves them, with a banner to **Keep** or **Undo** them, or **Review** the code.
+  </Step>
+  <Step title="Fill its integrations">
+    Open **Settings**. Under **Integrations**, choose which of your project's integrations fills each one the workflow requires: your tracker for the issues, your chat app for the channel.
+  </Step>
+  <Step title="Test the draft">
+    From **More**, select **Test the draft**. A test run executes the draft as it is, without publishing. Tool calls are validated but not carried out, so nothing is posted. Open the run to see each step's input and output.
+  </Step>
+  <Step title="Publish">
+    Select **Publish**. Final type-checks the workflow against your integrations, deploys it, and starts its schedule. Each publish is a new version; the previous ones stay available to promote.
+  </Step>
+  <Step title="Run it now">
+    From **More**, select **Run now** to start a run of the published version without waiting for the schedule. Open **Runs** to follow it step by step.
+  </Step>
+</Steps>
+
+The workflow the agent writes looks like this:
+
+```ts
+import { defineWorkflow, schedule, z } from '@finalai/workflows';
+
+export default defineWorkflow({
+  name: 'Morning issue digest',
+  input: z.object({}),
+  require: {
+    integrations: {
+      tracker: { description: 'Issue tracker', tools: { allow: ['issues.list'] } },
+      chat: { description: 'Team chat', tools: { allow: ['chat.postMessage'] } },
+    },
+  },
+  triggers: [schedule('0 9 * * 1-5', { timezone: 'America/New_York' })],
+  async run({ step, integrations }) {
+    const since = await step.run('since', async () =>
+      new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    );
+    const issues = await step.call('list-issues', integrations.tracker, 'issues.list', {
+      createdAfter: since,
+    });
+    const digest = await step.ai('summarize', {
+      prompt: `Summarize these new issues in at most five bullets:\n${JSON.stringify(issues)}`,
+      output: z.object({ bullets: z.array(z.string()) }),
+    });
+    await step.call('post', integrations.chat, 'chat.postMessage', {
+      channel: '#triage',
+      text: digest.bullets.map((bullet) => `• ${bullet}`).join('\n'),
+    });
+    return { posted: digest.bullets.length };
+  },
+});
+```
+
+The current time is read inside `step.run`, so a run that resumes later uses the same value. See [how a run executes](/workflows/write-a-workflow#how-a-run-executes).
+
+## Next steps
+
+- [Write a workflow](/workflows/write-a-workflow): the definition and the rules your code follows.
+- [Steps](/workflows/steps): every step and its options.
+- [Approvals and sign-ins](/workflows/approvals): ask a person before acting.

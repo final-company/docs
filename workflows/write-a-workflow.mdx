@@ -1,0 +1,94 @@
+---
+title: "Write a workflow"
+description: "The workflow definition, how a run executes, and the rules that keep replays correct."
+---
+
+A workflow is one module whose default export is `defineWorkflow(...)`. Final provides `@finalai/workflows` when it builds a version; you don't install it.
+
+```ts
+import { defineWorkflow, z } from '@finalai/workflows';
+
+export default defineWorkflow({
+  name: 'Welcome new customers',
+  description: 'Sends a welcome note and opens an onboarding task.',
+  input: z.object({ customerId: z.string(), email: z.string() }),
+  require: {
+    integrations: {
+      email: { description: 'Outbound email', tools: { allow: ['send'] } },
+    },
+  },
+  async run({ input, step, integrations }) {
+    await step.call('welcome', integrations.email, 'send', {
+      to: input.email,
+      subject: 'Welcome',
+    });
+    return { welcomed: input.customerId };
+  },
+});
+```
+
+## Definition
+
+| Field | What it does |
+| --- | --- |
+| `name` | Display name. |
+| `description` | Optional. Shown where the workflow is listed, and to agents when it's offered as a tool. |
+| `input` | A Zod schema for the run's input. A run whose input doesn't match fails with `invalid_input`. |
+| `require` | `integrations`: what the workflow needs, by key. See [integrations](#integrations). |
+| `triggers` | What starts runs automatically. See [Triggers](/workflows/triggers). You can always start a run by hand. |
+| `retries` | Default attempts for each step, including the first. |
+| `concurrency` | Limits on concurrent runs: `{ scope: 'workflow' \| 'tenant', limit }`. |
+| `run` | `({ input, step, integrations, run }) => result`. The result is stored as JSON. |
+
+## Integrations
+
+`require.integrations` names each integration the workflow needs, with a description and the most it may use. It's the same shape an agent's [integration slots](/build/integrations) use:
+
+```ts
+require: {
+  integrations: {
+    issues: {
+      description: 'Issue tracker where bugs are filed',
+      tools: { allow: ['issues.get', 'issues.create'] },
+      approvals: { 'issues.create': 'ask' },
+    },
+  },
+},
+```
+
+The key, `issues`, is how the code refers to it. In the workflow's **Settings**, you choose which of your project's integrations fills each key. In `run`, `integrations.issues` is a handle you pass to [`step.call`](/workflows/steps#call-an-integration-tool) or to an agent step's `provide`. `step.call` is typed per tool once the integrations are chosen.
+
+## How a run executes
+
+The `run` function is replayed from the top on every step. Each step is matched to its stored result by its id, so the code between steps must make the same decisions every time it runs. Follow these rules; Final checks them when you save and publish.
+
+- **Step ids are string literals or template literals, unique within the workflow.** They may not contain `~`.
+- **A step in a loop or fan-out needs an id that varies per item**, such as `` `notify-${user.id}` ``. Reaching the same id twice in one run fails it with `duplicate_step_id`.
+- **Anything with a side effect or a changing answer goes in a step.** Network calls, the current time, random numbers and environment reads belong in [`step.run`](/workflows/steps#run-your-own-code).
+- **Steps are awaited.** Run steps in parallel with `Promise.all`. `Promise.race`, `Promise.any` and `Promise.allSettled` aren't allowed.
+- **Step results are JSON.** A step's value is stored as JSON, and every replay reads that form: a `Date` comes back as a string.
+
+A loop and a fan-out over the same list:
+
+```ts
+for (const user of input.users) {
+  await step.call(`notify-${user.id}`, integrations.chat, 'chat.postMessage', {
+    text: `Hi ${user.name}`,
+  });
+}
+
+const summaries = await Promise.all(
+  input.users.map((user) =>
+    step.ai(`summarize-${user.id}`, {
+      prompt: user.bio,
+      output: z.object({ summary: z.string() }),
+    }),
+  ),
+);
+```
+
+A workflow with no model or agent steps is fully deterministic.
+
+## Code the canvas can't draw
+
+The canvas draws steps, conditions, loops, parallel lanes and error handlers. Code it doesn't model, such as a helper function or a complex expression, appears as a code block on the canvas. It still runs; edit it in the code view.

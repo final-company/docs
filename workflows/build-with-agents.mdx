@@ -1,0 +1,37 @@
+---
+title: "Build with agents"
+description: "Have any agent write, test and publish workflows with Final's workflow tools, and offer published workflows to agents as tools."
+---
+
+There's no special workflow agent: any agent with Final's workflow tools can build workflows. That includes your project's agent in Final and, through the [MCP gateway](/mcp-gateway/overview), Claude Code, Codex or Cursor.
+
+## Ask your project's agent
+
+In a workflow, select **Ask an agent** (or **Chat** from **More**). Your project's agent opens with the workflow named in your message; say what you want it to do or change. From a run, the message names the run, so you can ask why it failed or how to change what it did.
+
+The agent's edits show up live on the canvas with a banner to **Keep**, **Undo** or **Review** them, and you can keep editing on the canvas or in the code at the same time.
+
+## Use your own coding agent
+
+Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstart), then ask it to work on a workflow. It finds Final's workflow tools through the gateway's tool search.
+
+> Create a workflow in my Acme project that files a Linear issue for every high-severity Sentry alert, and test it with a sample alert.
+
+## The workflow tools
+
+| Tool | What it does |
+| --- | --- |
+| `create_workflow` | Creates a workflow in the project with a starter source. |
+| `read_workflow` | Reads the draft source and its revision, the requirements and the integrations filling them, the triggers, and the published version. |
+| `edit_workflow_source` | Changes the draft by exact text replacements against one revision, and returns the new revision's diagnostics. |
+| `check_workflow` | Runs every check publishing runs: the replay rules, TypeScript against your integrations' tools, and requirements without an integration. |
+| `test_workflow` | Runs a draft revision once with an input. Dry by default; a live test needs your approval. |
+| `publish_workflow` | Publishes a draft revision as the next version, and can offer it to agents as a tool. Needs your approval. |
+| `list_workflow_runs` | Lists runs, newest first, with status, trigger, input, output and error. |
+| `read_workflow_run` | Reads one run step by step, including a request waiting on a person. |
+
+Edits are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating and publishing need editor access to the project.
+
+## Offer a workflow as a tool
+
+In **Settings**, turn on **Agents can run it as a tool** (or ask your agent to publish with `exposeAsTool`). Agents in your project then see the published workflow as a tool, described by its `description` and taking its `input` schema, and calling it starts a run that acts for the person the agent works for.

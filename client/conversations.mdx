@@ -208,4 +208,4 @@ To receive events from systems you don't control, like GitHub webhooks, use a [c
 
 ## Approvals and stopping work
 
-Agents in conversations ask for approval the same way they do in sessions. Answer with `room.respond({ decisionId, optionId })` or `room.respond({ decisionId, outcome })`; see [handle approvals](/client/sessions#handle-approvals). `client.conversations.decisions()` lists what awaits the person across conversations. `room.cancel()` stops every agent's running turn in the conversation.
+Agents in conversations ask for approval the same way they do in sessions. Answer with `room.respond({ decisionId, optionId })` or `room.respond({ decisionId, outcome })`; see [handle approvals](/client/sessions#handle-approvals). `client.conversations.decisions()` lists what awaits the person across conversations. Decisions asked outside any conversation are listed with `project.decisions.list()`; see [decisions](/client/decisions). `room.cancel()` stops every agent's running turn in the conversation.

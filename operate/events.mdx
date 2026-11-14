@@ -5,7 +5,7 @@ description: "Read what changed in a project from its event feed, or have Final 
 
 Final keeps an **event feed** of what changes in a project: conversations created and archived, people and agents joining, turns ending, decisions raised and resolved, agents published, and projects created or moved. Read it to keep your own systems in step, like a dashboard of open decisions or an audit trail of finished turns, instead of polling each conversation.
 
-Events carry IDs and state, not content. Read the details you need through the API.
+Events carry IDs and state, not content, except a turn's structured result for the caller that asked for it. Read the details you need through the API.
 
 ## Read the feed
 
@@ -72,9 +72,9 @@ Failed deliveries are retried. A subscription that keeps failing is disabled; `e
 | `conversation.created`, `.archived`, `.unarchived`, `.deleted`, `.moved` | A conversation was created, archived, restored, deleted, or moved to another project. |
 | `participant.joined`, `participant.left` | A person, actor, or agent joined or left a conversation. |
 | `participant.replaced` | An agent participant now runs another agent document. |
-| `turn.ended` | An agent's turn ended, with its `stopReason`. |
+| `turn.ended` | An agent's turn ended, with its `stopReason`. For the API key or app that created the session, it also carries the turn's [structured result](/client/sessions#get-a-structured-result) as `output`, or `outputTruncated` when the result is too large to include. |
 | `session.plan_updated` | An agent reported a new plan. |
-| `decision.raised`, `decision.resolved` | A decision is waiting for an answer, or was answered. |
+| `decision.raised`, `decision.resolved` | A decision is waiting for an answer, or was answered, cancelled, or expired. The caller that raised a [decision](/client/decisions) sees its `requestKey` and `ownedByYou`. |
 | `agent.published`, `agent.archived` | A name was pointed at a new agent hash, or archived. |
 | `project.created`, `.archived`, `.unarchived`, `.moved` | A project changed in the tree. |
 | `link.created`, `link.deleted` | A conversation was linked to another, or unlinked. |

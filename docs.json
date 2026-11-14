@@ -106,7 +106,8 @@
             "group": "Call your agent",
             "pages": [
               "client/sessions",
-              "client/conversations"
+              "client/conversations",
+              "client/decisions"
             ]
           },
           {
@@ -143,6 +144,41 @@
               "mcp-gateway/accounts-and-approvals",
               "mcp-gateway/tools",
               "mcp-gateway/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "AI Workflows",
+        "icon": "diagram-project",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "workflows/overview",
+              "workflows/quickstart"
+            ]
+          },
+          {
+            "group": "Build a workflow",
+            "pages": [
+              "workflows/write-a-workflow",
+              "workflows/steps",
+              "workflows/triggers",
+              "workflows/approvals"
+            ]
+          },
+          {
+            "group": "Run and operate",
+            "pages": [
+              "workflows/runs-and-versions",
+              "workflows/build-with-agents"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "workflows/reference"
             ]
           }
         ]

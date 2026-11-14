@@ -1,0 +1,124 @@
+---
+title: "Steps"
+description: "Every step a workflow can take: run code, call a tool, ask a model, run an agent, ask a person, sleep, and wait for an event."
+---
+
+Every step takes an id first. A finished step's result is stored, so a replay of the run reads it instead of running the step again. Step ids follow [the rules for replays](/workflows/write-a-workflow#how-a-run-executes). Durations are strings such as `'90s'`, `'1h30m'` or `'2d'`, or milliseconds.
+
+## Run your own code
+
+```ts
+const order = await step.run('fetch-order', async ({ idempotencyKey, attempt }) => {
+  const response = await fetch(`https://api.example.com/orders/${input.orderId}`, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  });
+  return response.json();
+});
+```
+
+`step.run(id, fn, options?)` runs `fn` and stores its result. `idempotencyKey` is the same for every attempt of the step in a run, so pass it to services that deduplicate. Put anything with a side effect or a changing answer here, including the current time and random numbers.
+
+## Call an integration tool
+
+```ts
+const issue = await step.call('file-issue', integrations.tracker, 'issues.create', {
+  title: triage.summary,
+});
+```
+
+`step.call(id, integration, tool, input, options?)` calls a tool of an integration the workflow [requires](/workflows/write-a-workflow#integrations), under your project's policies, and records the call. It resolves to the tool's structured result when the tool declares an output schema, or to its content blocks otherwise.
+
+- A tool that reports an error fails the step with `tool_error`.
+- A call the project's policy refuses, or a person declines, fails with the platform's code.
+- When a call needs an approval or a person's sign-in, the step waits for it, then calls once more. See [Approvals and sign-ins](/workflows/approvals). `decisionTimeout` sets how long it waits, 24 hours by default; nobody answering fails the step with `decision_timeout`.
+- A call whose outcome is unknown (a timeout or dropped connection) fails with `outcome_unknown` and is never sent again. Catch it and check with the service whether the call went through.
+
+In a test run, the integration validates the call without carrying it out.
+
+## Ask a model
+
+```ts
+const triage = await step.ai('classify', {
+  prompt: `Classify this support email:\n${JSON.stringify(email)}`,
+  output: z.object({ severity: z.enum(['low', 'high']), summary: z.string() }),
+});
+```
+
+`step.ai(id, { prompt, system?, model?, output, timeout? })` makes one model call whose answer must match `output`, a Zod schema, and resolves to the parsed answer. It's billed to your project's inference sources. An answer that doesn't match fails the step with `invalid_output`. The timeout is one hour by default.
+
+## Run an agent
+
+```ts
+const review = await step.agent('review-pr', {
+  agent: 'acme/pr-reviewer',
+  prompt: `Review pull request ${input.prNumber}.`,
+  provide: { integrations: { github: integrations.github } },
+  output: z.object({ approve: z.boolean(), comments: z.array(z.string()) }),
+});
+```
+
+`step.agent(id, { agent, prompt, provide?, model?, output?, timeout? })` runs a published agent, by name, once with `prompt`.
+
+- `provide` fills the agent's [integration requirements](/build/requirements) from the workflow's own integrations.
+- With `output`, it resolves to the agent's result parsed with that schema; without it, to `{ text }`.
+- The run waits for as long as the agent takes, including while the agent waits on a person, up to `timeout` (24 hours by default). A timeout fails the step with `agent_timeout`.
+
+## Ask a person
+
+```ts
+const decision = await step.approval('refund', {
+  title: `Refund ${input.amount} to ${input.customer}?`,
+  description: 'Over the automatic refund limit.',
+  timeout: '2d',
+});
+if (decision?.approved !== true) return { refunded: false };
+```
+
+`step.approval(id, { title, description?, approvers?, timeout? })` asks people to approve and resolves to `{ approved, decidedBy, comment }`, or `null` when `timeout` passes first (seven days by default). See [Approvals and sign-ins](/workflows/approvals) for who is asked and where they answer.
+
+## Sleep and wait for an event
+
+```ts
+await step.sleep('cool-off', '1h');
+
+const signed = await step.waitForEvent('contract-signed', {
+  event: 'contract.signed',
+  match: { contractId: input.contractId },
+  timeout: '14d',
+});
+```
+
+`step.sleep(id, durationOrUntil)` waits for a duration or until a `Date`. `step.waitForEvent(id, { event, match?, timeout? })` resolves to the data of the first matching event [sent to your project](/workflows/triggers#send-an-event), or `null` on timeout. `match` compares top-level values of the event's data. Neither step holds any resources while it waits.
+
+## Retries, timeouts and errors
+
+`step.run` and `step.call` take `retries` and `timeout`:
+
+```ts
+await step.call('charge', integrations.billing, 'charges.create', input, {
+  retries: { maxAttempts: 1 },
+  timeout: '30s',
+});
+```
+
+| Option | What it does |
+| --- | --- |
+| `retries.maxAttempts` | Attempts including the first. The workflow's `retries` sets the default. |
+| `retries.strategy` | `'exponential'` or `'linear'` backoff between attempts. |
+| `retries.minDelay`, `retries.maxDelay` | Bounds on the delay between attempts. |
+| `timeout` | Time allowed for each attempt, five minutes by default. |
+
+- `retries: { maxAttempts: 1 }` means the step is never sent twice. If its outcome is unknown, it fails with `step_outcome_unknown` instead of running again.
+- Throw `createNonRetryableError(message, { code })` from a step to fail it at once.
+- A step that runs out of attempts throws an error for which `isStepError(error)` is true, with `stepId` and `code`. Catch it to carry on; uncaught, it fails the run.
+
+```ts
+import { isStepError } from '@finalai/workflows';
+
+try {
+  await step.call('notify', integrations.chat, 'chat.postMessage', { text });
+} catch (error) {
+  if (!isStepError(error)) throw error;
+  await step.run('log-failure', () => console.warn(`notify failed: ${error.code}`));
+}
+```

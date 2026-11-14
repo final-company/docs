@@ -161,6 +161,71 @@ await project.integrations.completeSignIn({ state, code });
 
 A shared integration (`oauth({ credential: 'shared' })`) is signed in once for everyone. Use shared integrations for work no person is present for, such as [schedules](/build/schedules) and [channels](/build/channels).
 
+## Call tools without a session
+
+Your own code can use a project's integrations directly, without starting an agent: a nightly job that files issues, or a backend step that posts to Slack. The call goes through the same tool policy, approvals, sign-ins, and call records as an agent's. An API key calls as the project and acts for nobody. An app calls with a person's token and acts for that person, so their own sign-ins apply.
+
+`project.integrations.listTools(integrationId)` lists the integration's tools and needs the `integrations:read` permission. `callTool` calls one and needs `integrations:call`:
+
+```ts
+import { IntegrationToolCallStatus } from '@finalai/agents/client';
+
+const outcome = await project.integrations.callTool(integrationId, {
+  name: 'create_issue',
+  arguments: { title: 'Checkout fails on Safari' },
+  callKey: 'triage-2026-11-13/create_issue',
+  requirement: {
+    description: 'Issue tracker',
+    tools: { allow: ['create_issue'] },
+    approvals: { create_issue: 'ask' },
+  },
+});
+
+switch (outcome.status) {
+  case IntegrationToolCallStatus.Completed:
+    console.log(outcome.result); // The MCP tool result
+    break;
+  case IntegrationToolCallStatus.DecisionRequired:
+    // Save outcome.decision.id; call again once it resolves.
+    break;
+  case IntegrationToolCallStatus.Failed:
+    console.error(outcome.error.code, outcome.error.message);
+    break;
+}
+```
+
+| Field | What it does |
+| --- | --- |
+| `name`, `arguments` | The tool and its input. |
+| `callKey` | Your key for this one logical call. A key that completed returns its recorded outcome and never runs the tool again; reusing it for a different call fails with `call_key_reused`. Keys are per caller, and per person for an app. |
+| `requirement` | A [slot policy](#choose-which-tools-the-agent-gets) for this call: which tools it may use and which need approval. Without it, the integration's own policy applies. |
+| `conversationId` | Where a person is asked, when the call needs an answer. |
+| `decisionId` | The resolved decision a repeated call relies on. |
+| `dryRun` | Check the call (exposure, approvals, credentials) without running the tool. |
+
+### When a call needs a person
+
+A call that needs an approval, a person's sign-in, or an answer to a question the tool asks returns `decision_required` with the decision's `id` and `kind` (`approval`, `sign_in`, or `input`). Nothing runs until it resolves. Then call again with the same `callKey` and the decision's ID:
+
+```ts
+const retried = await project.integrations.callTool(integrationId, {
+  name: 'create_issue',
+  arguments: { title: 'Checkout fails on Safari' },
+  callKey: 'triage-2026-11-13/create_issue',
+  decisionId,
+});
+```
+
+Where the person is asked depends on the call:
+
+- With `conversationId`, the decision is asked in that conversation, like an agent's.
+- Without one, it's a [decision in the project](/client/decisions) for the person the caller acts for. They see it in Final's apps and answer it there or in your app.
+- An API key with no `conversationId` acts for nobody, so a call that needs a person fails with `conversation_required`.
+
+Watch for the answer with the `decision.resolved` [event](/operate/events), which names the decision's ID.
+
+A call whose outcome is unknown, such as a timeout after the server received it, fails with `outcome_unknown`, and its key never runs the tool again. Check with the service whether the call went through before you use a new key.
+
 ## Final's gateway
 
 `finalGateway({ url })` is an ordinary integration for Final's MCP gateway: the project's tasks, chats, agents, and search, plus the tools of every service connected under **Connectors**. It's the same set of tools the [MCP gateway](/mcp-gateway/overview) gives Claude Code or Codex. Pass the gateway's **Final MCP URL**, `https://api.final.ai/v1/connectors/mcp`. It authenticates with a platform identity assertion for the calling session, so it needs no token, and that assertion confines it to the session's own conversation and the chats linked from it.
