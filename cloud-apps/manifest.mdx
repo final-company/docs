@@ -267,11 +267,15 @@ Fields for `type: function`. Functions don't use the container fields. See [func
 </ParamField>
 
 <ParamField path="public" type="boolean" default="true">
-  Whether the function gets a public URL. Set `false` to deploy it with no URL.
+  Whether anyone can call the function's URL. Set `false` to make it [private](/cloud-apps/functions#private-functions): it keeps its URL, but only callers holding an access token for it reach it.
+</ParamField>
+
+<ParamField path="access.projects" type="string[]" default="[]">
+  Only with `public: false`. IDs of other projects that may call the private function, besides the app's own project.
 </ParamField>
 
 <ParamField path="domains" type="string[]" default="[]">
-  Custom hostnames for a public function, with no scheme or path.
+  Custom hostnames for the function, with no scheme or path. A private function's custom hostnames are private too.
 </ParamField>
 
 <ParamField path="concurrency" type="integer" default="64">

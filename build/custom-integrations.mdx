@@ -7,7 +7,7 @@ description: "Write your own integration as a private Final Cloud Function: MCP 
 When no existing MCP server or connector fits, write the integration yourself. A custom integration is three ordinary pieces:
 
 1. An MCP server, written with the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) and deployed as a private [Final Cloud Function](/cloud-apps/functions).
-2. A tools integration whose MCP server is that function.
+2. A tools integration that names the function's URL.
 3. One credential integration for each API the tools call, which holds the OAuth sign-in, API key, or website session.
 
 The function never holds a credential. When a tool calls one of a credential's hosts, Final puts the credential on the request on its way out, and only for those hosts. Each person's sign-in works exactly as it does for any [integration](/build/integrations#sign-in).
@@ -54,7 +54,7 @@ export default {
 };
 ```
 
-`verifyIntegrationCall` from `@finalai/agents/integration-server` checks the [platform identity](/build/integrations#verify-calls-from-final) assertion Final sends with every call and returns the verified caller (`verified.caller`): the project, person, and session the call is for. Inside Final Cloud it reads what to verify against from the function's environment (`FINAL_CLOUD_APP_ID`, `FINAL_PLATFORM_ISSUER`); elsewhere, pass `audience` and `issuer`. Answer anything it refuses with `401`, so the function only serves calls from Final.
+`verifyIntegrationCall` from `@finalai/agents/integration-server` checks the [access token](#private-apps) every call to a private function carries and returns the verified caller (`verified.caller`): the project, person, and session the call is for. The token must be issued for the function's own origin (`https://` and the request's host) by Final's authorization server, which the function's environment names in `FINAL_AUTH_ISSUER`. Final Cloud already turns away requests without a valid token before they reach the function; verifying again tells you who is calling and keeps the check if the function is ever made public. Answer anything it refuses with `401`.
 
 Mark tools with the `readOnlyHint` or `destructiveHint` annotation: an agent's [approvals](/build/integrations#choose-which-tools-the-agent-gets) default to running read-only tools and asking before anything else.
 
@@ -64,7 +64,7 @@ A host can refuse the credential Final put on a request: `401` or `403`, or, for
 
 ## Deploy it
 
-Deploy the function private, so only Final can call it:
+Deploy the function private, so only callers holding an access token for it reach it:
 
 ```yaml final-cloud.yaml
 name: acme-integration
@@ -76,7 +76,24 @@ build:
 public: false
 ```
 
+It still gets its URL. Integrations in the app's own project can call it; to let integrations in other projects call it too, list those projects' IDs under `access.projects`:
+
+```yaml final-cloud.yaml
+access:
+  projects:
+    - <project-id>
+```
+
 See [Functions](/cloud-apps/functions) for building and deploying.
+
+## Private apps
+
+A function deployed with `public: false` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs or wakes. Final's authorization server issues those tokens only for the app's own project and the projects in `access.projects`, to Final's own calls on their behalf:
+
+- Calls through an integration that names the app's URL with `platformIdentity()` auth. Final exchanges the call's platform identity for a token.
+- [Workflow](/workflows/overview) steps. The workflow engine exchanges the step's token.
+
+Callers find the authorization server through standard OAuth discovery. The `401` points to the app's protected resource metadata ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)) at `https://<host>/.well-known/oauth-protected-resource`, which names the authorization server, and that server's metadata ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)) gives its token endpoint. Each token is issued for one origin, carries the scope `resource:invoke`, and expires within minutes.
 
 ## Add it to the project
 
@@ -97,7 +114,7 @@ const acmeApi = await project.integrations.create({
 
 const acme = await project.integrations.create({
   name: 'acme',
-  mcp: { cloudApp: 'capp_…', path: '/mcp' },
+  mcp: { url: 'https://<your-app-url>/mcp' },
   auth: platformIdentity(),
   credentials: [acmeApi.id],
 });
@@ -105,12 +122,8 @@ const acme = await project.integrations.create({
 
 The tools integration looks like any other: provide it for an agent's [slot](/build/integrations#require-a-slot), or reach its tools through Final's gateway.
 
-<ParamField path="mcp.cloudApp" type="string">
-  A Final Cloud app in the same project whose function serves MCP. Final calls it privately; deploy it with `public: false`.
-</ParamField>
-
-<ParamField path="mcp.path" type="string" default="/mcp">
-  Where the function serves MCP.
+<ParamField path="mcp.url" type="string">
+  The function's URL, which `final-cloud deploy` prints, and the path it serves MCP at. Final sees that the app is private, gets an access token for it, and sends the token with each call.
 </ParamField>
 
 <ParamField path="credentials" type="string[]">
@@ -148,4 +161,4 @@ Credential integrations work for any MCP server, not only Final Cloud Functions.
 | `final-egress-hosts` | The credential hosts, comma-separated (`*.example.com` covers its subdomains). |
 | `final-egress-env` | Base64url JSON of placeholder values, for placeholder credentials. |
 
-Treat the token as opaque. Send a request meant for one of the credential hosts to `<relay>/v1/relay` instead, with the same method, headers, and body, plus the token in `final-egress-token` and the real destination in `final-egress-url`. The relay adds the credential, sends the request over HTTPS, and streams the response back without following redirects. `final-egress-credential` on the response names the credential integrations it used. `relayFetch({ request })` from `@finalai/agents/integration-server` returns a `fetch` that does this for you, for a call `verifyIntegrationCall` accepted; inside Final Cloud you don't need it.
+Treat the token as opaque. Send a request meant for one of the credential hosts to `<relay>/v1/relay` instead, with the same method, headers, and body, plus the token in `final-egress-token` and the real destination in `final-egress-url`. The relay adds the credential, sends the request over HTTPS, and streams the response back without following redirects. `final-egress-credential` on the response names the credential integrations it used. `relayFetch({ request })` from `@finalai/agents/integration-server` returns a `fetch` that does this for you; inside Final Cloud you don't need it.

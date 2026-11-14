@@ -105,7 +105,7 @@ await project.sessions.create({
 </ParamField>
 
 <ParamField path="mcp.url" type="string">
-  The MCP server's HTTP endpoint. An integration needs at least one of `mcp`, `egress`, and `exit`. To serve tools from your own Final Cloud Function instead, see [custom integrations](/build/custom-integrations).
+  The MCP server's HTTP endpoint. An integration needs at least one of `mcp`, `egress`, and `exit`. For your own MCP server deployed as a private Final Cloud Function, this is the function's URL; see [custom integrations](/build/custom-integrations).
 </ParamField>
 
 <ParamField path="mcp.headers" type="Record<string, string>">

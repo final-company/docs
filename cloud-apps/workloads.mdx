@@ -24,7 +24,7 @@ Pick a **web app** for anything else: a full framework, a language other than Ja
 
 |  | Web app | Function | Service | Cron job |
 | --- | --- | --- | --- | --- |
-| Public URL | Yes | Yes, unless `public: false` | No | No |
+| Public URL | Yes | Yes, or private with `public: false` | No | No |
 | Runs from | A container | One JavaScript module | A container | A container |
 | Runs | All the time | When requests arrive | All the time | On a schedule or on demand, until it exits |
 | Success means | The health check passes | It answers requests | It's running | It exits with code `0` |
