@@ -13,7 +13,7 @@ The agent's edits show up live on the canvas with a banner to **Keep**, **Undo**
 
 ## Use your own coding agent
 
-Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstart), then ask it to work on a workflow. It finds Final's workflow tools through the gateway's tool search, as `final.workflows.create`, `final.workflows.read`, `final.workflows.edit_source`, `final.workflows.check`, `final.workflows.test`, `final.workflows.publish`, `final.workflows.list_runs` and `final.workflows.read_run`.
+Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstart), then ask it to work on a workflow. It finds Final's workflow tools through the gateway's tool search, as `final.workflows.list`, `final.workflows.create`, `final.workflows.read`, `final.workflows.edit_source`, `final.workflows.check`, `final.workflows.test`, `final.workflows.publish`, `final.workflows.list_runs` and `final.workflows.read_run`.
 
 > Create a workflow in my Acme project that files a Linear issue for every high-severity Sentry alert, and test it with a sample alert.
 
@@ -21,6 +21,7 @@ Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstar
 
 | Tool | What it does |
 | --- | --- |
+| `list_workflows` | Lists the project's workflows with their ids, published versions and latest runs. |
 | `create_workflow` | Creates a workflow in the project with a starter source. |
 | `read_workflow` | Reads the draft source and its revision, the requirements and the integrations filling them, the triggers, and the published version. |
 | `edit_workflow_source` | Changes the draft by exact text replacements against one revision, and returns the new revision's diagnostics. |
