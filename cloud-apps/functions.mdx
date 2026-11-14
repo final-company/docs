@@ -3,7 +3,7 @@ title: "Functions"
 description: "Deploy a JavaScript request handler for webhooks and small APIs, with no container to build."
 ---
 
-Use a function when one JavaScript handler can answer your HTTP requests: a webhook receiver, a small JSON API, or a redirect service. You write a `fetch` handler, and Final runs it at a public URL. There's no Dockerfile or server to manage, and a function that sits idle stops until the next request arrives.
+Use a function when one JavaScript handler can answer your HTTP requests: a webhook receiver, a small JSON API, or a redirect service. You write a `fetch` handler, and Final runs it at its own URL, public by default. There's no Dockerfile or server to manage, and a function that sits idle stops until the next request arrives.
 
 Functions run in a lightweight JavaScript runtime with web-standard APIs like `fetch`, `Request`, `Response`, and `crypto.subtle`. Each instance has 128 MB of memory. If you need Node.js-only libraries, native packages, or another language, use a [web app](/cloud-apps/web-apps).
 
@@ -190,6 +190,19 @@ outboundPolicy:
 ```
 
 Set `outboundPolicy.internet: false` to cut the function off from the internet entirely.
+
+## Private functions
+
+Functions are public by default: anyone with the URL can call them. Set `public: false` to make one private. It keeps its URL and custom domains, but only callers holding an access token for its origin reach it, and every other request gets `401` before the function runs:
+
+```yaml final-cloud.yaml
+public: false
+access:
+  projects:
+    - <project-id>
+```
+
+Final issues those tokens for calls on behalf of the app's own project and any projects listed in `access.projects`: [custom integrations](/build/custom-integrations) and [workflow](/workflows/overview) steps. Callers discover how to get one through standard OAuth metadata; see [private apps](/build/custom-integrations#private-apps). The function's environment holds `FINAL_AUTH_ISSUER`, the authorization server that issues the tokens, so the function can check them itself; `verifyIntegrationCall` from `@finalai/agents/integration-server` does this.
 
 The [manifest reference](/cloud-apps/manifest#functions) lists every function field.
 

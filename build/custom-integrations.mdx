@@ -1,0 +1,165 @@
+---
+title: "Custom integrations"
+sidebarTitle: "Custom integrations"
+description: "Write your own integration as a private Final Cloud Function: MCP tools whose outbound requests carry credentials Final holds."
+---
+
+When no existing MCP server or connector fits, write the integration yourself. A custom integration is three ordinary pieces:
+
+1. An MCP server, written with the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) and deployed as a private [Final Cloud Function](/cloud-apps/functions).
+2. A tools integration that names the function's URL.
+3. One credential integration for each API the tools call, which holds the OAuth sign-in, API key, or website session.
+
+The function never holds a credential. When a tool calls one of a credential's hosts, Final puts the credential on the request on its way out, and only for those hosts. Each person's sign-in works exactly as it does for any [integration](/build/integrations#sign-in).
+
+## Write the server
+
+Install the MCP server SDK, the Agent SDK, and Zod:
+
+```bash
+npm install @modelcontextprotocol/server @finalai/agents zod
+```
+
+```ts src/index.ts
+import { createMcpHandler, McpServer } from '@modelcontextprotocol/server';
+import { credentialRejection, verifyIntegrationCall } from '@finalai/agents/integration-server';
+import * as z from 'zod';
+
+const handler = createMcpHandler(() => {
+  const server = new McpServer({ name: 'acme', version: '1.0.0' });
+  server.registerTool(
+    'list_invoices',
+    {
+      description: 'Invoices with a given status',
+      inputSchema: z.object({ status: z.enum(['open', 'paid']) }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ status }) => {
+      const response = await fetch(`https://api.acme.com/v1/invoices?status=${status}`);
+      // A refused credential asks the person to sign in again.
+      const rejected = credentialRejection(response);
+      if (rejected != null) return rejected;
+      return { content: [{ type: 'text', text: await response.text() }] };
+    },
+  );
+  return server;
+});
+
+export default {
+  async fetch(request: Request, env: Record<string, unknown>) {
+    const verified = await verifyIntegrationCall({ request, env });
+    if (!verified.ok) return new Response(null, { status: 401 });
+    return handler.fetch(request);
+  },
+};
+```
+
+`verifyIntegrationCall` from `@finalai/agents/integration-server` checks the [access token](#private-apps) every call to a private function carries and returns the verified caller (`verified.caller`): the project, person, and session the call is for. The token must be issued for the function's own origin (`https://` and the request's host) by Final's authorization server, which the function's environment names in `FINAL_AUTH_ISSUER`. Final Cloud already turns away requests without a valid token before they reach the function; verifying again tells you who is calling and keeps the check if the function is ever made public. Answer anything it refuses with `401`.
+
+Mark tools with the `readOnlyHint` or `destructiveHint` annotation: an agent's [approvals](/build/integrations#choose-which-tools-the-agent-gets) default to running read-only tools and asking before anything else.
+
+Inside Final Cloud, plain `fetch` to a credential's hosts carries the credential. For a placeholder credential, the function's environment holds the placeholder in the variable the credential names; send it where the real value would go.
+
+A host can refuse the credential Final put on a request: `401` or `403`, or, for a website session, a redirect to its sign-in page. `credentialRejection(response)` returns the tool result that makes Final ask the person to sign in again, or `null` when the response is no such refusal: return it from the tool. For a website session, send requests with `redirect: 'manual'` and pass `{ url, browserSessionHosts }` so a redirect to the sign-in page is recognised.
+
+## Deploy it
+
+Deploy the function private, so only callers holding an access token for it reach it:
+
+```yaml final-cloud.yaml
+name: acme-integration
+type: function
+entry: dist/index.js
+build:
+  command: npm install && npm run build
+  output: dist/index.js
+public: false
+```
+
+It still gets its URL. Integrations in the app's own project can call it; to let integrations in other projects call it too, list those projects' IDs under `access.projects`:
+
+```yaml final-cloud.yaml
+access:
+  projects:
+    - <project-id>
+```
+
+See [Functions](/cloud-apps/functions) for building and deploying.
+
+## Private apps
+
+A function deployed with `public: false` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs. Final's authorization server issues those tokens only for the app's own project and the projects in `access.projects`:
+
+- Calls through an integration that names the app's URL with `platformIdentity()` auth. Final exchanges the call's platform identity for a token.
+- [Workflow](/workflows/overview) steps. The workflow engine exchanges the step's token.
+- Your own apps registered with Final (OAuth clients) that an organization admin granted the `resource:invoke` scope: a project principal (`client_credentials` with `project`), or a person who can use the app's project. Request the token with `resource` set to the app's origin.
+
+Callers find the authorization server through standard OAuth discovery. The `401` points to the app's protected resource metadata ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)) at `https://<host>/.well-known/oauth-protected-resource`, which names the authorization server, and that server's metadata ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)) gives its token endpoint. Each token is issued for one origin, carries the scope `resource:invoke`, and expires within minutes.
+
+## Add it to the project
+
+Create a credential integration for each API, then the tools integration that names them:
+
+```ts setup.ts
+import { createClient, EgressInjectKind } from '@finalai/agents/client';
+import { oauth, platformIdentity } from '@finalai/agents/integrations';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+const acmeApi = await project.integrations.create({
+  name: 'acme-api',
+  egress: { hosts: ['api.acme.com'], inject: { kind: EgressInjectKind.Header } },
+  auth: oauth({ server: { issuer: 'https://login.acme.com' }, scopes: ['invoices.read'] }),
+});
+
+const acme = await project.integrations.create({
+  name: 'acme',
+  mcp: { url: 'https://<your-app-url>/mcp' },
+  auth: platformIdentity(),
+  credentials: [acmeApi.id],
+});
+```
+
+The tools integration looks like any other: provide it for an agent's [slot](/build/integrations#require-a-slot), or reach its tools through Final's gateway.
+
+<ParamField path="mcp.url" type="string">
+  The function's URL, which `final-cloud deploy` prints, and the path it serves MCP at. Final sees that the app is private, gets an access token for it, and sends the token with each call.
+</ParamField>
+
+<ParamField path="credentials" type="string[]">
+  Credential integrations in the same project whose credentials calls to this MCP server may carry.
+</ParamField>
+
+A credential integration has `egress` (its hosts, and how the credential is put on requests, as for [a sandbox's traffic](/build/integrations#credentials-for-a-sandboxs-traffic)) and one of these `auth` helpers from `@finalai/agents/integrations`:
+
+| Helper | The credential |
+| --- | --- |
+| `oauth({ server, scopes?, client?, credential? })` | An OAuth sign-in. `server` is the provider's `{ issuer }`, or its `{ authorizationEndpoint, tokenEndpoint }`. Providers that don't allow dynamic client registration need [your own OAuth client](#your-own-oauth-client). |
+| `secret('NAME')` | A [project secret](/operate/authentication#use-secrets-in-your-code). With `inject: { kind: 'placeholder', env }`, the function sees a placeholder instead, and Final replaces it with the real value wherever the request carries it. |
+| `browserSession({ signInUrl, credential? })` | A website session. The person signs in to the site in a browser Final runs, and requests to the egress hosts carry its cookies. Use it with `inject: { kind: 'header', header: 'cookie', format: 'raw' }`. |
+
+`credential` is `'personal'` (each person signs in, the default) or `'shared'` (one sign-in for the whole project). The first call that needs a person's sign-in raises a [sign-in](/build/integrations#sign-in) for them, as for any integration.
+
+## Your own OAuth client
+
+Some providers only accept OAuth clients registered ahead of time. Register one in your project with the redirect URI Final shows, then name it in the credential's auth with `client`. Its secret is a project secret, which Final reads each time it calls the provider's token endpoint.
+
+## Sites with no API
+
+When a site has no API but its actions replay as plain HTTP requests, record those requests, from an [agent-browser](https://github.com/vercel-labs/agent-browser) saved flow or the browser's network log, and write tools that send them with `fetch` and a `browserSession` credential. Recorded cookies never go in the code: the person signs in through Final, and the credential carries their session.
+
+A site that renders its pages in the browser, uses anti-bot checks, or needs real interaction is better used by the agent in a real browser when the task runs, with the [`browserUse` or `computerUse`](/build/sandboxes#require-compute) capability, or through its API if it has one.
+
+## Servers you host yourself
+
+Credential integrations work for any MCP server, not only Final Cloud Functions. When an integration names `credentials`, each call to its server carries these headers:
+
+| Header | What it holds |
+| --- | --- |
+| `final-egress-token` | A token for this call only. |
+| `final-egress-relay` | The relay's origin. |
+| `final-egress-hosts` | The credential hosts, comma-separated (`*.example.com` covers its subdomains). |
+| `final-egress-env` | Base64url JSON of placeholder values, for placeholder credentials. |
+
+Treat the token as opaque. Send a request meant for one of the credential hosts to `<relay>/v1/relay` instead, with the same method, headers, and body, plus the token in `final-egress-token` and the real destination in `final-egress-url`. The relay adds the credential, sends the request over HTTPS, and streams the response back without following redirects. `final-egress-credential` on the response names the credential integrations it used. `relayFetch({ request })` from `@finalai/agents/integration-server` returns a `fetch` that does this for you; inside Final Cloud you don't need it.
