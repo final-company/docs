@@ -19,7 +19,7 @@ icon: "book"
 | `@finalai/agents/tools` | Tools and their results | `defineServerlessTool`, `defineInProcessTool`, `toolResultFrom` |
 | `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineServerlessHook`, `defineInProcessHook`, `HookEvent` |
 | `@finalai/agents/channels` | [Channels](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS`, `ChannelSigningAlgorithm`, `ChannelSignatureEncoding`, `ChannelCredentialKind` |
-| `@finalai/agents/client` | Starting and talking to agents, in Node, browsers, React Native, and Workers | `createClient`, `sessionUpdateOf`, `textOf`, `isRequirementsUnmetError`, `isClientError`, `Capability`, `AgentSourceErrorCode`, and the API's types and enums |
+| `@finalai/agents/client` | Starting and talking to agents, in Node, browsers, React Native, and Workers | `createClient`, `sessionUpdateOf`, `textOf`, `isRequirementsUnmetError`, `isClientError`, `Capability`, `AgentApiErrorCode`, and the API's types and enums |
 | `@finalai/agents/verify` | [Verifying tokens Final signs](/build/integrations#verify-calls-from-final) | `verifyPlatformIdentity`, `verifyAccessToken`, `verifyHumanInput` |
 | `@finalai/agents/webhooks` | [Event webhooks](/operate/events#receive-webhooks) | `verifyWebhook` |
 | `@finalai/agents/testing` | Testing code that uses the client | `createFakeFetch`, `createFakeTransport` |
@@ -37,7 +37,7 @@ Lower-level packages are public too, each with its own README: [`@finalai/agent-
 | --- | --- |
 | `sessions` | `create({ agent, provide, id?, actor?, message?, output? })` starts a session; `attach(id)` returns a handle by ID. A handle sends messages, streams events, lists and answers decisions, reads `requirements()` and `provide()`, and cancels or closes. See [sessions](/client/sessions). |
 | `conversations` | `create` and `direct` take `provide`; `findDirect` looks up without creating. A handle's `addParticipant` and `participants.provide` set each agent's settings, and it has `inputs`, `context`, `labels`, and schedules. See [conversations](/client/conversations). |
-| `agents` | `publish({ agent?, source?, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent?, source? })`, and `parse(json)`. Pass `agent`, its `source` (`{ entry, files }`), or both; `get` returns the kept `source`, or `null`. See [publish with the source](/operate/publishing#publish-with-the-source). |
+| `agents` | `publish({ agent \| source, hash?, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent \| source, hash? })`, and `parse(json)`. Pass the `agent`, or its `source` (`{ entry, export?, files }`) for Final to make the document from; `get` returns the kept `source`, or `null`. See [publish with the source](/operate/publishing#publish-with-the-source). |
 | `sandboxes` | `create(environment, { setup?, ownedBy?, idempotencyKey? })`, `get`, `list`, and `providers()`. A handle runs commands, reads its `description()`, and deletes the sandbox. |
 | `sandboxSetups` | `publish({ name, setup })`, `get`, and `list`. See [sandbox setups](/build/sandbox-setups). |
 | `sandboxProviders` | `register({ name, url })`, `list`, `get`, `update`, `refresh`, and `remove` for providers you run. See [run your own provider](/build/sandboxes#run-your-own-provider). |
@@ -87,7 +87,7 @@ Stores the document and points `<name>` at it in a project: `project.agents.publ
 npx final-agents publish ./agent.ts --name release-assistant
 ```
 
-For an agent whose files are everything Final needs, `publish` also sends them (the modules the module imports and the files its document reads) as the agent's source, and prints `source: sent`. Otherwise it prints `source: not sent (<reason>)`. When Final refuses the source (`agent_source_invalid` or `agent_source_mismatch`), it publishes the document alone and prints `source: not kept (<reason>)`. See [publish with the source](/operate/publishing#publish-with-the-source).
+For an agent whose files are everything Final needs, `publish` sends them (the modules the module imports and the files its document reads) as the agent's source, and prints `source: sent`. Otherwise it prints `source: not sent (<reason>)`. It sends the source with the hash of the document it made. When Final refuses the source (`agent_source_invalid`) or makes another document (`hash_mismatch`), it publishes its document alone and prints `source: not kept (<reason>)`. See [publish with the source](/operate/publishing#publish-with-the-source).
 
 ### `conformance <module>`
 

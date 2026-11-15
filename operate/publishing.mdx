@@ -52,35 +52,35 @@ Names use lowercase letters, digits, `.`, `_`, and `-`, and are unique in a proj
 
 An agent's **source** is the files its document is made from: its module, the modules it imports, and the text files it reads, by path from your project's root. Final keeps them with the published version, and anyone who can read the agent can open them, on Final or with `agents.get`. An agent's files are its source when they're [everything Final needs](/build/project-structure#agents-final-can-open): its modules import each other by relative path and otherwise only `@finalai/agents` and `zod`, its tools and hooks are [serverless](/build/tools#in-process-or-serverless), and it reads files only with `markdown()`, `skill(path)`, and `files()`.
 
-`final-agents publish` collects them itself: it follows the module's imports, records the files read while the document is made, and sends them with the document when they qualify. Paths start at the nearest directory with a `package.json`; pass `--source-root <dir>` for another. The last line of its output says what happened:
+`final-agents publish` collects them itself: it follows the module's imports and records the files read while the document is made. When they qualify, it sends them instead of the document, with the hash of the document it made, so Final checks it makes the same one. Paths start at the nearest directory with a `package.json`; pass `--source-root <dir>` for another. The last line of its output says what happened:
 
 | Output | Meaning |
 | --- | --- |
-| `source: sent` | Final kept the agent's files with this version. |
+| `source: sent` | Final made the document from the agent's files and kept them with this version. |
 | `source: not sent (<reason>)` | The files don't qualify, or you passed `--no-source`. Only the document was published. |
-| `source: not kept (<reason>)` | Final refused the source, so the CLI published the document on its own. |
+| `source: not kept (<reason>)` | Final refused the files or made another document from them, so the CLI published its document on its own. |
 
 Pass `--no-source` to publish only the document. Agents that import other packages or have in-process tools publish as before, without their source.
 
-Final makes the document from the source itself, in an isolated runtime with no network access, and checks that it's the same document, hash for hash. It refuses a source with one of two error codes, `AgentSourceErrorCode` in `@finalai/agents/client`:
+Final makes the document from the source itself, in an isolated runtime with no network access. These errors, `AgentApiErrorCode` in `@finalai/agents/client`, refuse it:
 
 | Code | Why |
 | --- | --- |
 | `agent_source_invalid` | The files don't make a document. `details.diagnostics` lists each problem with its `message`, `path`, `line`, and `column`. |
-| `agent_source_mismatch` | The files make a different document from the one sent with it, such as when your SDK version differs from Final's. |
+| `hash_mismatch` | The document Final made doesn't have the `hash` you sent, such as when your SDK version differs from Final's. Nothing is stored. The same code refuses a document that doesn't have its `hash`. |
 
-From code, `readAgentSource` from `@finalai/agents/source` loads a module and collects its source as the CLI does. Pass `source` with the agent, or on its own to let Final make the document from the files:
+From code, `readAgentSource` from `@finalai/agents/source` loads a module and collects its source as the CLI does. Send the agent or its source, not both:
 
 ```ts
 import { readAgentSource } from '@finalai/agents/source';
 
-const { agent, source } = await readAgentSource({ module: './agent.ts' });
+const { hash, source } = await readAgentSource({ module: './agent.ts' });
 if (!source.ok) throw new Error(source.reason);
-await project.agents.publish({ agent, source: source.source, name: 'release-assistant' });
-// Or: await project.agents.publish({ source: source.source, name: 'release-assistant' });
+// `hash` is optional: with it, Final refuses to store a different document.
+await project.agents.publish({ source: source.source, hash, name: 'release-assistant' });
 ```
 
-A source is `{ entry, files }`: `entry` is the path of the module that exports the agent, and `files` maps each path to its text. `project.agents.store` takes the same `agent` and `source`, and stores without naming anything.
+A source is `{ entry, export?, files }`. `entry` is the path of the module that exports the agent, and `files` maps each path to its text. `export` names the agent's export; leave it out when it's `agent`, the module's default export, or its only agent. `project.agents.store` takes the same `agent` or `source`, and stores without naming anything.
 
 ### Publish from CI
 
