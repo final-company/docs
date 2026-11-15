@@ -21,17 +21,17 @@ Final doesn't replace your coding agent. It gives the agent a computer to work o
 
     <Steps>
       <Step title="Create the agent">
-        Open **Agents** and click **New agent**. Enter a name, such as `Storefront Coder`, and choose the coding template.
+        Open **Agents** and click **New agent**, enter a name such as `Storefront Coder`, and edit its source. Or ask your project's agent to build it for you: any agent with Final's tools can create, change and publish agents ([Build agents with agents](/build/build-with-agents)).
 
-        Final creates a repository for the agent with an `agent.ts` and `instructions.md`. The agent states what it requires, and names no machine or model:
+        The agent is one file, `agent.ts`, that Final keeps as drafts. It states what the agent requires, and names no machine or model:
 
         ```ts agent.ts
-        import { defineAgent, markdown } from '@finalai/agents';
+        import { defineAgent } from '@finalai/agents';
         import { FinalHarness } from '@finalai/agents/harnesses';
 
         export const agent = defineAgent({
           name: 'Storefront Coder',
-          instructions: markdown('./instructions.md', { from: import.meta.url }),
+          instructions: `You work on the storefront. Run the tests before you hand off a change.`,
           require: {
             harness: {
               permissionMode: 'review',
@@ -54,7 +54,7 @@ Final doesn't replace your coding agent. It gives the agent a computer to work o
         Connect your Claude or ChatGPT subscription in Final to let agents use your plan instead of Final-provided models. When a chat uses your subscription, model calls are charged to it; when you haven't connected one, the project's API key or Final's metered inference is used, as the project allows. See [inference sources](/harnesses/settings#inference-sources).
       </Step>
       <Step title="Test and publish">
-        Use the agent editor's test to ask for something that proves the setup, such as `Run the test suite and tell me how many tests pass.` When the answer looks right, click **Publish**. Saving changes to the agent's repository doesn't publish them; only **Publish** does. Then start a chat with the agent, or add it to a project chat.
+        Use the agent editor's test to ask for something that proves the setup, such as `Run the test suite and tell me how many tests pass.` When the answer looks right, click **Publish**. Saving a draft doesn't publish it; only **Publish** does. Then start a chat with the agent, or add it to a project chat.
       </Step>
     </Steps>
 
