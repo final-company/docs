@@ -23,15 +23,15 @@ Final doesn't replace your coding agent. It gives the agent a computer to work o
       <Step title="Create the agent">
         Open **Agents** and click **New agent**, enter a name such as `Storefront Coder`, and edit its source. Or ask your project's agent to build it for you: any agent with Final's tools can create, change and publish agents ([Build agents with agents](/build/build-with-agents)).
 
-        The agent is one file, `agent.ts`, that Final keeps as drafts. It states what the agent requires, and names no machine or model:
+        Final keeps the agent's files as drafts, starting with `agent.ts` and its instructions in `instructions.md`. It states what the agent requires, and names no machine or model:
 
         ```ts agent.ts
-        import { defineAgent } from '@finalai/agents';
+        import { defineAgent, markdown } from '@finalai/agents';
         import { FinalHarness } from '@finalai/agents/harnesses';
 
         export const agent = defineAgent({
           name: 'Storefront Coder',
-          instructions: `You work on the storefront. Run the tests before you hand off a change.`,
+          instructions: markdown('./instructions.md', { from: import.meta.url }),
           require: {
             harness: {
               permissionMode: 'review',

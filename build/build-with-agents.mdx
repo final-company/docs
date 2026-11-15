@@ -25,55 +25,75 @@ Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstar
 | Tool | What it does |
 | --- | --- |
 | `create_agent` | Creates an agent in the project, blank or as a copy of a published agent. Needs your approval. |
-| `read_agent_source` | Reads the agent's draft source and its revision. |
-| `edit_agent_source` | Changes the draft by exact text replacements against one revision. |
-| `check_agent` | Makes the agent's document from the draft and type-checks it, and returns the diagnostics. |
+| `read_agent_source` | Lists the files of the agent's newest draft and its revision. |
+| `read_agent_file` | Reads one file of a draft. |
+| `edit_agent_file` | Changes one file by exact text replacements against one revision. |
+| `write_agent_file` | Writes one file whole, new or replacing the one at its path. |
+| `delete_agent_file` | Removes one file. |
+| `run_agent_shell` | Runs a bash command over the draft's files, such as `grep`, `sed` or `mv`. Files it changes become the next draft. |
+| `check_agent` | Makes the agent's document from the draft and type-checks it, and returns the diagnostics with their files and lines. |
 | `publish_agent` | Publishes a draft revision as the agent's next version. Needs your approval. |
 | `update_agent_from_upstream` | Merges the newest published version of the agent this one was copied from into a new draft. |
 
-Edits are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating and publishing need editor access to the project.
+Changes are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating and publishing need editor access to the project.
 
-## One file of source
+`run_agent_shell` interprets bash and its usual commands over the draft's files alone: there's no network, no Node.js or npm, and no other files. Use it to search and reorganize files, and `check_agent` to check the agent.
 
-An agent created or edited on Final is one TypeScript file, `agent.ts`, that exports the agent:
+## Source files
+
+An agent created or edited on Final is a set of files, laid out as in [your own repository](/build/project-structure): an entry module, `agent.ts`, that exports the agent, any modules it imports, and the text files it reads, such as its instructions and skills.
+
+<CodeGroup>
 
 ```ts agent.ts
-import { defineAgent, defineServerlessTool } from '@finalai/agents';
-import * as z from 'zod';
+import { defineAgent, markdown, skill } from '@finalai/agents';
+import { releaseStatus } from './tools/release-status.ts';
 
 export const agent = defineAgent({
   name: 'Release Assistant',
-  instructions: `You help maintainers decide whether a release is ready to ship.
-Call release_status before you assess a release, and end with the next action.`,
-  tools: {
-    release_status: defineServerlessTool({
-      description: 'Get the CI and sign-off status of a release.',
-      inputSchema: z.object({ version: z.string() }),
-      execute: async ({ version }) => {
-        const response = await fetch(`https://releases.acme.com/api/releases/${version}`);
-        return await response.json();
-      },
-    }),
-  },
+  instructions: markdown('./instructions.md', { from: import.meta.url }),
+  skills: [skill('./skills/release-checklist', { from: import.meta.url })],
+  tools: { release_status: releaseStatus },
   require: { harness: { permissionMode: 'ask' } },
 });
 ```
 
-The file imports only `@finalai/agents` (and its authoring entry points such as `@finalai/agents/harnesses`) and `zod`. Instructions and skills are written inline, and tools and hooks are [serverless](/build/tools#in-process-or-serverless). That's because Final makes the agent's [document](/build/project-structure#the-agents-document) from the file's text alone, with nothing else to install or read: no other files, packages, or code that runs in your process.
+```ts tools/release-status.ts
+import { defineServerlessTool } from '@finalai/agents';
+import * as z from 'zod';
 
-Agents that use `markdown()`, `skill(path)`, `files()`, local imports, or in-process tools still work. Keep them in [your own repository](/operate/publishing#publish-from-ci) and publish them from there.
+export const releaseStatus = defineServerlessTool({
+  description: 'Get the CI and sign-off status of a release.',
+  inputSchema: z.object({ version: z.string() }),
+  execute: async ({ version }) => {
+    const response = await fetch(`https://releases.acme.com/api/releases/${version}`);
+    return await response.json();
+  },
+});
+```
+
+```md instructions.md
+You help maintainers decide whether a release is ready to ship.
+Call release_status before you assess a release, and end with the next action.
+```
+
+</CodeGroup>
+
+Modules import each other by relative path (`./tools/release-status.ts`, or `./tools/release-status.js` for the TypeScript file it compiles from) and otherwise import only `@finalai/agents` (and its authoring entry points such as `@finalai/agents/harnesses`) and `zod`. Tools and hooks are [serverless](/build/tools#in-process-or-serverless). That's because Final makes the agent's [document](/build/project-structure#the-agents-document) from these files alone, with nothing to install and no code that runs in your process.
+
+Agents that import other npm packages or use in-process tools still work. Keep them in [your own repository](/operate/publishing#publish-from-ci) and publish them from there.
 
 ## Drafts and publishing
 
 Each edit makes a new numbered draft revision. A draft changes nothing anyone uses: chats, channel installs, and anyone fetching the agent by name keep using its published version.
 
-Publishing is the checkpoint. `publish_agent` publishes one draft revision as the agent's next version, and Final keeps that revision's source with it, so every published version can be opened, compared, and rolled back to. See [publishing](/operate/publishing).
+Publishing is the checkpoint. `publish_agent` publishes one draft revision as the agent's next version, and Final keeps that revision's files with it, so every published version can be opened, compared, and rolled back to. See [publishing](/operate/publishing).
 
 ## Copy an agent and keep it current
 
 `create_agent` can start from a published agent, including a public one such as `acme/release-assistant`. The copy is yours to change, and it remembers the agent it came from.
 
-When the original publishes a new version, `update_agent_from_upstream` merges it into your copy as a new draft, keeping your changes. Where both changed the same lines, the draft keeps both sides between standard conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`). Resolve them with `edit_agent_source`, run `check_agent`, and publish.
+When the original publishes a new version, `update_agent_from_upstream` merges it into your copy as a new draft, file by file, keeping your changes. Where both changed the same lines, the file keeps both sides between standard conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`), and the result names the files. Resolve them with `edit_agent_file`, run `check_agent`, and publish.
 
 ## Learn from the docs
 
