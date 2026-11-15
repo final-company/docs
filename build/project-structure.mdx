@@ -53,7 +53,7 @@ Final keeps an agent's **source** with each published version: the modules its m
 - its tools and hooks are [serverless](#code-that-runs-on-final);
 - it reads files only with `markdown()`, `skill(path)`, and `files()`, relative to its modules.
 
-The layout above qualifies when its tools and hooks are serverless. Final makes the agent's document from the files alone, so `final-agents publish` sends them as the agent's [source](/operate/publishing#publish-with-the-source) and the published version can be opened and edited on Final. An agent that imports other packages or runs in-process code is published without its source.
+The layout above qualifies when its tools and hooks are serverless. Final makes the agent's document from the files alone, so `final-agents publish` sends them as the agent's [source](/operate/publishing#the-source) and the published version can be opened and edited on Final. The CLI publishes nothing for files that aren't the whole agent, and says why. An agent that runs in-process code runs only from the process that defines it.
 
 ## Text files beside the module
 

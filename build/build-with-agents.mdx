@@ -81,7 +81,7 @@ Call release_status before you assess a release, and end with the next action.
 
 Modules import each other by relative path (`./tools/release-status.ts`, or `./tools/release-status.js` for the TypeScript file it compiles from) and otherwise import only `@finalai/agents` (and its authoring entry points such as `@finalai/agents/harnesses`) and `zod`. Tools and hooks are [serverless](/build/tools#in-process-or-serverless). That's because Final makes the agent's [document](/build/project-structure#the-agents-document) from these files alone, with nothing to install and no code that runs in your process.
 
-Agents that import other npm packages or use in-process tools still work. Keep them in [your own repository](/operate/publishing#publish-from-ci) and publish them from there.
+An agent that uses in-process tools runs only from the process that defines it, and isn't published. One that builds its document with other npm packages can be published from code with `project.agents.publish({ agent })`, which publishes the module written from its document.
 
 ## Drafts and publishing
 
@@ -89,7 +89,7 @@ Each change makes a new numbered draft. A draft changes nothing anyone uses: cha
 
 Publishing is the checkpoint. `publish_agent` publishes one draft as the agent's next version, and Final keeps that draft's files with it, so every published version can be opened, compared, and rolled back to. See [publishing](/operate/publishing).
 
-Any agent published with its source can be changed on Final, wherever it was published from: its first change starts draft 1 from the published source. When the agent is published again from its repository with `final-agents publish`, that version becomes the next draft, and changes you hadn't published yet are merged onto it, so Final and your repository never edit different versions without knowing.
+Any agent published with its source can be changed on Final, wherever it was published from: its first change starts draft 1 from the published source. When the agent is published again from its repository with `final-agents publish`, that version becomes the next draft, and changes you hadn't published yet are merged onto it. A version that lacks changes published on Final since that repository last published is refused with `draft_conflict`, and the draft it names merges the two, so a publish never undoes work published on Final.
 
 The tools are a client of [the drafts API](#the-drafts-api), which you can call yourself.
 

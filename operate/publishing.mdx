@@ -1,9 +1,9 @@
 ---
 title: "Testing and publishing"
-description: "Try changes by starting sessions, publish an agent by name with its source, and roll back by pointing the name at an earlier hash."
+description: "Try changes by starting sessions, publish an agent by name with its source, and roll back to an earlier version."
 ---
 
-An agent is a document stored by its content hash, and nothing is built or deployed. Starting a session sends the document with the call, so trying a change is just starting a session with the edited agent. **Publishing** gives a hash a name, so others in the project can fetch the agent, and Final's chats and channel installs can use it. An agent whose files are everything Final needs is published with its source, so it can be opened and edited on Final.
+An agent is a document stored by its content hash, and nothing is built or deployed. Starting a session sends the document with the call, so trying a change is just starting a session with the edited agent. **Publishing** gives a hash a name, so others in the project can fetch the agent, and Final's chats and channel installs can use it. Every published version keeps its source, so it can be opened and edited on Final.
 
 ## Try a change
 
@@ -32,10 +32,9 @@ npx final-agents publish ./agent.ts --name release-assistant
 ```text
 published release-assistant: sha256:9f3c2a1...
 id: agt_7Hq2...
-source: sent
 ```
 
-`publish` stores the document by its content hash and points the name at it. It reads `FINAL_API_KEY` and `FINAL_PROJECT_ID`; `--project` and `--host` override them. Pass `--export <name>` when the module exports more than one agent.
+`publish` sends the agent's files, and Final makes the document from them, keeps them with it, and points the name at its hash. It reads `FINAL_API_KEY` and `FINAL_PROJECT_ID`; `--project` and `--host` override them. Pass `--export <name>` when the module exports more than one agent.
 
 From code, it's one call:
 
@@ -44,32 +43,27 @@ const published = await project.agents.publish({ agent, name: 'release-assistant
 console.log(published.name, published.hash);
 ```
 
+An agent value is published as the one module that defines it, written from its document (the same document, hash for hash), so it can be opened on Final too. To publish your own files from code, see [the source](#the-source).
+
 Publishing points the name at the hash. New sessions that fetch the agent by name use it, and so do channel installs that name the agent. Sessions already running keep the hash they started with, so a publish never changes an agent in the middle of a conversation.
 
 Names use lowercase letters, digits, `.`, `_`, and `-`, and are unique in a project.
 
-### Publish with the source
+### The source
 
-An agent's **source** is the files its document is made from: its module, the modules it imports, and the text files it reads, by path from your project's root. Final keeps them with the published version, and anyone who can read the agent can open them, on Final or with `agents.get`. An agent's files are its source when they're [everything Final needs](/build/project-structure#agents-final-can-open): its modules import each other by relative path and otherwise only `@finalai/agents` and `zod`, its tools and hooks are [serverless](/build/tools#in-process-or-serverless), and it reads files only with `markdown()`, `skill(path)`, and `files()`.
+An agent's **source** is the files its document is made from: its module, the modules it imports, and the text files it reads, by path from your project's root. Final keeps them with every published version, and anyone who can read the agent can open them, on Final or with `agents.get`. An agent's files are its source when they're [the whole agent](/build/project-structure#agents-final-can-open): its modules import each other by relative path and otherwise only `@finalai/agents` and `zod`, its tools and hooks are [serverless](/build/tools#in-process-or-serverless), and it reads files only with `markdown()`, `skill(path)`, and `files()`.
 
-`final-agents publish` collects them itself: it follows the module's imports and records the files read while the document is made. When they qualify, it sends them instead of the document, with the hash of the document it made, so Final checks it makes the same one. Paths start at the nearest directory with a `package.json`; pass `--source-root <dir>` for another. The last line of its output says what happened:
+`final-agents publish` collects them itself: it follows the module's imports and records the files read while the document is made, and sends them with the hash of the document it made, so Final checks it makes the same one. Paths start at the nearest directory with a `package.json`; pass `--source-root <dir>` for another. When the files aren't the whole agent, it says why and publishes nothing. An agent with in-process tools or hooks runs only from the process that defines it, so it isn't published; start sessions with it from that process.
 
-| Output | Meaning |
-| --- | --- |
-| `source: sent` | Final made the document from the agent's files and kept them with this version. |
-| `source: not sent (<reason>)` | The files don't qualify, or you passed `--no-source`. Only the document was published. |
-| `source: not kept (<reason>)` | Final refused the files or made another document from them, so the CLI published its document on its own. |
-
-Pass `--no-source` to publish only the document. Agents that import other packages or have in-process tools publish as before, without their source.
-
-Final makes the document from the source itself, in an isolated runtime with no network access. These errors, `AgentApiErrorCode` in `@finalai/agents/client`, refuse it:
+These errors, `AgentApiErrorCode` in `@finalai/agents/client`, refuse a publish:
 
 | Code | Why |
 | --- | --- |
-| `agent_source_invalid` | The files don't make a document. `details.diagnostics` lists each problem with its `message`, `path`, `line`, and `column`. |
-| `hash_mismatch` | The document Final made doesn't have the `hash` you sent, such as when your SDK version differs from Final's. Nothing is stored. The same code refuses a document that doesn't have its `hash`. |
+| `agent_source_invalid` | The files don't make a document. `details.diagnostics` lists each problem with its `message`, `path`, `line`, and `column`, and the CLI prints them by file. |
+| `hash_mismatch` | The document Final made doesn't have the `hash` you sent, such as when your SDK version differs from Final's. Nothing is stored. |
+| `draft_conflict` | The agent was published on Final since you last published it, and your files don't have those changes. Nothing is published. `details.latest` is the draft that merges your files onto them: bring its changes into your files and publish again, or publish that draft on Final. |
 
-From code, `readAgentSource` from `@finalai/agents/source` loads a module and collects its source as the CLI does. Send the agent or its source, not both:
+From code, `readAgentSource` from `@finalai/agents/source` loads a module and collects its source as the CLI does:
 
 ```ts
 import { readAgentSource } from '@finalai/agents/source';
@@ -80,7 +74,7 @@ if (!source.ok) throw new Error(source.reason);
 await project.agents.publish({ source: source.source, hash, name: 'release-assistant' });
 ```
 
-A source is `{ entry, export?, files }`. `entry` is the path of the module that exports the agent, and `files` maps each path to its text. `export` names the agent's export; leave it out when it's `agent`, the module's default export, or its only agent. `project.agents.store` takes the same `agent` or `source`, and stores without naming anything.
+A source is `{ entry, export?, files }`. `entry` is the path of the module that exports the agent, and `files` maps each path to its text. `export` names the agent's export; leave it out when it's `agent`, the module's default export, or its only agent. `project.agents.store` stores an agent without naming anything, as its `source` or its value, for sessions to run.
 
 ### Publish from CI
 
@@ -107,9 +101,9 @@ jobs:
           FINAL_PROJECT_ID: prj_your_project
 ```
 
-Final doesn't watch your repository: an agent is published only when something calls `publish`. Your repository is your version control, and each publish is a version on Final, with its source when the agent's files qualify.
+Final doesn't watch your repository: an agent is published only when something calls `publish`. A repository is optional; each publish is a version on Final, with its source.
 
-Final keeps every agent's source as numbered drafts, whether it was created on Final or published from a repository, and publishing a draft makes the next version. A version published from your repository becomes the next draft on Final, with unpublished changes made there merged onto it. See [build agents with agents](/build/build-with-agents#drafts-and-publishing).
+Final keeps every agent's versions as numbered drafts, whether it was created on Final or published from a repository, and publishing a draft makes the next version. A version published from your repository becomes the next draft on Final, with unpublished changes made there merged onto it. When someone published changes on Final that your files don't have, the publish fails with `draft_conflict` instead of undoing them. See [build agents with agents](/build/build-with-agents#drafts-and-publishing).
 
 ## Fetch a published agent
 
@@ -149,17 +143,16 @@ const { publications } = await project.agents.history({ name: 'release-assistant
 for (const publication of publications) console.log(publication.hash, publication.publishedAt);
 ```
 
-To roll back, fetch the earlier hash and publish it under the name again:
+To roll back, publish the earlier version's draft again. Each draft says which hash it was published as (`publishedHash`):
 
 ```ts
-const previous = publications[1];
-if (previous != null) {
-  const earlier = await project.agents.get({ hash: previous.hash });
-  await project.agents.publish({ agent: earlier, name: 'release-assistant' });
-}
+const { drafts } = await project.agents.drafts.list({ agentId: agent.id });
+const earlier = drafts.find((draft) => draft.publishedHash === publications[1]?.hash);
+if (earlier != null)
+  await project.agents.drafts.publish({ agentId: agent.id, draft: earlier.number });
 ```
 
-The rollback is a new publication, so the history stays complete.
+An agent never edited on Final has no drafts: fetch the earlier hash with `agents.get({ hash })` and publish it under the name again. Either way the rollback is a new publication, so the history stays complete.
 
 ## Documents as files
 

@@ -37,7 +37,7 @@ Lower-level packages are public too, each with its own README: [`@finalai/agent-
 | --- | --- |
 | `sessions` | `create({ agent, provide, id?, actor?, message?, output? })` starts a session; `attach(id)` returns a handle by ID. A handle sends messages, streams events, lists and answers decisions, reads `requirements()` and `provide()`, and cancels or closes. See [sessions](/client/sessions). |
 | `conversations` | `create` and `direct` take `provide`; `findDirect` looks up without creating. A handle's `addParticipant` and `participants.provide` set each agent's settings, and it has `inputs`, `context`, `labels`, and schedules. See [conversations](/client/conversations). |
-| `agents` | `create({ name, source } \| { name, from })`, `publish({ agent \| source, hash?, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent \| source, hash? })`, `parse(json)`, and `drafts`. Pass the `agent`, or its `source` (`{ entry, export?, sdk?, files }`) for Final to make the document from; `get` returns the kept `source`, or `null`. See [publish with the source](/operate/publishing#publish-with-the-source) and [the drafts API](/build/build-with-agents#the-drafts-api). |
+| `agents` | `create({ name, source } \| { name, from })`, `publish({ agent \| source, hash?, name, visibility? })` (always with the source), `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent \| source, hash? })`, `parse(json)`, and `drafts`. Pass the `agent`, or its `source` (`{ entry, export?, sdk?, files }`) for Final to make the document from; `get` returns the kept `source`, or `null`. See [publish with the source](/operate/publishing#the-source) and [the drafts API](/build/build-with-agents#the-drafts-api). |
 | `sandboxes` | `create(environment, { setup?, ownedBy?, idempotencyKey? })`, `get`, `list`, and `providers()`. A handle runs commands, reads its `description()`, and deletes the sandbox. |
 | `sandboxSetups` | `publish({ name, setup })`, `get`, and `list`. See [sandbox setups](/build/sandbox-setups). |
 | `sandboxProviders` | `register({ name, url })`, `list`, `get`, `update`, `refresh`, and `remove` for providers you run. See [run your own provider](/build/sandboxes#run-your-own-provider). |
@@ -87,7 +87,7 @@ Stores the document and points `<name>` at it in a project: `project.agents.publ
 npx final-agents publish ./agent.ts --name release-assistant
 ```
 
-For an agent whose files are everything Final needs, `publish` sends them (the modules the module imports and the files its document reads) as the agent's source, and prints `source: sent`. Otherwise it prints `source: not sent (<reason>)`. It sends the source with the hash of the document it made. When Final refuses the source (`agent_source_invalid`) or makes another document (`hash_mismatch`), it publishes its document alone and prints `source: not kept (<reason>)`. See [publish with the source](/operate/publishing#publish-with-the-source).
+`publish` sends the agent's files (the modules the module imports and the files its document reads) as its source, with the hash of the document it made. When the files aren't the whole agent, it says why and publishes nothing. When Final refuses them (`agent_source_invalid`), it prints the problems by file; `hash_mismatch` means Final made another document, and `draft_conflict` that changes published on Final are missing from your files. See [the source](/operate/publishing#the-source).
 
 ### `conformance <module>`
 
@@ -109,10 +109,6 @@ npx final-agents conformance ./my-harness.ts --profile final-required
 
 <ParamField path="--project" type="string">
   `publish` only: the project. Overrides `FINAL_PROJECT_ID`.
-</ParamField>
-
-<ParamField path="--no-source" type="boolean">
-  `publish` only: send only the agent's document, not its source files.
 </ParamField>
 
 <ParamField path="--source-root" type="string">
