@@ -19,13 +19,13 @@ icon: "book"
 | `@finalai/agents/tools` | Tools and their results | `defineServerlessTool`, `defineInProcessTool`, `toolResultFrom` |
 | `@finalai/agents/hooks` | [Hooks](/build/hooks) | `defineServerlessHook`, `defineInProcessHook`, `HookEvent` |
 | `@finalai/agents/channels` | [Channels](/build/channels) | `defineChannel`, `GET`, `POST`, `PUT`, `DELETE`, `WS`, `ChannelSigningAlgorithm`, `ChannelSignatureEncoding`, `ChannelCredentialKind` |
-| `@finalai/agents/client` | Starting and talking to agents, in Node, browsers, React Native, and Workers | `createClient`, `sessionUpdateOf`, `textOf`, `isRequirementsUnmetError`, `isClientError`, `Capability`, and the API's types and enums |
+| `@finalai/agents/client` | Starting and talking to agents, in Node, browsers, React Native, and Workers | `createClient`, `sessionUpdateOf`, `textOf`, `isRequirementsUnmetError`, `isClientError`, `Capability`, `AgentApiErrorCode`, and the API's types and enums |
 | `@finalai/agents/verify` | [Verifying tokens Final signs](/build/integrations#verify-calls-from-final) | `verifyPlatformIdentity`, `verifyAccessToken`, `verifyHumanInput` |
 | `@finalai/agents/webhooks` | [Event webhooks](/operate/events#receive-webhooks) | `verifyWebhook` |
 | `@finalai/agents/testing` | Testing code that uses the client | `createFakeFetch`, `createFakeTransport` |
 | `@finalai/daytona-agent-provider/sandboxes` | Daytona sandboxes | `daytona` |
 
-Lower-level packages are public too, each with its own README: [`@finalai/agent-provider`](https://www.npmjs.com/package/@finalai/agent-provider) (the provider contracts and conformance kits), [`@finalai/acp-session`](https://www.npmjs.com/package/@finalai/acp-session) (ACP validation, Final's extensions, and the adapter toolkit), [`@finalai/agent-protocol`](https://www.npmjs.com/package/@finalai/agent-protocol) (the API's wire contracts), and the [`@finalai/acp-adapter-claude-code`](https://www.npmjs.com/package/@finalai/acp-adapter-claude-code) and [`@finalai/acp-adapter-codex`](https://www.npmjs.com/package/@finalai/acp-adapter-codex) adapters. The [`@finalai/agents` README](https://www.npmjs.com/package/@finalai/agents) summarizes the SDK.
+Lower-level packages are public too, each with its own README: [`@finalai/agent-provider`](https://www.npmjs.com/package/@finalai/agent-provider) (the provider contracts and conformance kits), [`@finalai/acp-session`](https://www.npmjs.com/package/@finalai/acp-session) (ACP validation, Final's extensions, and the adapter toolkit), [`@finalai/agent-protocol`](https://www.npmjs.com/package/@finalai/agent-protocol) (the API's wire contracts), [`@finalai/agent-definition`](https://www.npmjs.com/package/@finalai/agent-definition) (making documents, from files on disk or in memory with `documentOf(agent, { files })`, `agentModuleOf(document)` to write one module that makes a document, and `agentSourceGraph` and `AGENT_SOURCE_MODULES` to read an agent's source files), and the [`@finalai/acp-adapter-claude-code`](https://www.npmjs.com/package/@finalai/acp-adapter-claude-code) and [`@finalai/acp-adapter-codex`](https://www.npmjs.com/package/@finalai/acp-adapter-codex) adapters. The [`@finalai/agents` README](https://www.npmjs.com/package/@finalai/agents) summarizes the SDK.
 
 ## Client
 
@@ -37,7 +37,7 @@ Lower-level packages are public too, each with its own README: [`@finalai/agent-
 | --- | --- |
 | `sessions` | `create({ agent, provide, id?, actor?, message?, output? })` starts a session; `attach(id)` returns a handle by ID. A handle sends messages, streams events, lists and answers decisions, reads `requirements()` and `provide()`, and cancels or closes. See [sessions](/client/sessions). |
 | `conversations` | `create` and `direct` take `provide`; `findDirect` looks up without creating. A handle's `addParticipant` and `participants.provide` set each agent's settings, and it has `inputs`, `context`, `labels`, and schedules. See [conversations](/client/conversations). |
-| `agents` | `publish({ agent, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent })`, and `parse(json)`. See [publishing](/operate/publishing). |
+| `agents` | `create({ name, source } \| { name, from })`, `publish({ agent \| source, hash?, name, visibility? })` (always with the source), `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent \| source, hash? })`, `parse(json)`, and `drafts`. Pass the `agent`, or its `source` (`{ entry, export?, sdk?, files }`) for Final to make the document from; `get` returns the kept `source`, or `null`. See [publish with the source](/operate/publishing#the-source) and [the drafts API](/build/build-with-agents#the-drafts-api). |
 | `sandboxes` | `create(environment, { setup?, ownedBy?, idempotencyKey? })`, `get`, `list`, and `providers()`. A handle runs commands, reads its `description()`, and deletes the sandbox. |
 | `sandboxSetups` | `publish({ name, setup })`, `get`, and `list`. See [sandbox setups](/build/sandbox-setups). |
 | `sandboxProviders` | `register({ name, url })`, `list`, `get`, `update`, `refresh`, and `remove` for providers you run. See [run your own provider](/build/sandboxes#run-your-own-provider). |
@@ -58,7 +58,7 @@ The client itself also has:
 | `sessions` | `attach`, `get`, and `fork` for existing sessions by ID. |
 | `conversations` | The signed-in person's conversations: `list`, `get`, `search`, and `decisions`. |
 | `channelBindings`, `channelTickets` | Channel installs by ID, and the tickets an installer's link and connect pages complete. |
-| `agents` | `list` the agents the caller can use, and `get({ id })` one in whichever project owns it. |
+| `agents` | `list` the agents the caller can use, `get({ id })` one in whichever project owns it, and `drafts`, its drafts by agent ID. |
 | `publishers` | `get(handle)` reads a publisher's public agents, harnesses, adapters, and channels. |
 | `organization` | Model credentials and their grants, budgets, and spending restrictions. See [subscriptions and keys](/harnesses/settings#subscriptions-and-keys). |
 | `inference` | `offering()` lists the models Final's metered inference serves, with prices. |
@@ -87,6 +87,8 @@ Stores the document and points `<name>` at it in a project: `project.agents.publ
 npx final-agents publish ./agent.ts --name release-assistant
 ```
 
+`publish` sends the agent's files (the modules the module imports and the files its document reads) as its source, with the hash of the document it made. When the files aren't the whole agent, it says why and publishes nothing. When Final refuses them (`agent_source_invalid`), it prints the problems by file; `hash_mismatch` means Final made another document, and `draft_conflict` that changes published on Final are missing from your files. See [the source](/operate/publishing#the-source).
+
 ### `conformance <module>`
 
 Runs the harness conformance kit against a harness implementation the module exports. See [test conformance](/harnesses/overview#test-conformance).
@@ -107,6 +109,10 @@ npx final-agents conformance ./my-harness.ts --profile final-required
 
 <ParamField path="--project" type="string">
   `publish` only: the project. Overrides `FINAL_PROJECT_ID`.
+</ParamField>
+
+<ParamField path="--source-root" type="string">
+  `publish` only: the directory source paths start from. Defaults to the nearest directory with a `package.json`.
 </ParamField>
 
 <ParamField path="--host" type="URL" default="https://agent-session.final.ai">

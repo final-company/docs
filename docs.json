@@ -92,7 +92,8 @@
               "build/sandbox-setups",
               "build/where-code-runs",
               "build/schedules",
-              "build/channels"
+              "build/channels",
+              "build/build-with-agents"
             ]
           },
           {

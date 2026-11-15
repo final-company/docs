@@ -1,7 +1,7 @@
 ---
 title: "The agent module"
 sidebarTitle: "Agent module"
-description: "Define an agent as one explicit value in a TypeScript module, and keep its text files beside it."
+description: "Define an agent as one explicit value in a TypeScript module, with its other modules and text files beside it."
 ---
 
 An agent is one value made with `defineAgent`, exported from a module you choose. It lists every part explicitly: there's no folder convention to follow and nothing is discovered from file names. Import tools, hooks, and skills like any other code, and pass them in.
@@ -44,6 +44,16 @@ export const agent = defineAgent({
 ```
 
 Only `name`, `instructions`, and `require` are required. Lay out the other files however you like: one file per tool, or all of them in `agent.ts`.
+
+## Agents Final can open
+
+Final keeps an agent's **source** with each published version: the modules its module imports and the text files its document reads, by path. Anyone who can read the agent can open them, on Final or with `agents.get`, and agents created or changed on Final, by you or by [an agent](/build/build-with-agents), are edited as these files. An agent's files are its source when:
+
+- its modules import each other by relative path (`./tools.js` names `tools.ts`), and otherwise import only `@finalai/agents`, its authoring entry points such as `@finalai/agents/harnesses`, and `zod`;
+- its tools and hooks are [serverless](#code-that-runs-on-final);
+- it reads files only with `markdown()`, `skill(path)`, and `files()`, relative to its modules.
+
+The layout above qualifies when its tools and hooks are serverless. Final makes the agent's document from the files alone, so `final-agents publish` sends them as the agent's [source](/operate/publishing#the-source) and the published version can be opened and edited on Final. The CLI publishes nothing for files that aren't the whole agent, and says why. An agent that runs in-process code runs only from the process that defines it.
 
 ## Text files beside the module
 
