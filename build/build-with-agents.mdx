@@ -85,15 +85,49 @@ Agents that import other npm packages or use in-process tools still work. Keep t
 
 ## Drafts and publishing
 
-Each edit makes a new numbered draft revision. A draft changes nothing anyone uses: chats, channel installs, and anyone fetching the agent by name keep using its published version.
+Each change makes a new numbered draft. A draft changes nothing anyone uses: chats, channel installs, and anyone fetching the agent by name keep using its published version. `check_agent` runs every check publishing runs, storing nothing.
 
-Publishing is the checkpoint. `publish_agent` publishes one draft revision as the agent's next version, and Final keeps that revision's files with it, so every published version can be opened, compared, and rolled back to. See [publishing](/operate/publishing).
+Publishing is the checkpoint. `publish_agent` publishes one draft as the agent's next version, and Final keeps that draft's files with it, so every published version can be opened, compared, and rolled back to. See [publishing](/operate/publishing).
+
+Any agent published with its source can be changed on Final, wherever it was published from: its first change starts draft 1 from the published source. When the agent is published again from its repository with `final-agents publish`, that version becomes the next draft, and changes you hadn't published yet are merged onto it, so Final and your repository never edit different versions without knowing.
+
+The tools are a client of [the drafts API](#the-drafts-api), which you can call yourself.
 
 ## Copy an agent and keep it current
 
 `create_agent` can start from a published agent, including a public one such as `acme/release-assistant`. The copy is yours to change, and it remembers the agent it came from.
 
 When the original publishes a new version, `update_agent_from_upstream` merges it into your copy as a new draft, file by file, keeping your changes. Where both changed the same lines, the file keeps both sides between standard conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`), and the result names the files. Resolve them with `edit_agent_file`, run `check_agent`, and publish.
+
+## The drafts API
+
+Build, the agent tools, and your own code use the same API, through `@finalai/agents/client`:
+
+```ts
+const { agent, draft } = await project.agents.create({ name: 'release-assistant', source });
+
+const next = await project.agents.drafts.create({
+  agentId: agent.id,
+  base: draft.number,
+  files: { 'instructions.md': 'Ship only when CI is green.\n' },
+});
+
+const checked = await project.agents.drafts.check({ agentId: agent.id, draft: next.number });
+if (checked.diagnostics.length === 0)
+  await project.agents.drafts.publish({ agentId: agent.id, draft: next.number });
+```
+
+| Method | What it does |
+| --- | --- |
+| `project.agents.create({ name, source })` | Creates an agent from its source and publishes its first draft. `{ name, from: { agentId } }` makes a copy that tracks the original. |
+| `drafts.list({ agentId })` | The agent's drafts, newest first, whether you can change them, and the agent it tracks. |
+| `drafts.get({ agentId, draft })` | One draft with its files (`'latest'` for the newest). |
+| `drafts.create({ agentId, base, files })` | The next draft: `files` sets a path's text, or removes it with `null`. `base` is the newest draft, or `null` for an agent without drafts. Fails with `draft_conflict` when another draft landed first. |
+| `drafts.check({ agentId, draft })` | The problems publishing would find, or the document it would make. Stores nothing. |
+| `drafts.publish({ agentId, draft })` | Publishes a draft under the agent's name. Fails with `agent_source_invalid` when its checks do. |
+| `drafts.mergeUpstream({ agentId })` | Merges the tracked agent's newest version into a new draft. |
+
+`client.agents.drafts` is the same API, by agent ID from any client.
 
 ## Learn from the docs
 

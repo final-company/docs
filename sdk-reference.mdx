@@ -37,7 +37,7 @@ Lower-level packages are public too, each with its own README: [`@finalai/agent-
 | --- | --- |
 | `sessions` | `create({ agent, provide, id?, actor?, message?, output? })` starts a session; `attach(id)` returns a handle by ID. A handle sends messages, streams events, lists and answers decisions, reads `requirements()` and `provide()`, and cancels or closes. See [sessions](/client/sessions). |
 | `conversations` | `create` and `direct` take `provide`; `findDirect` looks up without creating. A handle's `addParticipant` and `participants.provide` set each agent's settings, and it has `inputs`, `context`, `labels`, and schedules. See [conversations](/client/conversations). |
-| `agents` | `publish({ agent \| source, hash?, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent \| source, hash? })`, and `parse(json)`. Pass the `agent`, or its `source` (`{ entry, export?, files }`) for Final to make the document from; `get` returns the kept `source`, or `null`. See [publish with the source](/operate/publishing#publish-with-the-source). |
+| `agents` | `create({ name, source } \| { name, from })`, `publish({ agent \| source, hash?, name, visibility? })`, `get({ name } \| { id } \| { hash })`, `history({ name })`, `list()`, `store({ agent \| source, hash? })`, `parse(json)`, and `drafts`. Pass the `agent`, or its `source` (`{ entry, export?, sdk?, files }`) for Final to make the document from; `get` returns the kept `source`, or `null`. See [publish with the source](/operate/publishing#publish-with-the-source) and [the drafts API](/build/build-with-agents#the-drafts-api). |
 | `sandboxes` | `create(environment, { setup?, ownedBy?, idempotencyKey? })`, `get`, `list`, and `providers()`. A handle runs commands, reads its `description()`, and deletes the sandbox. |
 | `sandboxSetups` | `publish({ name, setup })`, `get`, and `list`. See [sandbox setups](/build/sandbox-setups). |
 | `sandboxProviders` | `register({ name, url })`, `list`, `get`, `update`, `refresh`, and `remove` for providers you run. See [run your own provider](/build/sandboxes#run-your-own-provider). |
@@ -58,7 +58,7 @@ The client itself also has:
 | `sessions` | `attach`, `get`, and `fork` for existing sessions by ID. |
 | `conversations` | The signed-in person's conversations: `list`, `get`, `search`, and `decisions`. |
 | `channelBindings`, `channelTickets` | Channel installs by ID, and the tickets an installer's link and connect pages complete. |
-| `agents` | `list` the agents the caller can use, and `get({ id })` one in whichever project owns it. |
+| `agents` | `list` the agents the caller can use, `get({ id })` one in whichever project owns it, and `drafts`, its drafts by agent ID. |
 | `publishers` | `get(handle)` reads a publisher's public agents, harnesses, adapters, and channels. |
 | `organization` | Model credentials and their grants, budgets, and spending restrictions. See [subscriptions and keys](/harnesses/settings#subscriptions-and-keys). |
 | `inference` | `offering()` lists the models Final's metered inference serves, with prices. |

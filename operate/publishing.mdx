@@ -109,7 +109,7 @@ jobs:
 
 Final doesn't watch your repository: an agent is published only when something calls `publish`. Your repository is your version control, and each publish is a version on Final, with its source when the agent's files qualify.
 
-Agents created or edited on Final don't live in a repository. Final keeps their source as numbered drafts, and publishing a draft makes the next version. See [build agents with agents](/build/build-with-agents).
+Final keeps every agent's source as numbered drafts, whether it was created on Final or published from a repository, and publishing a draft makes the next version. A version published from your repository becomes the next draft on Final, with unpublished changes made there merged onto it. See [build agents with agents](/build/build-with-agents#drafts-and-publishing).
 
 ## Fetch a published agent
 
