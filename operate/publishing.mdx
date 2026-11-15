@@ -1,9 +1,9 @@
 ---
 title: "Testing and publishing"
-description: "Try changes by starting sessions, publish an agent by name, and roll back by pointing the name at an earlier hash."
+description: "Try changes by starting sessions, publish an agent by name with its source, and roll back by pointing the name at an earlier hash."
 ---
 
-An agent is a document stored by its content hash, and nothing is built or deployed. Starting a session sends the document with the call, so trying a change is just starting a session with the edited agent. **Publishing** gives a hash a name, so others in the project can fetch the agent, and Final's chats and channel installs can use it.
+An agent is a document stored by its content hash, and nothing is built or deployed. Starting a session sends the document with the call, so trying a change is just starting a session with the edited agent. **Publishing** gives a hash a name, so others in the project can fetch the agent, and Final's chats and channel installs can use it. An agent written as one file is published with its source, so it can be opened and edited on Final.
 
 ## Try a change
 
@@ -32,6 +32,7 @@ npx final-agents publish ./agent.ts --name release-assistant
 ```text
 published release-assistant: sha256:9f3c2a1...
 id: agt_7Hq2...
+source: sent
 ```
 
 `publish` stores the document by its content hash and points the name at it. It reads `FINAL_API_KEY` and `FINAL_PROJECT_ID`; `--project` and `--host` override them. Pass `--export <name>` when the module exports more than one agent.
@@ -46,6 +47,43 @@ console.log(published.name, published.hash);
 Publishing points the name at the hash. New sessions that fetch the agent by name use it, and so do channel installs that name the agent. Sessions already running keep the hash they started with, so a publish never changes an agent in the middle of a conversation.
 
 Names use lowercase letters, digits, `.`, `_`, and `-`, and are unique in a project.
+
+### Publish with the source
+
+An agent's **source** is its module as text. When the module is one file whose text is the whole agent, Final keeps that text with the published version, and anyone who can read the agent can open it, on Final or with `agents.get`. A module qualifies when it:
+
+- Imports only `@finalai/agents`, its authoring entry points such as `@finalai/agents/harnesses`, and `zod`.
+- Writes instructions and skills inline, without `markdown()`, `skill(path)`, `files()`, or `import.meta`.
+- Has only [serverless](/build/tools#in-process-or-serverless) tools and hooks.
+
+`final-agents publish` checks this itself and sends the module's text with the document when it qualifies. The last line of its output says what happened:
+
+| Output | Meaning |
+| --- | --- |
+| `source: sent` | Final kept the module's text with this version. |
+| `source: not sent (<reason>)` | The module doesn't qualify, or you passed `--no-source`. Only the document was published. |
+| `source: not kept (<reason>)` | Final refused the source, so the CLI published the document on its own. |
+
+Pass `--no-source` to publish only the document. Agents that span several files, read text files beside the module, or have in-process tools publish as before, without their source.
+
+Final makes the document from the source itself, in an isolated runtime with no network access, and checks that it's the same document, hash for hash. It refuses a source with one of two error codes, `AgentSourceErrorCode` in `@finalai/agents/client`:
+
+| Code | Why |
+| --- | --- |
+| `agent_source_invalid` | The text doesn't make a document. `details.diagnostics` lists each problem with its `message`, `line`, and `column`. |
+| `agent_source_mismatch` | The text makes a different document from the one sent with it, such as when your SDK version differs from Final's. |
+
+From code, pass `source` with the agent, or on its own to let Final make the document from the text:
+
+```ts
+import { readFile } from 'node:fs/promises';
+
+const source = await readFile(new URL('./agent.ts', import.meta.url), 'utf8');
+await project.agents.publish({ agent, source, name: 'release-assistant' });
+// Or: await project.agents.publish({ source, name: 'release-assistant' });
+```
+
+`project.agents.store` takes the same `agent` and `source`, and stores without naming anything.
 
 ### Publish from CI
 
@@ -72,7 +110,9 @@ jobs:
           FINAL_PROJECT_ID: prj_your_project
 ```
 
-Final doesn't watch your repository: an agent is published only when something calls `publish`.
+Final doesn't watch your repository: an agent is published only when something calls `publish`. Your repository is your version control, and each publish is a version on Final, with its source when the module qualifies.
+
+Agents created or edited on Final don't live in a repository. Final keeps their source as numbered drafts, and publishing a draft makes the next version. See [build agents with agents](/build/build-with-agents).
 
 ## Fetch a published agent
 
@@ -80,7 +120,15 @@ Final doesn't watch your repository: an agent is published only when something c
 const agent = await project.agents.get({ name: 'release-assistant' });
 ```
 
-Fetch by `{ name }`, `{ id }`, or `{ hash }` for an exact version. A fetched agent is data: pass it to `project.sessions.create`, a conversation participant, or `publish` like the value you defined. Its serverless tools run as usual. An in-process tool can't run for a caller that doesn't hold its code, so `agent.inProcess` lists them and starting such an agent fails with `code_unavailable`. Agents meant for Final's chats, channels, and teammates who fetch them use [serverless tools](/build/tools#in-process-or-serverless).
+Fetch by `{ name }`, `{ id }`, or `{ hash }` for an exact version. `agent.source` is the module that version was published with, or `null` when it was published without one. A fetched agent is data: pass it to `project.sessions.create`, a conversation participant, or `publish` like the value you defined. Its serverless tools run as usual. An in-process tool can't run for a caller that doesn't hold its code, so `agent.inProcess` lists them and starting such an agent fails with `code_unavailable`. Agents meant for Final's chats, channels, and teammates who fetch them use [serverless tools](/build/tools#in-process-or-serverless).
+
+### Open a published agent's source
+
+On Final, open a published agent to read and edit its source. Editing makes a draft, and the published version doesn't change until you publish again. You can also ask any agent with Final's tools to make the change; see [build agents with agents](/build/build-with-agents).
+
+An agent published without its source can still be opened when it has no in-process tools or hooks: its document holds everything needed to write it back as one file. `agentModuleOf(document)` from `@finalai/agent-definition` writes that module, and the module makes the same document, hash for hash.
+
+### List agents
 
 `project.agents.list()` lists the agents published in the project and those it inherits from parent projects. `client.agents.get({ id })` reads one agent by ID in whichever project owns it.
 

@@ -1,7 +1,7 @@
 ---
 title: "The agent module"
 sidebarTitle: "Agent module"
-description: "Define an agent as one explicit value in a TypeScript module, and keep its text files beside it."
+description: "Define an agent as one explicit value in a TypeScript module, written as one file or with its text files beside it."
 ---
 
 An agent is one value made with `defineAgent`, exported from a module you choose. It lists every part explicitly: there's no folder convention to follow and nothing is discovered from file names. Import tools, hooks, and skills like any other code, and pass them in.
@@ -45,9 +45,46 @@ export const agent = defineAgent({
 
 Only `name`, `instructions`, and `require` are required. Lay out the other files however you like: one file per tool, or all of them in `agent.ts`.
 
+## One-file agents
+
+An agent can also be one file, with everything inline:
+
+```ts agent.ts
+import { defineAgent, defineServerlessTool, skill } from '@finalai/agents';
+import * as z from 'zod';
+
+export const agent = defineAgent({
+  name: 'Release Assistant',
+  instructions: `You help maintainers decide whether a release is ready to ship.
+Call release_status before you assess a release, and end with the next action.`,
+  skills: [
+    skill({
+      name: 'changelog',
+      description: 'Write a changelog entry for a release.',
+      instructions: 'List user-facing changes first, then fixes, each with its pull request.',
+    }),
+  ],
+  tools: {
+    release_status: defineServerlessTool({
+      description: 'Get the CI and sign-off status of a release.',
+      inputSchema: z.object({ version: z.string() }),
+      execute: async ({ version }) => {
+        const response = await fetch(`https://releases.acme.com/api/releases/${version}`);
+        return await response.json();
+      },
+    }),
+  },
+  require: { harness: { permissionMode: 'ask' } },
+});
+```
+
+A one-file agent imports only `@finalai/agents`, its authoring entry points such as `@finalai/agents/harnesses`, and `zod`; writes its instructions and skills inline; and uses only [serverless](#code-that-runs-on-final) tools and hooks. Its text is the whole agent, so Final can make its document from the text alone. That's the form Final edits: agents created or changed on Final, by you or by [an agent](/build/build-with-agents), are one file. It's also what `final-agents publish` sends as the agent's [source](/operate/publishing#publish-with-the-source), so the published version can be opened and edited on Final.
+
+Multi-file layouts like the one above still work. Keep them in your own repository and publish from there; they publish the document without its source.
+
 ## Text files beside the module
 
-`markdown(path, { from: import.meta.url })` and `skill(path, { from: import.meta.url })` name text files relative to the module. Nothing is read when you call them; the files are read when the agent's document is made, which is when you start a session, publish, or print. Pass inline strings instead when that's simpler:
+In a multi-file agent, `markdown(path, { from: import.meta.url })` and `skill(path, { from: import.meta.url })` name text files relative to the module. Nothing is read when you call them; the files are read when the agent's document is made, which is when you start a session, publish, or print. Pass inline strings instead when that's simpler:
 
 ```ts
 instructions: 'You help maintainers decide whether a release is ready to ship.',

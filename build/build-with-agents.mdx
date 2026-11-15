@@ -1,0 +1,87 @@
+---
+title: "Build agents with agents"
+sidebarTitle: "Build with agents"
+description: "Have any agent create, edit, check and publish agents with Final's agent tools, and learn the SDK from Final's docs as it works."
+---
+
+There's no special builder agent: any agent with Final's tools can create and edit agents. That includes your project's agent in Final and, through the [MCP gateway](/mcp-gateway/overview), Claude Code, Codex or Cursor. The same agents build [workflows](/workflows/build-with-agents).
+
+## Ask your project's agent
+
+In a chat, ask your project's agent for the agent you want, or name an existing agent and say what to change:
+
+> Make an agent for our support channel that answers billing questions from our help center and hands refunds to a person.
+
+The agent writes the agent's source, checks it, and asks you before it creates or publishes anything.
+
+## Use your own coding agent
+
+Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstart), then ask it to work on an agent. It finds Final's agent tools through the gateway's tool search.
+
+> Copy the triage agent in my Acme project, make it label issues by component instead of by team, and publish it as triage-by-component.
+
+## The agent tools
+
+| Tool | What it does |
+| --- | --- |
+| `create_agent` | Creates an agent in the project, blank or as a copy of a published agent. Needs your approval. |
+| `read_agent_source` | Reads the agent's draft source and its revision. |
+| `edit_agent_source` | Changes the draft by exact text replacements against one revision. |
+| `check_agent` | Makes the agent's document from the draft and type-checks it, and returns the diagnostics. |
+| `publish_agent` | Publishes a draft revision as the agent's next version. Needs your approval. |
+| `update_agent_from_upstream` | Merges the newest published version of the agent this one was copied from into a new draft. |
+
+Edits are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating and publishing need editor access to the project.
+
+## One file of source
+
+An agent created or edited on Final is one TypeScript file, `agent.ts`, that exports the agent:
+
+```ts agent.ts
+import { defineAgent, defineServerlessTool } from '@finalai/agents';
+import * as z from 'zod';
+
+export const agent = defineAgent({
+  name: 'Release Assistant',
+  instructions: `You help maintainers decide whether a release is ready to ship.
+Call release_status before you assess a release, and end with the next action.`,
+  tools: {
+    release_status: defineServerlessTool({
+      description: 'Get the CI and sign-off status of a release.',
+      inputSchema: z.object({ version: z.string() }),
+      execute: async ({ version }) => {
+        const response = await fetch(`https://releases.acme.com/api/releases/${version}`);
+        return await response.json();
+      },
+    }),
+  },
+  require: { harness: { permissionMode: 'ask' } },
+});
+```
+
+The file imports only `@finalai/agents` (and its authoring entry points such as `@finalai/agents/harnesses`) and `zod`. Instructions and skills are written inline, and tools and hooks are [serverless](/build/tools#in-process-or-serverless). That's because Final makes the agent's [document](/build/project-structure#the-agents-document) from the file's text alone, with nothing else to install or read: no other files, packages, or code that runs in your process.
+
+Agents that use `markdown()`, `skill(path)`, `files()`, local imports, or in-process tools still work. Keep them in [your own repository](/operate/publishing#publish-from-ci) and publish them from there.
+
+## Drafts and publishing
+
+Each edit makes a new numbered draft revision. A draft changes nothing anyone uses: chats, channel installs, and anyone fetching the agent by name keep using its published version.
+
+Publishing is the checkpoint. `publish_agent` publishes one draft revision as the agent's next version, and Final keeps that revision's source with it, so every published version can be opened, compared, and rolled back to. See [publishing](/operate/publishing).
+
+## Copy an agent and keep it current
+
+`create_agent` can start from a published agent, including a public one such as `acme/release-assistant`. The copy is yours to change, and it remembers the agent it came from.
+
+When the original publishes a new version, `update_agent_from_upstream` merges it into your copy as a new draft, keeping your changes. Where both changed the same lines, the draft keeps both sides between standard conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`). Resolve them with `edit_agent_source`, run `check_agent`, and publish.
+
+## Learn from the docs
+
+Every agent in Final has two docs tools, so it learns the SDK from these pages instead of from a long prompt:
+
+| Tool | What it does |
+| --- | --- |
+| `search_docs` | Finds the final.ai/docs pages that match a query, with a snippet from each. |
+| `read_doc` | Reads one page as Markdown, by its path. |
+
+An agent building an agent looks up what it needs, such as [tools](/build/tools), [requirements](/build/requirements), or [integrations](/build/integrations), as it goes.
