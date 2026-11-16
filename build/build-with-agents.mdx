@@ -12,7 +12,7 @@ In a chat, ask your project's agent for the agent you want, or name an existing 
 
 > Make an agent for our support channel that answers billing questions from our help center and hands refunds to a person.
 
-The agent writes the agent's source, checks it, and asks you before it creates or publishes anything.
+The agent writes the agent's source, checks it, tries it, and asks you before it creates, tries or publishes anything.
 
 ## Use your own coding agent
 
@@ -32,10 +32,14 @@ Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstar
 | `delete_agent_file` | Removes one file. |
 | `run_agent_shell` | Runs a bash command over the draft's files, such as `grep`, `sed` or `mv`. Files it changes become the next draft. |
 | `check_agent` | Makes the agent's document from the draft and type-checks it, and returns the diagnostics with their files and lines. |
+| `test_agent` | Tries a draft before publishing: starts one test session of it with a first message. Needs your approval. |
+| `read_agent_test` | Reads a test session's state, the draft's latest reply, and any question waiting for you. |
 | `publish_agent` | Publishes a draft revision as the agent's next version. Needs your approval. |
 | `update_agent_from_upstream` | Merges the newest published version of the agent this one was copied from into a new draft. |
 
-Changes are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating and publishing need editor access to the project.
+Changes are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating, trying and publishing need editor access to the project.
+
+An agent in Final doesn't carry these tools' definitions on every turn. It finds them as the `final.agents` group in its tool search, next to `final.workflows` for [workflows](/workflows/build-with-agents), and reads their definitions when building comes up.
 
 `run_agent_shell` interprets bash and its usual commands over the draft's files alone: there's no network, no Node.js or npm, and no other files. Use it to search and reorganize files, and `check_agent` to check the agent.
 
@@ -82,6 +86,12 @@ Call release_status before you assess a release, and end with the next action.
 Modules import each other by relative path (`./tools/release-status.ts`, or `./tools/release-status.js` for the TypeScript file it compiles from) and otherwise import only `@finalai/agents` (and its authoring entry points such as `@finalai/agents/harnesses`) and `zod`. Tools and hooks are [serverless](/build/tools#in-process-or-serverless). That's because Final makes the agent's [document](/build/project-structure#the-agents-document) from these files alone, with nothing to install and no code that runs in your process.
 
 An agent that uses in-process tools runs only from the process that defines it, and isn't published. One that builds its document with other npm packages can be published from code with `project.agents.publish({ agent })`, which publishes the module written from its document.
+
+## Try a draft
+
+A draft changes nothing anyone uses, so try it before publishing. `test_agent` starts one test session of the draft, the same test **Build** runs, with the first message you or the agent give it. It runs as you, with what the draft requires, so it asks you first. `read_agent_test` reads the session's state and the draft's latest reply.
+
+If the draft still needs something chosen, such as a model or a sign-in, nothing starts; try it once from **Build** to choose.
 
 ## Drafts and publishing
 
@@ -138,4 +148,8 @@ Every agent in Final has two docs tools, so it learns the SDK from these pages i
 | `search_docs` | Finds the final.ai/docs pages that match a query, with a snippet from each. |
 | `read_doc` | Reads one page as Markdown, by its path. |
 
-An agent building an agent looks up what it needs, such as [tools](/build/tools), [requirements](/build/requirements), or [integrations](/build/integrations), as it goes.
+An agent building an agent reads this page first, then looks up what it needs, such as [tools](/build/tools), [requirements](/build/requirements), or [integrations](/build/integrations), as it goes.
+
+## Ask for the least the work needs
+
+Final runs agents from source alone, so tools and hooks are [serverless](/build/tools#in-process-or-serverless). Beyond that, request the least the work needs: the lowest [permission ceiling](/build/requirements#harness), the fewest sandbox capabilities, and integrations narrowed to the tools the agent uses. Prefer an integration the person already has over writing a tool. An agent that works on Tasks keeps Final's Task tools; see [Final's gateway](/build/integrations#finals-gateway).
