@@ -4,7 +4,7 @@ sidebarTitle: "Runner sizes"
 description: "Pick the CPU, memory, and disk for each job, and see what's installed on every runner."
 ---
 
-The label in `runs-on` decides which machine a job gets. Every size runs Ubuntu 24.04 on x64, has the same software, and gives each job a machine of its own. Bigger sizes only change the CPU, memory, and disk.
+The label in `runs-on` decides which machine a job gets. Every size runs Ubuntu 24.04 on x64, has the same software, and gives each job a machine of its own. Bigger sizes only change the CPU, memory, and disk. A runner's vCPUs are reserved for its job: it has all of them the whole time and doesn't share them, so the same job runs at the same speed whatever else is running.
 
 | Label | vCPU | Memory | Disk | Good for |
 | --- | --- | --- | --- | --- |

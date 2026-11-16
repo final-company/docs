@@ -228,6 +228,7 @@
             "group": "Use VMs",
             "pages": [
               "vm-platform/workloads",
+              "vm-platform/cpu-and-memory",
               "vm-platform/lifecycle-and-snapshots",
               "vm-platform/images-and-templates",
               "vm-platform/files-and-volumes",

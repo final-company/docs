@@ -105,7 +105,7 @@ A template saves a VM after its service has started, so new VMs skip the slow pa
   "image_id": "img_5Tg7hJ2kL9mN4pQ8rS3vW6",
   "start_cmd": "mkdir -p /tmp/site && cd /tmp/site && echo ok > index.html && python3 -m http.server 8000 --bind 0.0.0.0",
   "ready_cmd": "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')\"",
-  "vcpu": 2,
+  "cpu": 1,
   "memory_mb": 2048
 }
 ```
@@ -125,8 +125,8 @@ A template saves a VM after its service has started, so new VMs skip the slow pa
 <ParamField body="warmup_cmd" type="string">
   Optional command run once after the service is ready, such as a first request that loads caches. VMs created from the template start faster on whatever it touches.
 </ParamField>
-<ParamField body="vcpu" type="integer" default="2">
-  vCPUs for the build and for every VM created from the template. 1 to 64.
+<ParamField body="cpu" type="number | object" default="0.25">
+  CPU for the build and for every VM created from the template: a request, or `{"request", "limit"}`, in vCPUs. See [CPU and memory](/vm-platform/cpu-and-memory). The older `vcpu` field still works.
 </ParamField>
 <ParamField body="memory_mb" type="integer" default="2048">
   Memory in MiB, 256 to 262144.

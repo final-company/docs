@@ -1,0 +1,77 @@
+---
+title: "CPU and memory"
+sidebarTitle: "CPU and memory"
+description: "Reserve the CPU a VM always gets, let it burst higher when the machine is idle, and see how CPU is metered."
+icon: "microchip"
+---
+
+Every VM has a CPU **request** and a CPU **limit**. The request is guaranteed: the VM gets at least that much CPU however busy the machine it runs on is. The limit is the most it can use. Between the two, the VM bursts onto CPU that other VMs on the machine aren't using. Above the limit, it's throttled.
+
+Most VMs spend most of their time waiting on a network call, a model, or a person, and need a lot of CPU only for short stretches. A small request with a higher limit fits that: you reserve little, and the VM still gets several CPUs when it has work to do.
+
+CPU is counted in vCPUs. One vCPU is one hardware thread.
+
+## Defaults
+
+A VM that doesn't ask for CPU gets a request of **0.25 vCPU** and a limit **16 vCPUs above the request**: 16.25. Its guest sees 17 CPUs, the limit rounded up, so tools that size themselves from the CPU count, like `make -j$(nproc)` or a test runner's worker pool, can use the whole burst.
+
+## Set the CPU
+
+Pass `cpu` in `size` when you create a VM, either as one number or as a request and a limit:
+
+| `size.cpu` | Request | Limit | Guest CPUs |
+| --- | --- | --- | --- |
+| *(omitted)* | 0.25 | 16.25 | 17 |
+| `1` | 1 | 17 | 17 |
+| `{"request": 0.5, "limit": 4}` | 0.5 | 4 | 4 |
+| `{"request": 2, "limit": 2}` | 2 | 2 | 2 |
+
+A number sets the request, and the limit is 16 vCPUs above it. The request is at least 0.25, the limit is at least the request, and neither is more than 32. Both take up to three decimal places.
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"size": {"cpu": {"request": 0.5, "limit": 4}, "memory_mb": 4096}}' \
+  | jq '.sandbox.size'
+```
+
+```json
+{
+  "vcpu": 4,
+  "cpu": { "request": 0.5, "limit": 4 },
+  "memory_mb": 4096,
+  "disk_gb": 10
+}
+```
+
+`size.vcpu` in a response is the number of CPUs the guest sees.
+
+## Choose a request and a limit
+
+- **Agents, dev servers, and previews**: keep the default, or raise the request a little if the VM is slow when the machine is busy. These VMs idle most of the time, so a small request costs little and the limit covers their bursts.
+- **CI, benchmarks, and anything that needs the same speed every run**: set the request equal to the limit, such as `{"request": 4, "limit": 4}`. The VM then has those CPUs to itself and never depends on its neighbors being idle. [Final CI Runners](/ci-runners/runner-sizes) work this way.
+- **Capping a noisy job**: lower the limit. A VM can't use more than its limit even when the machine is idle.
+
+A VM at its limit is throttled, not stopped: it keeps running, just no faster. If a job that should be CPU-bound runs slower than expected, raise its limit; if it's slow only when other work is running, raise its request.
+
+## How CPU is metered
+
+Each second, a running VM's CPU is metered at the **higher of its request and what it actually used**. An idle VM counts as its request. A VM bursting above its request counts as what it used. Paused and stopped VMs use no CPU.
+
+So a VM with a 0.25 vCPU request that sits idle for an hour and then compiles on 8 vCPUs for five minutes counts 0.25 vCPU-hours for the idle hour and about 0.67 vCPU-hours for the build, instead of reserving 8 vCPUs for the whole time.
+
+## Memory
+
+Memory is fixed. `size.memory_mb` is reserved for the VM when it runs, it's always available to the VM, and the VM can't use more. It's metered at its full size while the VM runs.
+
+## Change a VM's size
+
+CPU and memory come with the VM wherever it goes:
+
+- A VM created from a [template](/vm-platform/images-and-templates), or resumed from a [snapshot](/vm-platform/lifecycle-and-snapshots) with its memory, gets the source's CPU and memory.
+- To change a VM's own size, stop it first. The new size applies from its next boot.
+
+## Older requests
+
+Requests that send `size.vcpu` (an integer, 1 to 32) instead of `size.cpu` still work. `"vcpu": 4` means a request of 0.25 vCPU and a limit of 4. Sending both `vcpu` and `cpu` is an error.
