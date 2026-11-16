@@ -249,7 +249,9 @@ require: {
 },
 ```
 
-Connected services can add many tools, so the agent searches for the ones it needs instead of seeing them all up front. An agent provided the gateway can also ask for an [optional requirement](/build/requirements#optional-requirements) it was started without.
+Connected services can add many tools, so the agent searches for the ones it needs instead of seeing them all up front. Final's tools for building agents and workflows are searched for the same way, as the `final.agents` and `final.workflows` groups.
+
+An agent that works on Tasks needs `get_task`, `update_task` and `read_original_message`. They don't have to be in `tools.load`, since search reaches them, but don't leave them out with `allow` or `deny`. An agent provided the gateway can also ask for an [optional requirement](/build/requirements#optional-requirements) it was started without.
 
 ## Verify calls from Final
 

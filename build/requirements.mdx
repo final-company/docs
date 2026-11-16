@@ -12,6 +12,8 @@ An agent states what it needs; whoever starts it provides it. The agent never na
 | `require.compute.<capability>`: the access the model needs | A sandbox per capability | `files` and `shell` run in the calling process. `computerUse` and `browserUse` fail unless optional. |
 | `require.integrations.<slot>`: a description and a tool policy | An integration per slot | The call fails, unless the slot is optional; then its tools are absent. |
 
+Require the least the work needs: the lowest permission ceiling, only the sandbox capabilities and access the model uses, and slots narrowed to the tools it calls. Whoever provides an agent can see what it asks for, and a smaller request is easier to provide and to trust.
+
 ```ts agent.ts
 import { defineAgent } from '@finalai/agents';
 import { FinalHarness } from '@finalai/agents/harnesses';

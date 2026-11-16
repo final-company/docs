@@ -32,9 +32,11 @@ Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstar
 
 Edits are checked against the revision they were made from, so an agent never overwrites a change it hasn't read. Creating and publishing need editor access to the project.
 
+An agent in Final finds these tools as the `final.workflows` group in its tool search, and reads their definitions only when it works on a workflow.
+
 ## Learn from the docs
 
-Every agent in Final also has two docs tools: `search_docs` finds the final.ai/docs pages that match a query, with a snippet from each, and `read_doc` reads one page as Markdown by its path. An agent writing a workflow looks up [steps](/workflows/steps), [triggers](/workflows/triggers), and the [reference](/workflows/reference) as it goes, instead of relying on a long prompt.
+Every agent in Final also has two docs tools: `search_docs` finds the final.ai/docs pages that match a query, with a snippet from each, and `read_doc` reads one page as Markdown by its path. An agent writing a workflow reads this page first, then looks up [steps](/workflows/steps), [triggers](/workflows/triggers), and the [reference](/workflows/reference) as it goes, instead of relying on a long prompt.
 
 The same agents build agents too; see [build agents with agents](/build/build-with-agents).
 
