@@ -170,7 +170,7 @@ curl -sS "$FINAL_VM_API_URL/sandboxes" \
   | jq '.sandbox | {id, state}'
 ```
 
-The new VM resumes from the snapshot's memory, so programs that were running keep running. It gets the same CPU request, CPU limit, and memory as the original. You can ask for a larger disk, but not a smaller one.
+The new VM resumes from the snapshot's memory, so programs that were running keep running. It gets the same CPU request, CPU limit, and memory limit as the original. You can give it a different memory request with `size.memory`, and a larger disk, but not a smaller one.
 
 If you include a `workload` in the request, Final boots from the snapshot's disk instead and runs your new command, without restoring memory.
 

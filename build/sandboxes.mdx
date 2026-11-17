@@ -168,7 +168,7 @@ Final reads the provider's discovery document when you register it, and authenti
 </ParamField>
 
 <ParamField path="machine" type="{ vcpu?, memoryMb?, diskGb? }">
-  The machine's size. `vcpu` is the most CPU it can burst to; it's guaranteed 0.25 vCPU and uses more when the host has idle CPU. See [CPU and memory](/vm-platform/cpu-and-memory).
+  The machine's size. `vcpu`, from 1 to 32, is the most CPU it can burst to; it's guaranteed 0.25 vCPU and uses more when the host has idle CPU. `memoryMb` is fixed memory, reserved in full: 4096 unless you set it. `diskGb` is 12 unless you set it. See [CPU and memory](/vm-platform/cpu-and-memory).
 </ParamField>
 
 <ParamField path="region" type="string">
