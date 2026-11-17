@@ -3,7 +3,7 @@ title: "Functions"
 description: "Deploy a JavaScript request handler for webhooks and small APIs, with no container to build."
 ---
 
-Use a function when one JavaScript handler can answer your HTTP requests: a webhook receiver, a small JSON API, or a redirect service. You write a `fetch` handler, and Final runs it at its own URL. By default only your project can call it; set `access: public` to let anyone reach it. There's no Dockerfile or server to manage.
+Use a function when one JavaScript handler can answer your HTTP requests: a webhook receiver, a small JSON API, or a redirect service. You write a `fetch` handler, and Final runs it at its own URL. By default only your project can call it; `access: public` opens it to anyone. There's no Dockerfile or server to manage.
 
 Functions run in a lightweight JavaScript runtime with web-standard APIs like `fetch`, `Request`, `Response`, and `crypto.subtle`. Each instance has 128 MB of memory. If you need Node.js-only libraries, native packages, or another language, use a [web app](/cloud-apps/web-apps).
 
@@ -200,7 +200,7 @@ Set `outboundPolicy.internet: false` to cut the function off from the internet e
 | `conversation` | The app's own project, plus the people who can read the chat the app is shared with. |
 | `public` | Anyone with the URL, with no token. |
 
-At every level except `public`, the function keeps its URL and custom domains, but only callers holding an access token for its origin reach it. Every other request gets `401` before the function runs. To let other projects call it, use the long form:
+At every level but `public`, only callers holding an access token for the function's origin reach its URL and custom domains. Every other request gets `401` before the function runs. To let other projects call it, use the long form:
 
 ```yaml final-cloud.yaml
 access:
@@ -209,23 +209,23 @@ access:
     - <project-id>
 ```
 
-A deploy that opens a function to the organization or the public asks you to confirm first; see [review access changes](/cloud-apps/deployments#review-access-changes).
+A deploy that opens a function to the organization or the public asks you to [confirm first](/cloud-apps/deployments#review-access-changes).
 
 ### Calls from apps and agents
 
-Final issues access tokens for calls on behalf of the projects the level admits: [custom integrations](/build/custom-integrations) and [workflow](/workflows/overview) steps, for example. Callers discover how to get one through standard OAuth metadata; see [private apps](/build/custom-integrations#private-apps). The function's environment holds `FINAL_AUTH_ISSUER`, the authorization server that issues the tokens, so the function can check them itself; `verifyIntegrationCall` from `@finalai/agents/integration-server` does this.
+Final issues access tokens to calls from the projects the level admits, such as [custom integrations](/build/custom-integrations) and [workflow](/workflows/overview) steps. Callers find how to get one through standard OAuth metadata; see [private apps](/build/custom-integrations#private-apps). The function's environment holds `FINAL_AUTH_ISSUER`, the authorization server that issues the tokens, so the function can check them itself; `verifyIntegrationCall` from `@finalai/agents/integration-server` does this.
 
 ### People in a browser
 
-A person who opens a private function's URL in a browser tab is asked to sign in to Final, then lands on the page they asked for if the function's `access` admits them. The sign-in lasts up to ten minutes, and the next page after that signs them in again, usually without asking. A private function framed by a site other than Final shows a page saying to open it from Final instead.
+A person who opens a private function in a browser signs in to Final, then lands on the page they asked for if the function's `access` admits them. Embedded in a site other than Final, a private function shows a page saying to open it from Final.
 
-The function receives the person's access token as `Authorization: Bearer`, never a cookie. `verifyAccessToken` from `@finalai/agents/verify` returns the person as `subject` and their display name as `name`, for showing who did something. Decide access by `subject`, never by `name`.
+The function receives the person's access token as `Authorization: Bearer`, never a cookie. `verifyAccessToken` from `@finalai/agents/verify` returns the person as `subject` and their display name as `name`. Decide access by `subject`, never by `name`.
 
-The function's own pages can open WebSockets under the person's sign-in. Such a socket stays open for up to an hour, then closes with code `4401`; reconnect, and the person's current sign-in admits it again if they still have access. Callers that send their own access token open WebSockets straight through, as before.
+The function's pages can open WebSockets under the person's sign-in. Such a socket closes with code `4401` after up to an hour; reconnect, and it's admitted again if the person still has access.
 
 ### Share a function with a chat
 
-A function at the `conversation` level is shared with one chat. When your agent deploys it with `deploy_cloud_app` from a chat, Final shares the app with that chat if it isn't shared with one yet, and the people who can read the chat can open it. The person deploying must be able to read the chat. A function that isn't shared with any chat yet admits only its own project's callers. Rolling back a deployment never changes who can see it.
+A function at the `conversation` level is shared with one chat. When an agent first deploys it from a chat, Final shares it with that chat, and people who can read the chat can open it. The person deploying must be able to read the chat. Until it's shared, only its own project's callers reach it. Rolling back a deployment doesn't change who can see it.
 
 The [manifest reference](/cloud-apps/manifest#functions) lists every function field.
 

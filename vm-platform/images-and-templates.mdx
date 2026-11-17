@@ -129,7 +129,7 @@ A template saves a VM after its service has started, so new VMs skip the slow pa
   CPU for the build and for every VM created from the template: a request, or `{"request", "limit"}`, in vCPUs. See [CPU and memory](/vm-platform/cpu-and-memory). The older `vcpu` field still works.
 </ParamField>
 <ParamField body="memory" type="number | object" default="128">
-  Memory for the build and for every VM created from the template: a request, or `{"request", "limit"}`, in MiB. A number's limit is 64 GiB. See [CPU and memory](/vm-platform/cpu-and-memory#memory).
+  Memory for the build and for every VM created from the template: a request, or `{"request", "limit"}`, in MiB. See [CPU and memory](/vm-platform/cpu-and-memory#memory).
 </ParamField>
 <ParamField body="memory_mb" type="integer" deprecated>
   Older form: a fixed size in MiB, 256 to 262144, used as both the request and the limit. Don't send it with `memory`.

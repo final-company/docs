@@ -47,7 +47,7 @@ observability:
     retention: 90d
 ```
 
-Final rejects fields it doesn't recognize, so a typo fails validation instead of being silently ignored. A manifest that still sets `public`, which [`access`](#fields-for-every-app) replaced, fails with a message saying what to use instead. Run `npx final-cloud validate` to check a file before you push it.
+Final rejects fields it doesn't recognize, so a typo fails validation instead of being silently ignored. The old `public` field fails with a message pointing to [`access`](#fields-for-every-app). Run `npx final-cloud validate` to check a file before you push it.
 
 ## Fields for every app
 
@@ -81,9 +81,9 @@ Final rejects fields it doesn't recognize, so a typo fails validation instead of
 </ParamField>
 
 <ParamField path="access" type="string | object">
-  Who can reach the app: `public`, `project`, `organization`, or `conversation`. Functions take every level and default to `project`. A web app is served publicly at its address, so it takes only `public`, its default. Services and cron jobs have no address, so they take only `project`, their default. See [who can reach a function](/cloud-apps/functions#who-can-reach-a-function).
+  Who can reach the app: `public`, `project`, `organization`, or `conversation`. Functions take every level and default to `project`. Web apps take only `public`; services and cron jobs, which have no address, take only `project`. See [who can reach a function](/cloud-apps/functions#who-can-reach-a-function).
 
-  The long form `{ level, projects }` also lets other projects call a function at the `project` level:
+  The long form `{ level, projects }` lets other projects call a `project`-level function:
 
   ```yaml
   access:
@@ -289,7 +289,7 @@ Fields for `type: function`. Functions don't use the container fields. See [func
 </ParamField>
 
 <ParamField path="domains" type="string[]" default="[]">
-  Custom hostnames for the function, with no scheme or path. They're served at the function's `access` level, the same as its own hostname.
+  Custom hostnames for the function, with no scheme or path. They have the same `access` as its own hostname.
 </ParamField>
 
 <ParamField path="limits" type="object">

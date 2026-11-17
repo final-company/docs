@@ -63,9 +63,7 @@ So a VM with a 0.25 vCPU request that sits idle for an hour and then compiles on
 
 ## Memory
 
-Memory follows the same model, in MiB. Every VM has a memory **request** and a memory **limit**. The request is guaranteed: the VM always has it. Above it, the VM grows into memory the machine isn't using, up to its limit, and Final takes back memory the VM frees. Past the limit, the guest's own out-of-memory killer ends processes, as on any Linux machine. Memory bursts on Linux guests.
-
-A VM that doesn't ask for memory requests **128 MiB** with a limit of **64 GiB** (65536 MiB). A VM that allocates faster than Final can add memory is slowed down rather than killed until it reaches its limit.
+Memory follows the same model, in MiB. A VM always has its memory **request**. Above it, the VM grows into memory the machine isn't using, up to its **limit**, and memory it frees goes back to the machine. Allocating quickly slows the VM down rather than killing it. Past the limit, the guest's out-of-memory killer ends processes, as on any Linux machine. By default, a VM requests **128 MiB** with a limit of **64 GiB** (65536 MiB).
 
 ### Set the memory
 
@@ -78,7 +76,7 @@ Pass `memory` in `size`, either as one number or as a request and a limit:
 | `{"request": 1024, "limit": 8192}` | 1 GiB | 8 GiB |
 | `{"request": 4096, "limit": 4096}` | 4 GiB | 4 GiB |
 
-A number sets the request, and the limit is 64 GiB. The request is at least 128 MiB, the limit is at least 256 MiB and at least the request, and neither is more than 65536 MiB. Equal values give the VM fixed memory: all of it reserved, and never more.
+The request is at least 128 MiB, the limit is at least 256 MiB and at least the request, and neither is more than 65536 MiB. Equal values give the VM fixed memory: all of it reserved, and never more.
 
 ```bash
 curl -sS "$FINAL_VM_API_URL/sandboxes" \
@@ -97,23 +95,23 @@ curl -sS "$FINAL_VM_API_URL/sandboxes" \
 
 ### When a machine runs short
 
-Above its request, a VM uses memory that the machine's VMs share. When a machine runs short of memory, Final acts only on VMs using more than their request: it reclaims memory from them, then stops them growing, and if that isn't enough, pauses one and moves it to another machine with room, where it keeps running with its processes intact. If it can't be moved, it stays paused, with `interruption` reading `{"reason": "memory_pressure", "at": <time>}`, and its next resume places it on a machine with room. A VM within its request is never paused for memory.
+When a machine runs short of memory, only VMs using more than their request are affected. Final takes memory back from them and stops them growing. If that isn't enough, it pauses one and moves it to a machine with room, where it keeps running with its processes intact. If it can't be moved, it stays paused with `interruption.reason` set to `memory_pressure`, and resuming it places it on a machine with room. A VM within its request is never paused for memory.
 
-So give a VM a request that covers what it must never lose, and a limit for what it may use when there's room. Set the request equal to the limit for work that can't be paused, such as CI.
+Give a VM a request that covers what it must never lose, and a limit for what it may use when there's room. For work that can't be paused, such as CI, set the request equal to the limit.
 
 ### How memory is metered
 
-Each second, a running VM's memory is metered at the **higher of its request and what it uses**, like [CPU](#how-cpu-is-metered). A VM with fixed memory counts its whole size.
+Like [CPU](#how-cpu-is-metered), a running VM's memory is metered each second at the **higher of its request and what it uses**. Fixed memory counts its whole size.
 
 ### The older memory_mb field
 
-`size.memory_mb` without `size.memory` still works and means a fixed size: `"memory_mb": 4096` is a request and a limit of 4096 MiB, from 256 to 262144. Sending both `memory` and `memory_mb` is an error.
+`size.memory_mb` still works and means a fixed size, from 256 to 262144: `"memory_mb": 4096` is a request and a limit of 4096 MiB. Sending both `memory` and `memory_mb` is an error.
 
 ## Change a VM's size
 
 CPU and memory come with the VM wherever it goes:
 
-- A VM created from a [template](/vm-platform/images-and-templates), or resumed from a [snapshot](/vm-platform/lifecycle-and-snapshots) with its memory, gets the source's CPU and memory limit. You can give it a different memory request with `size.memory`, but not a different limit.
+- A VM created from a [template](/vm-platform/images-and-templates), or resumed from a [snapshot](/vm-platform/lifecycle-and-snapshots) with its memory, gets the source's CPU and memory limit. `size.memory` can change its memory request, not its limit.
 - To change a VM's own size, stop it first. The new size applies from its next boot.
 
 ## Older CPU requests

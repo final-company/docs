@@ -59,7 +59,7 @@ Want your coding agent to do this for your own project? Copy the [agent setup pr
     - `timers.wall_clock_limit_s` caps how long the VM runs before Final pauses it: 15 minutes here, so a forgotten VM doesn't keep running.
     - `workload` is the command the VM runs when it boots. This one writes a line of text to `result.txt` and exits. `restart: false` tells Final not to run it again after it exits.
 
-    The request doesn't name an image or a size, so you get the defaults: an Ubuntu image with Git, Python, and Node.js, a 10 GB disk, a CPU request of 0.25 vCPU that bursts up to 16.25 vCPUs when the machine has idle CPU, and a memory request of 128 MiB that grows up to 64 GiB when the machine has free memory ([CPU and memory](/vm-platform/cpu-and-memory)). Commands run as `user` in `/home/user/workspace`.
+    The request doesn't name an image or a size, so you get the defaults: an Ubuntu image with Git, Python, and Node.js, a 10 GB disk, and a request of 0.25 vCPU and 128 MiB that bursts up to 16.25 vCPUs and 64 GiB when the machine has room ([CPU and memory](/vm-platform/cpu-and-memory)). Commands run as `user` in `/home/user/workspace`.
   </Step>
 
   <Step title="Create the VM">

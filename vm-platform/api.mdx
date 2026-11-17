@@ -148,7 +148,7 @@ See [files and volumes](/vm-platform/files-and-volumes) for how commits and vers
 </ParamField>
 
 <ParamField body="size" type="object">
-  CPU, memory, and disk. VMs created from a template, or from a snapshot without a `workload`, use the source's CPU and memory limit; they can take a different memory request, and the disk can only be larger than the source's. See [CPU and memory](/vm-platform/cpu-and-memory).
+  CPU, memory, and disk. VMs created from a template, or from a snapshot without a `workload`, use the source's CPU and memory limit, but can take a different memory request; the disk can only be larger than the source's. See [CPU and memory](/vm-platform/cpu-and-memory).
 
   <Expandable title="properties">
     <ParamField body="cpu" type="number | object" default="0.25">
@@ -158,7 +158,7 @@ See [files and volumes](/vm-platform/files-and-volumes) for how commits and vers
       Older form: `"vcpu": 4` means a 0.25 request and a limit of 4. 1 to 32. Don't send it with `cpu`.
     </ParamField>
     <ParamField body="memory" type="number | object" default="128">
-      The memory the VM is guaranteed (its request) and the most it can grow to (its limit), in MiB. A number sets the request, and the limit is 65536 (64 GiB). `{"request": 4096, "limit": 4096}` sets both; equal values give the VM fixed, fully reserved memory. The request is at least 128, the limit at least 256 and at least the request, and neither more than 65536.
+      The memory the VM is guaranteed (its request) and the most it can grow to (its limit), in MiB. A number sets the request, and the limit is 65536. `{"request": 4096, "limit": 4096}` sets both; equal values give fixed, fully reserved memory. The request is at least 128, the limit at least 256 and at least the request, and neither more than 65536.
     </ParamField>
     <ParamField body="memory_mb" type="integer" deprecated>
       Older form: a fixed size in MiB, 256 to 262144, used as both the request and the limit. Don't send it with `memory`.
@@ -343,7 +343,7 @@ See [files and volumes](/vm-platform/files-and-volumes) for how commits and vers
   Set when Final had to move the VM after a machine failure. `recovery_point` says which saved state it came back from, and `memory_kept` says whether memory came with it.
 </ResponseField>
 <ResponseField name="interruption" type="object | null">
-  Why Final, not you, last paused or stopped the VM, and when: `reason` is `idle`, `wall_clock`, `host_fenced`, `host_lost`, or `memory_pressure` (its machine ran short of memory while it used more than its [memory request](/vm-platform/cpu-and-memory#when-a-machine-runs-short)), and `at` is the time. `null` while it runs, and after you stop, pause, or wake it.
+  Why and when Final, not you, last paused or stopped the VM: `reason` is `idle`, `wall_clock`, `host_fenced`, `host_lost`, or [`memory_pressure`](/vm-platform/cpu-and-memory#when-a-machine-runs-short), and `at` is the time. `null` while it runs and after you stop, pause, or wake it.
 </ResponseField>
 
 ## List sandboxes

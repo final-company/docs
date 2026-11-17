@@ -35,7 +35,7 @@ deploying acme-api widens its access:
 Deploy acme-api with this access? [y/N]
 ```
 
-That happens when a deploy opens the app wider, the first time it becomes `public` or a function becomes `organization` ([access levels](/cloud-apps/manifest#fields-for-every-app)), or when it adds a secret, database, or custom domain. Deploys that don't change access go straight through. Pass `--yes` to answer the prompt in advance, which is useful in scripts once you've reviewed the change.
+That happens when a deploy first makes an app `public` or a function `organization` ([access levels](/cloud-apps/manifest#fields-for-every-app)), or adds a secret, database, or custom domain. Deploys that don't change access go straight through. Pass `--yes` to answer the prompt in advance, which is useful in scripts once you've reviewed the change.
 
 ## Follow the rollout
 

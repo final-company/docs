@@ -32,8 +32,8 @@ Connect Claude Code, Codex or Cursor to the [MCP gateway](/mcp-gateway/quickstar
 | `delete_agent_file` | Removes one file. |
 | `run_agent_shell` | Runs a bash command over the draft's files, such as `grep`, `sed` or `mv`. Files it changes become the next draft. |
 | `check_agent` | Makes the agent's document from the draft and type-checks it, and returns the diagnostics with their files and lines. |
-| `test_agent` | Tries a draft before publishing: starts one test session of it with a first message, and optionally the harness and model to try it on. Needs your approval. |
-| `read_agent_test` | Reads a test session's state, the draft's latest reply, why its latest turn failed, and any question waiting for you. |
+| `test_agent` | Tries a draft before publishing: starts one test session of it with a first message, optionally the harness and model to use. Needs your approval. |
+| `read_agent_test` | Reads a test session's state, the draft's latest reply, any error, and any question waiting for you. |
 | `publish_agent` | Publishes a draft revision as the agent's next version. Needs your approval. |
 | `update_agent_from_upstream` | Merges the newest published version of the agent this one was copied from into a new draft. |
 
@@ -89,9 +89,9 @@ An agent that uses in-process tools runs only from the process that defines it, 
 
 ## Try a draft
 
-A draft changes nothing anyone uses, so try it before publishing. `test_agent` starts one test session of the draft, the same test **Build** runs, with the first message you or the agent give it. It runs as you, with what the draft requires, so it asks you first. `read_agent_test` reads the session's state and the draft's latest reply, and `error` says why the latest turn failed, such as a model provider refusing the call.
+A draft changes nothing anyone uses, so try it before publishing. `test_agent` starts one test session of the draft, the same test **Build** runs, with the first message you or the agent give it. It runs as you, with what the draft requires, so it asks you first. `read_agent_test` reads the session's state and the draft's latest reply; `error` says why the latest turn failed.
 
-If no model is chosen for the agent yet, nothing starts, and the refusal lists the models the project allows for the draft, marking the one the agent recommends. The agent passes one back as `test_agent`'s `model` (a harness and a model), which the approval card shows, and the choice is remembered for that agent, as it is in **Build**. If the draft needs anything else chosen, such as an integration or a sandbox, try it once from **Build** to choose.
+If the agent has no model chosen yet, nothing starts, and the reply lists the models the project allows, marking the recommended one. Pass one back as `test_agent`'s `model` (a harness and a model); Final remembers it for that agent. If the draft needs anything else chosen, such as an integration or a sandbox, try it once from **Build**.
 
 ## Drafts and publishing
 

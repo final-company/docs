@@ -36,10 +36,10 @@ Find the symptom that matches what you see. When you're not sure where to start,
     Workloads restart when they exit, unless you set `"restart": false`. Set it for any command that's meant to finish.
   </Accordion>
   <Accordion title="My long job paused partway through">
-    The VM's `interruption.reason` says why. `idle` or `wall_clock` means the idle timeout or the wall-clock limit fired. A VM counts as idle when nothing is talking to it, even if a process inside is busy. For long jobs, set `timers.idle_timeout_s` to `null` and choose a `wall_clock_limit_s` that fits. To give a running VM more time, call `POST /sandboxes/{id}/timeout`. See [what Final does automatically](/vm-platform/lifecycle-and-snapshots#what-final-does-automatically).
+    Check the VM's `interruption.reason`. `idle` or `wall_clock` means the idle timeout or the wall-clock limit fired. A VM counts as idle when nothing is talking to it, even if a process inside is busy. For long jobs, set `timers.idle_timeout_s` to `null` and choose a `wall_clock_limit_s` that fits. To give a running VM more time, call `POST /sandboxes/{id}/timeout`. See [what Final does automatically](/vm-platform/lifecycle-and-snapshots#what-final-does-automatically).
   </Accordion>
   <Accordion title="My VM paused with reason memory_pressure">
-    Its machine ran short of memory while the VM used more than its memory request, and Final couldn't move it to another machine. Resume it, and give it a larger `size.memory` request, or a request equal to its limit, if it mustn't be paused. See [when a machine runs short](/vm-platform/cpu-and-memory#when-a-machine-runs-short).
+    Its machine ran short of memory while the VM used more than its memory request, and Final couldn't move it. Resume it. If it mustn't be paused, give it a larger memory request, or one equal to its limit. See [when a machine runs short](/vm-platform/cpu-and-memory#when-a-machine-runs-short).
   </Accordion>
   <Accordion title="The health check says unhealthy">
     Read `health.error` from `GET /sandboxes/{id}/workload`. Make sure the server listens on the `port` in the check, binds to `0.0.0.0`, and answers `path`. If it's slow to boot, raise `grace_s`.

@@ -112,7 +112,7 @@ serverlessNanocodeClaude({
 | `finalCredits({ billTo?, budget? })` | Final's metered inference, billed to the project (default) or the person (`billTo: 'person'`), optionally capped by a named project budget. | `{ "source": "final", "billTo": "project" }` |
 | `harnessLogin()` | The harness's own login on the machine it runs on, like a CLI you signed in to there. | `{ "source": "harness" }` |
 
-A source that can never serve the request is passed over without asking: one the harness doesn't accept, one pinned to another vendor than the model's, `finalCredits()` for a model Final's metered inference doesn't serve, or a personal source (a person's subscription, or credits billed to the person) when no person is acting.
+Final skips, without asking, a source that can never serve the request: one the harness doesn't accept, one pinned to a vendor other than the model's, `finalCredits()` for a model Final doesn't serve, or a personal source when no person is acting.
 
 | Harness | Sources it accepts |
 | --- | --- |
@@ -124,11 +124,11 @@ A source that can never serve the request is passed over without asking: one the
 
 ### When a source can't pay
 
-Past a source that could serve the request, Final moves on only with a person's approval. When such a source can't pay, because a person's subscription isn't connected or is invalid, a subscription or key is used up, the payer isn't permitted, or a budget is spent, or when the vendor refuses the request for quota or credit, the work pauses and the responsible person is asked how to continue: connect or fix the source, try it again, or use the next source. Approving the next source applies to that chat; the person can also choose to use it for every chat with that agent, and remove it later from the **Agent subscriptions** page.
+Past a source that could serve the request, Final moves on only with a person's approval. When that source can't pay, such as a subscription that isn't connected or is used up, a spent budget, or a vendor's quota refusal, the work pauses and asks the responsible person to fix the source, retry, or use the next source. Approval applies to that chat, or to every chat with that agent if they choose; remove it on the **Agent subscriptions** page.
 
-The question appears in the chat, and in **Needs Help**. Work that no chat shows, such as a schedule, a webhook, or an API session, asks in **Needs Help**, and answering resumes it as the person it acts for. When nobody can be asked, the work fails and says to configure a usable billing source. Only the person billed can approve charges billed to a person.
+The question appears in the chat and in **Needs Help**; work no chat shows, such as a schedule or an API session, asks only in **Needs Help** and resumes when answered. When nobody can be asked, the work fails. Only the person billed can approve charges billed to them.
 
-A model that Final's metered inference doesn't serve can't use `finalCredits()`; `client.inference.offering()` lists the vendors and models it serves, with prices.
+`client.inference.offering()` lists the vendors and models `finalCredits()` serves, with prices.
 
 Your Final API key is never used for model calls. Model calls always follow the `inference` the caller provides.
 
@@ -154,14 +154,14 @@ for (const [capability, status] of Object.entries(check.compute)) console.log(ca
 
 Each required capability's `status` is `harness` (the harness's own machine serves it), `sandbox` (a provided sandbox must), or `unavailable`. A harness is unsuitable when its lowest permission level is above the agent's ceiling, when it lacks a feature the agent uses and doesn't mark optional, or when its environment can't run it.
 
-`project.harnesses.previewInference` says which of the settings' inference sources would pay for the model if a published agent started with them now, for you in the project. `agent` is the published agent's ID, whose spending restrictions and budgets apply. It starts, spends, and creates nothing:
+`project.harnesses.previewInference` says which inference source would pay if you started a published agent with these settings now, applying the agent's spending restrictions and budgets. It starts and spends nothing:
 
 ```ts
 const preview = await project.harnesses.previewInference({ agent: agentId, harness });
 console.log(preview.source ?? 'nothing would pay', preview.vendor);
 ```
 
-`source` is the kind of the first source that would pay (`subscription`, `api-key`, `final`, or `harness`), or `null` when none would, including when a new chat would first have to ask the person. `vendor` is the model vendor it would pay, or `null` for none and for the harness's own login.
+`source` is `subscription`, `api-key`, `final`, or `harness`, or `null` when none would pay without first asking the person. `vendor` is the model vendor paid, or `null` for none and for `harness`.
 
 ## Change a running agent's harness
 

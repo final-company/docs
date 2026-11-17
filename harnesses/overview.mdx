@@ -44,7 +44,7 @@ The process adapters are public packages: `@finalai/acp-adapter-claude-code` run
 
 ### Model credentials for process harnesses
 
-A harness that runs as a process on a machine, like Claude Code or Codex, never gets a model credential in its environment. Final starts its adapter with a short-lived grant for Final's credential broker. The adapter redeems it for the credential the [inference sources](/harnesses/settings#inference-sources) resolve, renews it before it expires, and serves it to the harness through a local proxy, so the harness holds only the proxy's address and a local key. When a vendor refuses a subscription or key for its limit, the adapter reports it, and Final asks the person before the work moves to the next source; see [when a source can't pay](/harnesses/settings#when-a-source-cant-pay). `@finalai/agent-provider/model-credentials` has both sides of this for your own adapters.
+A harness that runs as a process on a machine, like Claude Code or Codex, never gets a model credential in its environment. Final starts its adapter with a short-lived grant for Final's credential broker. The adapter redeems it for the credential the [inference sources](/harnesses/settings#inference-sources) resolve, renews it before it expires, and serves it to the harness through a local proxy, so the harness holds only the proxy's address and a local key. When a vendor refuses a subscription or key for its limit, the adapter reports it, and Final asks the person [before moving to the next source](/harnesses/settings#when-a-source-cant-pay). `@finalai/agent-provider/model-credentials` has both sides of this for your own adapters.
 
 ## Define your own harness
 

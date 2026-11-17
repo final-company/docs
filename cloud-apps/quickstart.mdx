@@ -60,7 +60,7 @@ Prefer to hand this off? Give your coding agent the [setup prompt](/cloud-apps/o
   </Step>
 
   <Step title="Describe the app">
-    Create `final-cloud.yaml` in the project root. This tells Final what kind of app this is and where the code lives. `access: public` lets anyone open the URL; without it, a function answers only callers from your project.
+    Create `final-cloud.yaml` in the project root. This tells Final what kind of app this is and where the code lives. `access: public` lets anyone open the URL; without it, only your project can.
 
     ```yaml final-cloud.yaml
     name: hello-cloud
@@ -121,7 +121,7 @@ Prefer to hand this off? Give your coding agent the [setup prompt](/cloud-apps/o
     npx final-cloud deploy hello-cloud
     ```
 
-    Because this deploy makes the app public for the first time, the CLI says the deploy widens the app's access and asks you to confirm:
+    Because this deploy makes the app public for the first time, the CLI asks you to confirm:
 
     ```text
     Deploy hello-cloud with this access? [y/N]

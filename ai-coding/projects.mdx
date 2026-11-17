@@ -12,16 +12,16 @@ A project is where a team's coding work lives in Final. It holds the repositorie
 Every member has a personal project called **My Work**, which is a good place to experiment. For work you share with a team, create a project:
 
 1. In the sidebar, hover a project and click **+**, then choose **New Subproject**.
-2. Under **What are you working on?**, enter a name, such as `storefront`. Under **What are you trying to achieve?**, describe the goals and what done looks like. Add any files and GitHub repositories the project starts with; files go into the project's Files repository.
-3. In **Set up your AI team**, choose the lead's model and billing, and the models, billing, and compute for the agents that work on Tasks. Connect a personal subscription right there if the team uses one.
-4. For a shared project, in **Add your team**, add people from your organization or invite them by email, each with a role.
-5. Click **Create project**. With goals, the button reads **Create and plan**, and the project's Home chat proposes a plan once setup finishes.
+2. Enter a name, such as `storefront`, and optionally the project's goals and the files and GitHub repositories it starts with.
+3. In **Set up your AI team**, choose the models, billing, and compute for the lead and for the agents that work on Tasks.
+4. In **Add your team**, add people or invite them by email, each with a role.
+5. Click **Create project**, or **Create and plan** if you gave goals: the project's Home chat then proposes a plan.
 
-You can change the AI team later in the project's settings, under **AI team**, and its files and repositories under **Files & repositories**.
+Change these later in the project's settings, under **AI team** and **Files & repositories**.
 
 Subprojects inherit from their parent. Agents, sandbox setups, and harnesses in a parent project are available in the projects below it, so you can share a setup across several teams by putting it one level up.
 
-To invite people to a shared project later, open its menu (**...**), choose **Members**, and add them, or invite them by email, with a role:
+To add people later, open the project's menu (**...**), choose **Members**, and add or invite them with a role:
 
 | Role | Can |
 | --- | --- |
@@ -72,7 +72,7 @@ Commit the setup script the instructions mention, too. The [cloud environments](
 
 <AccordionGroup>
   <Accordion title="Where does a Final agent's own code live?">
-    A Final agent is defined by an `agent.ts` module and the files it names, such as `instructions.md`. When you create an agent in Final, Final keeps those files with each draft and published version, with no repository to manage. You can also keep them anywhere you like, including your application repository, and [publish](/operate/publishing) the agent from there.
+    A Final agent is defined by an `agent.ts` module and the files it names, such as `instructions.md`. When you create an agent in Final, Final keeps those files with each draft and version. You can also keep them anywhere you like, including your application repository, and [publish](/operate/publishing) the agent from there.
 
     Either way, the agent's source is separate from the code it works on. Connecting the agent's repository doesn't put your application on its computer. The computer gets your application from the repositories listed in its [sandbox setup](/ai-coding/cloud-environments#prepare-computers-for-a-final-agent).
   </Accordion>
