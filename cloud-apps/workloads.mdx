@@ -16,7 +16,7 @@ Every app has one type, set with `type` in `final-cloud.yaml`. To pick one, ask 
 
 Both answer HTTP requests at a public URL, so this is the choice people most often weigh.
 
-Pick a **function** when your handler is plain JavaScript and you'd rather not build a container. There's no Dockerfile, deploys are quick, and an idle function stops until the next request arrives. The trade-off is a smaller runtime: one module, web-standard APIs like `fetch` and `crypto.subtle`, 128 MB of memory, and no native packages or Node.js-only libraries.
+Pick a **function** when your handler is plain JavaScript and you'd rather not build a container. There's no Dockerfile, deploys are quick, and it can be private to your project, your organization, or a chat. The trade-off is a smaller runtime: one module, web-standard APIs like `fetch` and `crypto.subtle`, 128 MB of memory, and no native packages or Node.js-only libraries.
 
 Pick a **web app** for anything else: a full framework, a language other than JavaScript, native dependencies, or a process that keeps state in memory between requests. A web app runs your container on a machine size you choose and stays running.
 
@@ -24,7 +24,7 @@ Pick a **web app** for anything else: a full framework, a language other than Ja
 
 |  | Web app | Function | Service | Cron job |
 | --- | --- | --- | --- | --- |
-| Public URL | Yes | Yes, or private with `public: false` | No | No |
+| Public URL | Yes | With `access: public`; otherwise private to the project, organization, or a chat | No | No |
 | Runs from | A container | One JavaScript module | A container | A container |
 | Runs | All the time | When requests arrive | All the time | On a schedule or on demand, until it exits |
 | Success means | The health check passes | It answers requests | It's running | It exits with code `0` |

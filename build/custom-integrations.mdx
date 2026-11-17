@@ -64,7 +64,7 @@ A host can refuse the credential Final put on a request: `401` or `403`, or, for
 
 ## Deploy it
 
-Deploy the function private, so only callers holding an access token for it reach it:
+Deploy the function private, so only callers holding an access token for it reach it. That's the default for a function:
 
 ```yaml final-cloud.yaml
 name: acme-integration
@@ -73,26 +73,29 @@ entry: dist/index.js
 build:
   command: npm install && npm run build
   output: dist/index.js
-public: false
 ```
 
-It still gets its URL. Integrations in the app's own project can call it; to let integrations in other projects call it too, list those projects' IDs under `access.projects`:
+A function is private to its project unless its `access` says otherwise. It still gets its URL. Integrations in the app's own project can call it; to let integrations in other projects call it too, list those projects' IDs under `access.projects`:
 
 ```yaml final-cloud.yaml
 access:
+  level: project
   projects:
     - <project-id>
 ```
+
+`access: organization` lets every project in the organization call it instead. See [who can reach a function](/cloud-apps/functions#who-can-reach-a-function).
 
 See [Functions](/cloud-apps/functions) for building and deploying.
 
 ## Private apps
 
-A function deployed with `public: false` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs. Final's authorization server issues those tokens only for the app's own project and the projects in `access.projects`:
+A function with any `access` level but `public` answers only callers holding an access token for its origin. Every other request gets `401` before the function runs. Final's authorization server issues those tokens only for callers the level admits: at `project`, the app's own project and the projects in `access.projects`; at `organization`, any project in the organization; at `conversation`, the app's own project, plus people who can read the chat it's shared with:
 
 - Calls through an integration that names the app's URL with `platformIdentity()` auth. Final exchanges the call's platform identity for a token.
 - [Workflow](/workflows/overview) steps. The workflow engine exchanges the step's token.
 - Your own apps registered with Final (OAuth clients) that an organization admin granted the `resource:invoke` scope: a project principal (`client_credentials` with `project`), or a person who can use the app's project. Request the token with `resource` set to the app's origin.
+- People who open the function in a browser and sign in to Final; see [people in a browser](/cloud-apps/functions#people-in-a-browser).
 
 Callers find the authorization server through standard OAuth discovery. The `401` points to the app's protected resource metadata ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)) at `https://<host>/.well-known/oauth-protected-resource`, which names the authorization server, and that server's metadata ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)) gives its token endpoint. Each token is issued for one origin, carries the scope `resource:invoke`, and expires within minutes.
 
