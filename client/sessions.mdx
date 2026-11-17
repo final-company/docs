@@ -1,6 +1,6 @@
 ---
 title: "Sessions and streaming"
-description: "Start a session with what the agent requires, stream its reply into your UI, and let people approve actions."
+description: "Start a session with what the agent requires, stream its reply into your UI, let people approve actions, and start subagents."
 ---
 
 A session is one ongoing thread with one agent, like a single chat. You start it with the agent and a `provide` object, send it a message, and watch the work stream in: text as it's written, tool calls as they happen, and requests for a person when the agent needs one. Use sessions when your app owns the chat UI or runs the agent as a task. For chats stored in Final's apps, see [conversations](/client/conversations).
@@ -89,6 +89,10 @@ If the agent's requirements aren't met, `create` throws a `requirements_unmet` e
 
 <ParamField path="title" type="string">
   A title for the session.
+</ParamField>
+
+<ParamField path="parentSessionId" type="string">
+  The session this one works for, which makes it a subagent. See [start a subagent](#start-a-subagent).
 </ParamField>
 
 ## Get a structured result
@@ -283,6 +287,65 @@ To give the agent context without asking for a reply, use `observe`. The text jo
 await handle.observe('The release owner changed to Morgan.');
 ```
 
+## Start a subagent
+
+A subagent is a session that works for another session, like a second agent you ask for a review while you keep going. Pass the parent's ID as `parentSessionId` when you create it:
+
+```ts
+const { handle: reviewer } = await project.sessions.create({
+  agent: reviewerAgent,
+  provide: { harness },
+  parentSessionId: parent.id,
+  message: 'Check the 1.2.0 changelog against the merged pull requests.',
+});
+```
+
+`parent` is the handle of the session the subagent works for, and `reviewerAgent` is another agent you've defined. The subagent runs in the parent's project and acts for the same person. Only the parent session's own credential, or the person it acts for, can name a session as a parent.
+
+When each of the subagent's turns ends, its answer reaches the parent session as input. The parent keeps working instead of polling for a result. The answer is every message the subagent wrote after its last tool call. If it wrote none after that call, the answer is the last message it wrote before it.
+
+The subagent closes when its parent closes or fails. Close it sooner with `handle.close()` when its work is done. `session.get()` returns the parent's ID as `parentSessionId`, which is `null` for every other session.
+
+### Send a subagent more work
+
+`handle.inputs.send` gives a subagent something more to act on. Send it from the parent session's credential or as the person:
+
+```ts
+await reviewer.inputs.send({
+  from: { id: parent.id, name: 'Release assistant' },
+  content: 'Also check that every breaking change has a migration note.',
+});
+```
+
+The answer to the input reaches the parent like any other turn's. It takes the fields of a [conversation input](/client/conversations#send-an-input-from-another-system), such as `from`, `label`, `context`, `replyExpected`, and `turnPolicy`, without `participantId` or `actor`: who sent it, whom it acts for, and the turn that caused it come from your credential. The client makes a new `idempotencyKey` for each call; pass your own when you retry a request that might have reached Final.
+
+### Read what it wrote
+
+`handle.messages()` returns the session's messages a page at a time, one entry per agent message, newest last. Pass `toolCalls: true` to also list the tool calls between messages, with their title and status but not their output:
+
+```ts
+let page = await reviewer.messages({ toolCalls: true });
+for (const entry of page.messages) console.log(entry.kind, entry.text);
+
+while (page.hasMoreBefore) {
+  page = await reviewer.messages({ before: page.messages[0]!.seq, toolCalls: true });
+  // ...render the older entries above the ones you have...
+}
+```
+
+To read further back, pass the lowest `seq` on the page as `before`. `hasMoreBefore` is `true` while older entries remain. `limit` sets the page size: 20 by default, at most 200.
+
+| Field | What it is |
+| --- | --- |
+| `seq` | The `seq` of the event the entry starts at. |
+| `turnId` | The turn the entry is part of, or `null`. |
+| `kind` | `message` or `tool_call`. |
+| `text` | A message's text, or a tool call's title. |
+| `messageId` | A message's ID. |
+| `toolCallId`, `status` | A tool call's ID and its latest status. |
+
+`messages()` works on any session, not only subagents.
+
 ## Stop and clean up
 
 - `handle.cancel()` stops the running turn. The turn ends with the stop reason `cancelled`.
@@ -311,7 +374,8 @@ In-process tools and local compute need the process that created the session. Af
 
 | Call | Returns |
 | --- | --- |
-| `session.get()` | The session's state. |
+| `session.get()` | The session's state, including `parentSessionId` for a [subagent](#start-a-subagent). |
+| `session.messages({ before?, limit?, toolCalls? })` | A page of the agent's messages, newest last. See [read what it wrote](#read-what-it-wrote). |
 | `session.requirements()` | Each of the agent's requirements and what provides it now. |
 | `session.provide()` | The provide document the session was resolved with. |
 | `session.manifest()` | The agent document the session pins and its provide document. |

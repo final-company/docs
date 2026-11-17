@@ -60,6 +60,7 @@ Some steps wait for a person: approving a tool call, answering a question, or si
 Most sessions start because your app sends a message. Work can also arrive without one:
 
 - **Inputs** hand a conversation's agent something to act on that isn't a member's message, like a finished build. See [send an input](/client/conversations#send-an-input-from-another-system).
+- A [subagent](/client/sessions#start-a-subagent) is a session that works for another session. Each of its answers reaches the parent session as input.
 - [Schedules](/build/schedules) are timers in a conversation. Each firing prompts one agent participant, with what that participant was provided.
 - [Channels](/build/channels) turn an outside surface, like a webhook or a chat app, into people, places, and inputs in Final's chats.
 
