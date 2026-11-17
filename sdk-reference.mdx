@@ -43,7 +43,7 @@ Lower-level packages are public too, each with its own README: [`@finalai/agent-
 | `sandboxProviders` | `register({ name, url })`, `list`, `get`, `update`, `refresh`, and `remove` for providers you run. See [run your own provider](/build/sandboxes#run-your-own-provider). |
 | `integrations` | `create`, `get`, `list`, `update`, `delete`, and a person's `signIn`, `completeSignIn`, and `signOut`. `listTools` and `callTool` use an integration's tools without a session. See [integrations](/build/integrations). |
 | `decisions` | `raise`, `list`, `get`, `respond`, and `cancel` for decisions outside any conversation. See [decisions](/client/decisions). |
-| `harnesses` | `check({ agent, harness })`, `publish({ harness, name })`, `get`, `list`, and `allowances`. See [harness settings](/harnesses/settings). |
+| `harnesses` | `check({ agent, harness })`, `previewInference({ agent, harness })`, `publish({ harness, name })`, `get`, `list`, and `allowances`. See [harness settings](/harnesses/settings). |
 | `acpAdapters` | `publish({ adapter, name })`, `get`, and `list`. See [harnesses and adapters](/harnesses/overview). |
 | `channels` | `publish({ name, source })`, `get`, `install({ channel, agent, app?, agents: { provide } })`, and `installs()`. See [channels](/build/channels). |
 | `channelApps` | `create`, `list`, `update`, and `delete` for provider app credentials. |
