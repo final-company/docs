@@ -106,7 +106,7 @@ A template saves a VM after its service has started, so new VMs skip the slow pa
   "start_cmd": "mkdir -p /tmp/site && cd /tmp/site && echo ok > index.html && python3 -m http.server 8000 --bind 0.0.0.0",
   "ready_cmd": "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')\"",
   "cpu": 1,
-  "memory_mb": 2048
+  "memory": 2048
 }
 ```
 
@@ -128,8 +128,11 @@ A template saves a VM after its service has started, so new VMs skip the slow pa
 <ParamField body="cpu" type="number | object" default="0.25">
   CPU for the build and for every VM created from the template: a request, or `{"request", "limit"}`, in vCPUs. See [CPU and memory](/vm-platform/cpu-and-memory). The older `vcpu` field still works.
 </ParamField>
-<ParamField body="memory_mb" type="integer" default="2048">
-  Memory in MiB, 256 to 262144.
+<ParamField body="memory" type="number | object" default="128">
+  Memory for the build and for every VM created from the template: a request, or `{"request", "limit"}`, in MiB. See [CPU and memory](/vm-platform/cpu-and-memory#memory).
+</ParamField>
+<ParamField body="memory_mb" type="integer" deprecated>
+  Older form: a fixed size in MiB, 256 to 262144, used as both the request and the limit. Don't send it with `memory`.
 </ParamField>
 <ParamField body="tools" type="string[]">
   Platform tools to run, such as `["docker"]`. They're running in every VM created from the template.

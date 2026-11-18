@@ -1,7 +1,7 @@
 ---
 title: "CPU and memory"
 sidebarTitle: "CPU and memory"
-description: "Reserve the CPU a VM always gets, let it burst higher when the machine is idle, and see how CPU is metered."
+description: "Reserve the CPU and memory a VM always gets, let it burst higher when the machine has room, and see how both are metered."
 icon: "microchip"
 ---
 
@@ -11,7 +11,7 @@ Most VMs spend most of their time waiting on a network call, a model, or a perso
 
 CPU is counted in vCPUs. One vCPU is one hardware thread.
 
-## Defaults
+## Default CPU
 
 A VM that doesn't ask for CPU gets a request of **0.25 vCPU** and a limit **16 vCPUs above the request**: 16.25. Its guest sees 17 CPUs, the limit rounded up, so tools that size themselves from the CPU count, like `make -j$(nproc)` or a test runner's worker pool, can use the whole burst.
 
@@ -63,15 +63,57 @@ So a VM with a 0.25 vCPU request that sits idle for an hour and then compiles on
 
 ## Memory
 
-Memory is fixed. `size.memory_mb` is reserved for the VM when it runs, it's always available to the VM, and the VM can't use more. It's metered at its full size while the VM runs.
+Memory follows the same model, in MiB. A VM always has its memory **request**. Above it, the VM grows into memory the machine isn't using, up to its **limit**, and memory it frees goes back to the machine. Allocating quickly slows the VM down rather than killing it. Past the limit, the guest's out-of-memory killer ends processes, as on any Linux machine. By default, a VM requests **128 MiB** with a limit of **64 GiB** (65536 MiB).
+
+### Set the memory
+
+Pass `memory` in `size`, either as one number or as a request and a limit:
+
+| `size.memory` | Request | Limit |
+| --- | --- | --- |
+| *(omitted)* | 128 MiB | 64 GiB |
+| `1024` | 1 GiB | 64 GiB |
+| `{"request": 1024, "limit": 8192}` | 1 GiB | 8 GiB |
+| `{"request": 4096, "limit": 4096}` | 4 GiB | 4 GiB |
+
+The request is at least 128 MiB, the limit is at least 256 MiB and at least the request, and neither is more than 65536 MiB. Equal values give the VM fixed memory: all of it reserved, and never more.
+
+```bash
+curl -sS "$FINAL_VM_API_URL/sandboxes" \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"size": {"memory": {"request": 1024, "limit": 8192}}}' \
+  | jq '.sandbox.size.memory, .sandbox.size.memory_mb'
+```
+
+```json
+{ "request": 1024, "limit": 8192 }
+8192
+```
+
+`size.memory_mb` in a response is the limit.
+
+### When a machine runs short
+
+When a machine runs short of memory, only VMs using more than their request are affected. Final takes memory back from them and stops them growing. If that isn't enough, it pauses one and moves it to a machine with room, where it keeps running with its processes intact. If it can't be moved, it stays paused with `interruption.reason` set to `memory_pressure`, and resuming it places it on a machine with room. A VM within its request is never paused for memory.
+
+Give a VM a request that covers what it must never lose, and a limit for what it may use when there's room. For work that can't be paused, such as CI, set the request equal to the limit.
+
+### How memory is metered
+
+Like [CPU](#how-cpu-is-metered), a running VM's memory is metered each second at the **higher of its request and what it uses**. Fixed memory counts its whole size.
+
+### The older memory_mb field
+
+`size.memory_mb` still works and means a fixed size, from 256 to 262144: `"memory_mb": 4096` is a request and a limit of 4096 MiB. Sending both `memory` and `memory_mb` is an error.
 
 ## Change a VM's size
 
 CPU and memory come with the VM wherever it goes:
 
-- A VM created from a [template](/vm-platform/images-and-templates), or resumed from a [snapshot](/vm-platform/lifecycle-and-snapshots) with its memory, gets the source's CPU and memory.
+- A VM created from a [template](/vm-platform/images-and-templates), or resumed from a [snapshot](/vm-platform/lifecycle-and-snapshots) with its memory, gets the source's CPU and memory limit. `size.memory` can change its memory request, not its limit.
 - To change a VM's own size, stop it first. The new size applies from its next boot.
 
-## Older requests
+## Older CPU requests
 
 Requests that send `size.vcpu` (an integer, 1 to 32) instead of `size.cpu` still work. `"vcpu": 4` means a request of 0.25 vCPU and a limit of 4. Sending both `vcpu` and `cpu` is an error.

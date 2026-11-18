@@ -112,7 +112,7 @@ serverlessNanocodeClaude({
 | `finalCredits({ billTo?, budget? })` | Final's metered inference, billed to the project (default) or the person (`billTo: 'person'`), optionally capped by a named project budget. | `{ "source": "final", "billTo": "project" }` |
 | `harnessLogin()` | The harness's own login on the machine it runs on, like a CLI you signed in to there. | `{ "source": "harness" }` |
 
-A source the harness can't use is skipped. A personal subscription that isn't connected falls through to the next source; if it's the only source, the person is asked to connect it, the same way an [integration](/build/integrations#sign-in) asks them to sign in.
+Final skips, without asking, a source that can never serve the request: one the harness doesn't accept, one pinned to a vendor other than the model's, `finalCredits()` for a model Final doesn't serve, or a personal source when no person is acting.
 
 | Harness | Sources it accepts |
 | --- | --- |
@@ -122,7 +122,13 @@ A source the harness can't use is skipped. A personal subscription that isn't co
 | `claude-code`, `codex` | `harnessLogin`, `subscription`, `apiKey`, `finalCredits` |
 | `acp-agent` | `harnessLogin` |
 
-When a vendor refuses a request because a subscription or API key hit its usage or rate limit, Final sends that request again on the next source in the list, such as `finalCredits()`, and tries the subscription first again once its limit resets. A model that Final's metered inference doesn't serve can't fall through to `finalCredits()`; `client.inference.offering()` lists the vendors and models it serves, with prices.
+### When a source can't pay
+
+Past a source that could serve the request, Final moves on only with a person's approval. When that source can't pay, such as a subscription that isn't connected or is used up, a spent budget, or a vendor's quota refusal, the work pauses and asks the responsible person to fix the source, retry, or use the next source. Approval applies to that chat, or to every chat with that agent if they choose; remove it on the **Agent subscriptions** page.
+
+The question appears in the chat and in **Needs Help**; work no chat shows, such as a schedule or an API session, asks only in **Needs Help** and resumes when answered. When nobody can be asked, the work fails. Only the person billed can approve charges billed to them.
+
+`client.inference.offering()` lists the vendors and models `finalCredits()` serves, with prices.
 
 Your Final API key is never used for model calls. Model calls always follow the `inference` the caller provides.
 
@@ -147,6 +153,15 @@ for (const [capability, status] of Object.entries(check.compute)) console.log(ca
 ```
 
 Each required capability's `status` is `harness` (the harness's own machine serves it), `sandbox` (a provided sandbox must), or `unavailable`. A harness is unsuitable when its lowest permission level is above the agent's ceiling, when it lacks a feature the agent uses and doesn't mark optional, or when its environment can't run it.
+
+`project.harnesses.previewInference` says which inference source would pay if you started a published agent with these settings now, applying the agent's spending restrictions and budgets. It starts and spends nothing:
+
+```ts
+const preview = await project.harnesses.previewInference({ agent: agentId, harness });
+console.log(preview.source ?? 'nothing would pay', preview.vendor);
+```
+
+`source` is `subscription`, `api-key`, `final`, or `harness`, or `null` when none would pay without first asking the person. `vendor` is the model vendor paid, or `null` for none and for `harness`.
 
 ## Change a running agent's harness
 

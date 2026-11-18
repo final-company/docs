@@ -30,13 +30,12 @@ Before anything ships, the CLI previews the deployment. If it gives the app acce
 
 ```text
 deploying acme-api widens its access:
-  public: yes
-  secretNames: STRIPE_API_KEY
+  secretNames: stripe-api-key
   databases: orders
 Deploy acme-api with this access? [y/N]
 ```
 
-That happens the first time an app becomes public, or when a deploy adds a secret, database, or custom domain. Deploys that don't change access go straight through. Pass `--yes` to answer the prompt in advance, which is useful in scripts once you've reviewed the change.
+That happens when a deploy first makes an app `public` or a function `organization` ([access levels](/cloud-apps/manifest#fields-for-every-app)), or adds a secret, database, or custom domain. Deploys that don't change access go straight through. Pass `--yes` to answer the prompt in advance, which is useful in scripts once you've reviewed the change.
 
 ## Follow the rollout
 

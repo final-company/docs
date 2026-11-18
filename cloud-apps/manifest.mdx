@@ -47,7 +47,7 @@ observability:
     retention: 90d
 ```
 
-Final rejects fields it doesn't recognize, so a typo fails validation instead of being silently ignored. Run `npx final-cloud validate` to check a file before you push it.
+Final rejects fields it doesn't recognize, so a typo fails validation instead of being silently ignored. The old `public` field fails with a message pointing to [`access`](#fields-for-every-app). Run `npx final-cloud validate` to check a file before you push it.
 
 ## Fields for every app
 
@@ -76,6 +76,28 @@ Final rejects fields it doesn't recognize, so a typo fails validation instead of
     </ParamField>
     <ParamField path="binding" type="string">
       The prefix for the database's environment variables. Defaults to the name in uppercase with hyphens turned into underscores, plus `_DB`, so `orders` becomes `ORDERS_DB` and the app gets `ORDERS_DB_URL` and `ORDERS_DB_TOKEN`. Each binding in an app must be unique.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="access" type="string | object">
+  Who can reach the app: `public`, `project`, `organization`, or `conversation`. Functions take every level and default to `project`. Web apps take only `public`; services and cron jobs, which have no address, take only `project`. See [who can reach a function](/cloud-apps/functions#who-can-reach-a-function).
+
+  The long form `{ level, projects }` lets other projects call a `project`-level function:
+
+  ```yaml
+  access:
+    level: project
+    projects:
+      - <project-id>
+  ```
+
+  <Expandable title="properties">
+    <ParamField path="level" type="'public' | 'project' | 'organization' | 'conversation'" required>
+      The access level.
+    </ParamField>
+    <ParamField path="projects" type="string[]" default="[]">
+      Only with `level: project`. IDs of other projects that may call the function, besides the app's own project. Up to 100.
     </ParamField>
   </Expandable>
 </ParamField>
@@ -266,35 +288,8 @@ Fields for `type: function`. Functions don't use the container fields. See [func
   </Expandable>
 </ParamField>
 
-<ParamField path="public" type="boolean" default="true">
-  Whether anyone can call the function's URL. Set `false` to make it [private](/cloud-apps/functions#private-functions): it keeps its URL, but only callers holding an access token for it reach it.
-</ParamField>
-
-<ParamField path="access.projects" type="string[]" default="[]">
-  Only with `public: false`. IDs of other projects that may call the private function, besides the app's own project.
-</ParamField>
-
 <ParamField path="domains" type="string[]" default="[]">
-  Custom hostnames for the function, with no scheme or path. A private function's custom hostnames are private too.
-</ParamField>
-
-<ParamField path="concurrency" type="integer" default="64">
-  Requests one instance handles at the same time, from 1 to 256.
-</ParamField>
-
-<ParamField path="scaling" type="object">
-  <Expandable title="properties">
-    <ParamField path="min" type="integer" default="1">
-      Minimum instances, 0 or 1.
-    </ParamField>
-    <ParamField path="max" type="integer" default="4">
-      Maximum instances, from 1 to 16. Final adds instances up to this number when every instance is busy.
-    </ParamField>
-  </Expandable>
-</ParamField>
-
-<ParamField path="idleTimeoutSeconds" type="integer" default="60">
-  How long an instance waits without requests before it stops, from 10 to 86400 seconds. The next request starts it again.
+  Custom hostnames for the function, with no scheme or path. They have the same `access` as its own hostname.
 </ParamField>
 
 <ParamField path="limits" type="object">

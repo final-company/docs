@@ -148,7 +148,7 @@ See [files and volumes](/vm-platform/files-and-volumes) for how commits and vers
 </ParamField>
 
 <ParamField body="size" type="object">
-  CPU, memory, and disk. VMs created from a template, or from a snapshot without a `workload`, use the source's CPU and memory, and the disk can only be larger than the source's. See [CPU and memory](/vm-platform/cpu-and-memory).
+  CPU, memory, and disk. VMs created from a template, or from a snapshot without a `workload`, use the source's CPU and memory limit, but can take a different memory request; the disk can only be larger than the source's. See [CPU and memory](/vm-platform/cpu-and-memory).
 
   <Expandable title="properties">
     <ParamField body="cpu" type="number | object" default="0.25">
@@ -157,8 +157,11 @@ See [files and volumes](/vm-platform/files-and-volumes) for how commits and vers
     <ParamField body="vcpu" type="integer" deprecated>
       Older form: `"vcpu": 4` means a 0.25 request and a limit of 4. 1 to 32. Don't send it with `cpu`.
     </ParamField>
-    <ParamField body="memory_mb" type="integer" default="2048">
-      Memory in MiB, 256 to 262144.
+    <ParamField body="memory" type="number | object" default="128">
+      The memory the VM is guaranteed (its request) and the most it can grow to (its limit), in MiB. A number sets the request, and the limit is 65536. `{"request": 4096, "limit": 4096}` sets both; equal values give fixed, fully reserved memory. The request is at least 128, the limit at least 256 and at least the request, and neither more than 65536.
+    </ParamField>
+    <ParamField body="memory_mb" type="integer" deprecated>
+      Older form: a fixed size in MiB, 256 to 262144, used as both the request and the limit. Don't send it with `memory`.
     </ParamField>
     <ParamField body="disk_gb" type="integer" default="10">
       Disk in GB, 1 to 2048.
@@ -277,7 +280,7 @@ See [files and volumes](/vm-platform/files-and-volumes) for how commits and vers
   The project the VM belongs to.
 </ResponseField>
 <ResponseField name="size" type="object">
-  `cpu` (`{"request", "limit"}` in vCPUs), `vcpu` (the CPUs the guest sees), `memory_mb`, and `disk_gb`.
+  `cpu` (`{"request", "limit"}` in vCPUs), `vcpu` (the CPUs the guest sees), `memory` (`{"request", "limit"}` in MiB), `memory_mb` (the memory limit), and `disk_gb`.
 </ResponseField>
 <ResponseField name="image_id" type="string">
   The image the VM's disk came from.
@@ -338,6 +341,9 @@ See [files and volumes](/vm-platform/files-and-volumes) for how commits and vers
 </ResponseField>
 <ResponseField name="recovery" type="object | null">
   Set when Final had to move the VM after a machine failure. `recovery_point` says which saved state it came back from, and `memory_kept` says whether memory came with it.
+</ResponseField>
+<ResponseField name="interruption" type="object | null">
+  Why and when Final, not you, last paused or stopped the VM: `reason` is `idle`, `wall_clock`, `host_fenced`, `host_lost`, or [`memory_pressure`](/vm-platform/cpu-and-memory#when-a-machine-runs-short), and `at` is the time. `null` while it runs and after you stop, pause, or wake it.
 </ResponseField>
 
 ## List sandboxes
