@@ -302,7 +302,7 @@ const { handle: reviewer } = await project.sessions.create({
 
 `parent` is the parent session's handle. The subagent runs in the parent's project and acts for the same person. Only the parent session's credential, or the person it acts for, can name it as a parent.
 
-When each of the subagent's turns ends, its answer reaches the parent as input, so the parent never polls. The answer is the messages the subagent wrote after its last tool call or, if there are none, the last message before it.
+When each of the subagent's turns ends, its answer reaches the parent as input, so the parent never polls. The answer is the messages the subagent wrote after its last tool call or, if there are none, the last message before it. An answer longer than 16,000 characters is cut; read the rest with [`handle.messages()`](#read-what-it-wrote).
 
 The subagent closes when its parent closes or fails, or sooner with `handle.close()`. `session.get()` returns `parentSessionId`, which is `null` for other sessions.
 
