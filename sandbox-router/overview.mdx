@@ -1,0 +1,90 @@
+---
+title: "Sandbox Router"
+description: "One SDK and one API to create and manage code sandboxes across E2B, Daytona, Modal, Vercel Sandbox, Boat, and Final VMs."
+icon: "route"
+---
+
+Sandbox Router gives you one client for code sandboxes from many providers. You describe the sandbox you need (size, image, capabilities, price ceiling) and the router picks a provider that can run it, falls back to another if the first can't, and returns a handle that works the same way whichever provider it landed on: commands, streaming processes, terminals, files, ports, pause, snapshots, and forks.
+
+```ts
+import { createSandboxRouter } from '@finalai/sandbox-router';
+
+const router = createSandboxRouter({ apiKey: process.env.FINAL_API_KEY! });
+
+const sandbox = await router.sandboxes.create({
+  cpu: 2,
+  memoryMib: 4096,
+  routing: { sort: 'price', maxPricePerHour: '0.25' },
+});
+
+console.log(sandbox.info.provider); // For example, "e2b"
+const { stdout } = await sandbox.run('node --version');
+await sandbox.delete();
+```
+
+## Two ways to run it
+
+The same SDK and the same provider code run in two modes. Pick one when you create the router.
+
+| | Hosted | In-process |
+| --- | --- | --- |
+| Create with | `createSandboxRouter({ apiKey })` | `createSandboxRouter({ providers: [...] })` |
+| Calls | Final's API at `https://api.final.ai/v1` | Each provider's API directly, from your process |
+| Final account | Required | Not needed |
+| Provider accounts | Your own keys stored as project secrets, or Final's accounts billed through Final | Your own keys, passed to each provider |
+| Routing data | Final's catalog, with measured create latency and success rates | Final's public catalog by default, or rate cards you supply |
+| Timeouts | Enforced by the router on every provider | Only on providers with native idle and lifetime timeouts |
+| Usage and billing | Metered per sandbox | Billed by each provider to your accounts |
+
+In-process mode is a good fit when you already have provider accounts and don't want another service in the path. Hosted mode adds the catalog, Final-held accounts, stored keys, idempotent creates, and metering. See [the quickstart](/sandbox-router/quickstart) for both.
+
+## Providers
+
+| Provider | Name in routing | In-process package |
+| --- | --- | --- |
+| E2B | `e2b` | `@finalai/sandbox-router-e2b` |
+| Daytona | `daytona` | `@finalai/sandbox-router-daytona` |
+| Modal | `modal` | `@finalai/sandbox-router-modal` |
+| Vercel Sandbox | `vercel` | `@finalai/sandbox-router-vercel` |
+| Boat | `boat` | `@finalai/sandbox-router-boat` |
+| [Final VMs](/vm-platform/overview) | `final` | `@finalai/sandbox-router-final` |
+
+Providers differ in what they support, and in their prices, isolation, and hardware. Each provider declares its capabilities, and the router only offers a capability once it has passed the [conformance checks](/sandbox-router/write-a-provider#check-your-provider). Call `router.providers.list()` or [search the catalog](/sandbox-router/catalog-and-pricing) for current details rather than relying on any fixed list; routing excludes providers that lack a capability your request needs.
+
+## Leaving the router
+
+You're never locked in. Every sandbox records the provider it runs on and that provider's own ID for it:
+
+```ts
+const { provider, providerSandboxId, region } = await sandbox.native();
+```
+
+With those, you can manage the sandbox with the provider's own SDK or dashboard. Where the provider supports it, `sandbox.connect()` also returns a credential for the provider's API, so you can talk to the sandbox directly. See [leave the router](/sandbox-router/sandboxes#leave-the-router).
+
+## Key concepts
+
+| Term | What it means |
+| --- | --- |
+| **Offer** | One provider in one region, with the size your request would get, its price where known, verified capabilities, isolation and hardware where known, and measured create latency. See [catalog and pricing](/sandbox-router/catalog-and-pricing). |
+| **Routing** | The rules that choose an offer: which providers, sort order, price ceiling, required capabilities, and fallbacks. See [routing](/sandbox-router/routing). |
+| **Image** | A portable description of a sandbox's starting files and tools that each provider builds in its own way. See [images](/sandbox-router/images). |
+| **Capability** | A feature a provider supports beyond commands and files, such as `pause`, `snapshot`, or `networkPolicy`. |
+| **Billing mode** | Who pays the provider: `byok` (your key) or `managed` (Final's account). See [BYOK and managed billing](/sandbox-router/byok-and-billing). |
+| **Placement** | The provider a sandbox landed on. Placement is final: a running sandbox never moves to another provider. |
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/sandbox-router/quickstart">
+    Create a sandbox, run a command, write and read a file, and delete it.
+  </Card>
+  <Card title="Routing" icon="route" href="/sandbox-router/routing">
+    Choose providers by price, latency, capability, and region, with fallbacks.
+  </Card>
+  <Card title="Sandboxes" icon="box" href="/sandbox-router/sandboxes">
+    Stream processes, open terminals, pause, snapshot, and fork.
+  </Card>
+  <Card title="API reference" icon="code" href="/sandbox-router/api">
+    Every HTTP route, the error codes, and the WebSocket process protocol.
+  </Card>
+</Columns>

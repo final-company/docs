@@ -1,0 +1,273 @@
+---
+title: "Sandbox Router API reference"
+sidebarTitle: "API reference"
+description: "Every Sandbox Router HTTP route, authentication, idempotent creates, error codes, and the WebSocket protocol for processes and terminals."
+icon: "code"
+---
+
+The hosted Sandbox Router is a JSON HTTP API. The [SDK](/sandbox-router/quickstart) wraps all of it; use the API directly from other languages. Every request goes to this base URL:
+
+```text
+https://api.final.ai/v1
+```
+
+Authenticate with a [Final API key](/api-keys) in the `Authorization` header:
+
+```bash
+curl -sS https://api.final.ai/v1/sandboxes \
+  -H "Authorization: Bearer $FINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"size": "small", "routing": {"sort": "price", "max_price_per_hour": "0.25"}, "labels": {"purpose": "docs"}}'
+```
+
+In the SDK, `createSandboxRouter({ apiKey, baseUrl })` takes the origin without `/v1` (`https://api.final.ai` by default), and `requestTimeoutMs` (default 120 seconds) applies to each request.
+
+## Conventions
+
+- **JSON is snake_case.** The SDK's `memoryMib` is `memory_mib` on the wire, `maxPricePerHour` is `max_price_per_hour`, and so on. Keys inside `env`, `labels`, `provider_options`, `secret_refs`, and `details` are yours and are passed through unchanged. Enum values are unchanged too, such as `"networkPolicy"` in `require`.
+- **Money** is a decimal string in US dollars, such as `"0.25"`.
+- **IDs** have prefixes: `sbr_` for sandboxes, `snp_` for snapshots, and `simg_` for registered images.
+- **Requests are strict.** The API rejects fields it doesn't know. Responses can gain fields, so ignore ones you don't know.
+
+## Public routes
+
+These answer without an API key, so you can browse prices and providers before you sign up:
+
+| Method | Path | Returns |
+| --- | --- | --- |
+| `GET` | `/sandbox-offers` | Ranked [offers](/sandbox-router/catalog-and-pricing#the-offer-object): `{ "offers": [...] }`. Query: `cpu`, `memory_mib`, `disk_gib`, `size`, `gpu` (`kind:count`), `region`, `require` (comma-separated capabilities), `isolation`, `sort`, `max_price_per_hour`, `byok`. |
+| `GET` | `/sandbox-catalog` | `{ "entries": [...] }`: for each provider, its list prices as a `rate_card`, its `isolation`, and its `hardware`, each `null` where unknown. See [where prices come from](/sandbox-router/catalog-and-pricing#where-prices-come-from). |
+| `GET` | `/sandbox-providers` | `{ "providers": [...] }`: each provider's `name`, `regions`, `capabilities`, `isolation`, `billing_model`, `price_version` (the last three `null` where unknown), `status`, and, with an API key, your stored `credential`. |
+| `GET` | `/sandbox-price-versions` | `{ "versions": [...] }`, the [price versions](/sandbox-router/catalog-and-pricing#price-versions). Query: `provider`, `at`. |
+
+With an API key, offers and providers also reflect your stored provider keys.
+
+## Routes
+
+Every other route needs an API key.
+
+### Catalog, images, and credentials
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `POST` | `/sandbox-offers/match` | [Dry run](/sandbox-router/routing#dry-run-a-request) a create body. Returns `eligible`, `excluded`, and `nearest`. |
+| `POST` | `/sandbox-images` | Register an image. Body: `{ "spec": {...} }`. Returns the image record with its `simg_` ID. |
+| `GET` | `/sandbox-images/{id}` | An image record, with each provider's build `strategy`, `state`, and `error_code`. `router.images.get(id)` in the SDK. |
+| `POST` | `/sandbox-images/{id}/prepare` | Start building or baking the image. Body: `{ "providers": [...] }` (optional). Returns the image record. |
+| `POST` | `/sandbox-artifacts` | Upload the content of an image's `copy` step. Body: `digest` and `files`, each with a relative `path`, `mode`, and base64 `data`. |
+| `PUT` | `/sandbox-providers/{provider}/credential` | [Store a provider key](/sandbox-router/byok-and-billing#store-a-provider-key). Body: `{ "secret": "E2B_API_KEY", "mode": "prioritized" }`. |
+| `DELETE` | `/sandbox-providers/{provider}/credential` | Stop using your key for a provider. |
+| `GET` | `/sandbox-usage` | Usage and charges for the project. Query: `from`, `to`. |
+| `GET` | `/sandbox-spend-limit` | `{ "monthly_cap": "500", "month_to_date": "123.45" }`; `monthly_cap` is `null` without a cap. |
+| `PUT` | `/sandbox-spend-limit` | [Set the monthly cap](/sandbox-router/byok-and-billing#spend-limits). Body: `{ "monthly_cap": "500" }`. |
+| `DELETE` | `/sandbox-spend-limit` | Remove the cap. |
+
+### Sandboxes
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `POST` | `/sandboxes` | Create a sandbox. Body: the [create options](/sandbox-router/sandboxes#create-options) in snake_case, without `idempotency_key` and `signal`. Returns the sandbox. Send an [`Idempotency-Key`](#idempotent-creates) header. |
+| `GET` | `/sandboxes` | `{ "sandboxes": [...] }`. Query: `provider`, `state`, `labels` (`key=value,key=value`). |
+| `GET` | `/sandboxes/{id}` | The sandbox. |
+| `DELETE` | `/sandboxes/{id}` | Delete the sandbox. |
+| `POST` | `/sandboxes/{id}/pause` | Body: `{ "keep": "memory" }` or `"files"`. Returns `{ "kept": ... }`. |
+| `POST` | `/sandboxes/{id}/resume` | Returns `{ "cold_restart": false }`. |
+| `POST` | `/sandboxes/{id}/stop` | Stop, keeping files. |
+| `POST` | `/sandboxes/{id}/start` | Start a stopped sandbox. |
+| `POST` | `/sandboxes/{id}/timeout` | Body: `{ "idle_s": 600, "max_s": 14400 }`. |
+| `POST` | `/sandboxes/{id}/resize` | Body: `{ "cpu": 4, "memory_mib": 8192 }`. Returns the granted `cpu`, `memory_mib`, and `disk_gib`. |
+| `POST` | `/sandboxes/{id}/network` | Body: `{ "egress": "deny-all" }`, `"allow-all"`, or `{ "egress": { "allow_domains": [...], "allow_cidrs": [...] } }`. |
+| `POST` | `/sandboxes/{id}/snapshots` | Body: `{ "name": "..." }` (optional). Returns `{ "snapshot_id": "snp_..." }`. |
+| `POST` | `/sandboxes/{id}/fork` | Body: `{ "count": 3, "labels": {...} }`, `count` from 1 to 50. Returns `{ "sandboxes": [...] }`. |
+| `POST` | `/sandboxes/{id}/commands` | [Run a command](#run-a-command). |
+| `GET` | `/sandboxes/{id}/exec` | WebSocket: [a streaming process](#websocket-processes-and-terminals). |
+| `GET` | `/sandboxes/{id}/pty` | WebSocket: a terminal. |
+| `GET` | `/sandboxes/{id}/ports/{port}` | `{ "url", "auth", "token", "header", "expires_at" }`. See [ports](/sandbox-router/sandboxes#ports). |
+| `POST` | `/sandboxes/{id}/connect` | A [direct credential](/sandbox-router/sandboxes#leave-the-router) for the provider's API. |
+| `GET` | `/sandboxes/{id}/native` | `{ "provider", "provider_sandbox_id", "region" }`. |
+| `GET` | `/sandboxes/{id}/usage` | The sandbox's [usage](/sandbox-router/catalog-and-pricing#usage-costs). |
+
+Lifecycle routes for an operation the sandbox's provider doesn't support return `409` with `unsupported_by_provider`.
+
+### Files
+
+| Method | Path | What it does |
+| --- | --- | --- |
+| `GET` | `/sandboxes/{id}/files?path=` | Read a file. The body is the raw bytes. Add `offset` and `length` for a range. |
+| `PUT` | `/sandboxes/{id}/files?path=` | Write a file from the raw request body (`Content-Type: application/octet-stream`). Add `mode` to set permissions. Creates parent directories. |
+| `GET` | `/sandboxes/{id}/files/list?path=` | `{ "entries": [...] }`. |
+| `GET` | `/sandboxes/{id}/files/stat?path=` | `{ "entry": {...} }`, or `{ "entry": null }` for a missing path. |
+| `POST` | `/sandboxes/{id}/files/mkdir` | Body: `{ "path": "...", "recursive": true }`. |
+| `POST` | `/sandboxes/{id}/files/delete` | Body: `{ "path": "...", "recursive": false }`. |
+
+File entries have `name`, `path`, `kind` (`file`, `directory`, `symlink`, `other`), `size`, `modified_at`, and `mode`.
+
+## The sandbox object
+
+```json
+{
+  "id": "sbr_...",
+  "provider": "<provider>",
+  "provider_sandbox_id": "<the provider's own ID>",
+  "region": "<region>",
+  "state": "running",
+  "native_state": "<the provider's state>",
+  "native_error": null,
+  "granted": { "cpu": 2, "memory_mib": 4096, "disk_gib": null },
+  "price": { "hourly": "<USD per hour>", "price_version": "<provider>@<YYYY-MM-DD>" },
+  "billing": { "mode": "managed", "credential": null },
+  "capabilities": ["labels", "pause", "resume"],
+  "image": null,
+  "labels": { "purpose": "docs" },
+  "applied": ["cpu", "memoryMib"],
+  "attempts": [
+    {
+      "provider": "<provider>",
+      "region": "<region>",
+      "billing": "managed",
+      "outcome": "succeeded",
+      "error_code": null,
+      "message": null
+    }
+  ],
+  "created_at": "2026-11-18T17:04:12.000Z"
+}
+```
+
+Values in angle brackets depend on where the sandbox lands. `price.hourly` and `price.price_version` are `null` when the price is unknown.
+
+The fields are described under [the sandbox info](/sandbox-router/sandboxes#the-sandbox-info). Each attempt's `outcome` is `succeeded`, `failed`, `unknown` (the provider may have created a sandbox the router couldn't confirm or remove), or `orphan_reaped` (a sandbox the attempt left behind was found and deleted).
+
+## Idempotent creates
+
+Send an `Idempotency-Key` header with `POST /sandboxes`, such as a UUID you generate per logical create. If the request times out or the connection drops, send it again with the same key and body: you get the sandbox the first request created instead of a second one. In the SDK, pass `idempotencyKey`.
+
+## Run a command
+
+`POST /sandboxes/{id}/commands` runs a command to completion:
+
+```json
+{ "command": "npm test", "cwd": "/app", "env": { "CI": "1" }, "timeout_ms": 600000 }
+```
+
+`command` is a string run under `sh -c`, or an array of arguments. The response is the result:
+
+```json
+{ "exit_code": 0, "signal": null, "reason": "exited", "stdout": "...", "stderr": "" }
+```
+
+With `"stream": true`, the response is newline-delimited JSON instead: one [frame](#frames) per line, ending with an `exit` or `error` frame.
+
+## WebSocket processes and terminals
+
+`/sandboxes/{id}/exec` and `/sandboxes/{id}/pty` are WebSockets, one per process. Connect to `wss://api.final.ai/v1/sandboxes/{id}/exec` (or `/pty`) with two subprotocols:
+
+- `sandbox-router.v1`
+- `bearer.` followed by your API key
+
+A connection rejected for authentication closes with code `4401`.
+
+### Start a process
+
+After the socket opens, send a `start` message:
+
+```json
+{ "type": "start", "command": "npm run dev", "cwd": "/app", "env": { "PORT": "3000" }, "stdin": true, "timeout_ms": 3600000 }
+```
+
+For `/pty`, send `cols` and `rows`; `command` is optional and defaults to the user's login shell. The server answers with a `started` frame, then the process's output.
+
+### Client messages
+
+| `type` | Fields | What it does |
+| --- | --- | --- |
+| `start` | `command`, `cwd`, `env`, `stdin`, `timeout_ms`, `cols`, `rows` | Starts the process. Send once, first. |
+| `stdin` | `data` (base64) | Writes to stdin, or to the terminal. |
+| `close_stdin` | | Closes stdin. |
+| `kill` | `signal` (optional): `SIGTERM`, `SIGKILL`, `SIGINT`, or `SIGHUP` | Signals the process. |
+| `resize` | `cols`, `rows` | Resizes a terminal. |
+
+### Frames
+
+The server sends one JSON frame per message. Every frame has a `kind` and a `seq` that increases by one per frame, starting at `0`.
+
+| `kind` | Fields | Meaning |
+| --- | --- | --- |
+| `started` | `process_id`, `pid`, `started_at` | The process is running. Keep `process_id` to reattach. |
+| `stdout`, `stderr` | `data` (base64) | Output. |
+| `data` | `data` (base64) | Terminal output (`/pty` only). |
+| `exit` | `code`, `signal`, `reason` | The process ended. `reason` is `exited`, `killed`, `timeout`, `output_cap`, or `provider_lost`. Last frame. |
+| `error` | `code`, `message` | The process couldn't run or the stream failed. `code` is an [error code](#error-codes). Last frame. |
+| `gap` | `from`, `to` | Frames `from` through `to` were lost and can't be replayed; `to` is `null` when the count is unknown. |
+
+Ignore frame kinds you don't recognize.
+
+### Reattach
+
+If the socket drops, the process keeps running. Open a new socket with the process ID and the last `seq` you received, and don't send `start`:
+
+```text
+wss://api.final.ai/v1/sandboxes/{id}/exec?process_id={process_id}&after_seq={seq}
+```
+
+The server sends the frames after `after_seq`. If it can't replay some of them, it sends one `gap` frame for what's missing instead of skipping them silently. `after_seq=-1` replays everything still available.
+
+## Errors
+
+Errors return a JSON body with an `error` object:
+
+```json
+{
+  "error": {
+    "code": "no_matching_offer",
+    "message": "no provider can serve this request",
+    "provider": null,
+    "attempts": [],
+    "details": {
+      "excluded": [
+        {
+          "provider": "<provider>",
+          "region": "<region>",
+          "check": "resources",
+          "failures": [
+            {
+              "check": "resources",
+              "detail": "cpu: at most 16 vCPU",
+              "fix": { "field": "cpu", "to": 16, "description": "ask for at most 16 vCPU" }
+            }
+          ]
+        }
+      ],
+      "nearest": {
+        "field": "cpu",
+        "to": 16,
+        "description": "ask for at most 16 vCPU",
+        "gains": [{ "provider": "<provider>", "region": "<region>" }]
+      }
+    },
+    "native_error": null
+  }
+}
+```
+
+`provider` is the provider whose call failed, `attempts` lists a create's attempts, `details` carries structured detail such as the excluded offers of a create that matched none, and `native_error` is the provider's own error text, verbatim.
+
+### Error codes
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_request` | The request is malformed or uses something this mode doesn't support. |
+| `unauthorized` | The API key, or a provider key, was rejected. HTTP `401` or `403` from the API. |
+| `not_found` | No such sandbox, process, image, or provider. HTTP `404`. |
+| `unsupported_by_provider` | The sandbox's provider doesn't support this operation. HTTP `409`. |
+| `no_matching_offer` | No offer can serve the create request. HTTP `409`. `details` has `excluded` and `nearest`. |
+| `provider_unavailable` | Every provider tried was out of capacity, rate-limited, or failing. |
+| `provider_error` | The provider failed in a way that isn't retryable. |
+| `budget_exceeded` | The create would exceed your project's spend limit. HTTP `402`. |
+| `create_outcome_unknown` | A provider may have created a sandbox the router couldn't confirm or remove, so it stopped instead of trying another. |
+| `timeout` | The operation, or an image's ready check, took too long. |
+| `network_error` | The SDK couldn't reach the API, or a process stream ended before the process did. |
+| `invalid_response` | The API answered with something the SDK couldn't read. |
+
+The last two only come from the SDK, never from the API.

@@ -246,6 +246,36 @@
         ]
       },
       {
+        "tab": "Sandbox Router",
+        "icon": "route",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "sandbox-router/overview",
+              "sandbox-router/quickstart"
+            ]
+          },
+          {
+            "group": "Use the router",
+            "pages": [
+              "sandbox-router/routing",
+              "sandbox-router/catalog-and-pricing",
+              "sandbox-router/images",
+              "sandbox-router/sandboxes",
+              "sandbox-router/byok-and-billing"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "sandbox-router/api",
+              "sandbox-router/write-a-provider"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Final CI Runners",
         "icon": "play",
         "groups": [

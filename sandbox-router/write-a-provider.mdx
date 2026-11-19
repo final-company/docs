@@ -1,0 +1,137 @@
+---
+title: "Write a provider"
+description: "Add a sandbox provider with defineProvider and verify it with the conformance kit."
+icon: "plug"
+---
+
+A provider is a plain object that tells the router what a sandbox service can do and how to call it. The six built-in providers use the same contract, and you can publish your own as an npm package and use it with an in-process router. The hosted router only runs providers Final has verified.
+
+The contract lives in `@finalai/sandbox-router/provider`, and the checks every provider must pass in `@finalai/sandbox-router/conformance`.
+
+## Define the provider
+
+Export a factory that takes credentials and returns `defineProvider({...})`. Never read environment variables inside it; callers pass keys in.
+
+```ts acme.ts
+import * as z from 'zod';
+import {
+  Capability,
+  defineProvider,
+  fitWithinLimits,
+  ImageStrategy,
+  SPECIFICATION_VERSION,
+  type ProviderLimitsIface,
+} from '@finalai/sandbox-router/provider';
+
+const limits: ProviderLimitsIface = {
+  maxCpu: 8,
+  maxMemoryMib: 16384,
+  cpuStep: 1,
+  maxOutputBytes: 16 * 1024 * 1024,
+};
+
+export const acme = (credentials: { apiKey: string }) =>
+  defineProvider({
+    specificationVersion: SPECIFICATION_VERSION,
+    name: 'acme',
+    regions: ['us-east'],
+    capabilities: [Capability.Labels, Capability.Pause, Capability.Resume, Capability.Pty],
+    limits,
+    providerOptions: z.object({ machineClass: z.string().optional() }).strict(),
+    fit: (spec) => fitWithinLimits({ limits, spec }),
+    image: {
+      strategy: (spec) => (spec.base.kind === 'oci' ? null : ImageStrategy.Runtime),
+    },
+    // create, get, list, delete, exec, files, ports, and the optional operations below
+  });
+```
+
+`defineProvider` checks the static parts and returns the object unchanged. It throws if `specificationVersion` isn't one this router supports, the name isn't lowercase letters, digits, and dashes starting with a letter (up to 32 characters), or there are no regions.
+
+## The contract
+
+### Description
+
+| Field | What it is |
+| --- | --- |
+| `specificationVersion` | `SPECIFICATION_VERSION`. Providers and the router evolve independently; this says which contract you implement. |
+| `name` | The name callers route by. |
+| `regions` | The regions you create in. The router builds one offer per region and passes the chosen one to `create` as `context.region`. |
+| `capabilities` | What you support beyond commands and files. Declared here, but a catalog only offers what [conformance](#check-your-provider) verified. |
+| `limits` | Size limits and steps, or the named `sizes` you offer, plus `maxOutputBytes`, `maxLifetimeS`, and `maxIdleS` where they apply. |
+| `providerOptions` | A Zod schema for your entry of `providerOptions`, or `null`. |
+| `fit(spec, context?)` | Pure: the size a spec gets here (`granted`, and the named `size` if any), with `applied`, `ignored`, and `rejected` fields. `context` carries the `region` and your validated `providerOptions`. `fitWithinLimits({ limits, spec })` does this from your limits. |
+| `prices(spec, context)` | Optional. For services whose API reports prices: the `hourlyRunning`, `hourlyPaused`, `perCreate`, `priceVersion`, and `billingModel` for this spec, with `hardware` and a `sourceUrl` if known. A price from here takes precedence over the catalog. |
+
+A provider carries no prices, isolation, or hardware. Those come from Final's catalog, or from `prices` when your service's API reports them. See [where prices come from](/sandbox-router/catalog-and-pricing#where-prices-come-from).
+
+### Operations
+
+Every operation returns a `ResultIface<T>`: `{ ok: true, value }` or `{ ok: false, error }`. Never throw. The error has a router error `code`, a `message`, `retryable` (whether another provider or a retry may succeed: capacity, rate limits, server errors, timeouts), the HTTP `status`, and `nativeError`, the provider's own error text. Helpers: `ok(value)`, `fail(code, message, options)`, `failFromStatus(provider, status, body)` for HTTP APIs, `attempt(provider, run)` to wrap an SDK call that may throw, and `unsupported(provider, operation)`.
+
+| Operation | Required | Contract |
+| --- | --- | --- |
+| `create(spec, context)` | Yes | Resolves once the sandbox can run a command. Put `context.labels` on the sandbox, create in `context.region` when it's set, and use `context.name` where the provider names sandboxes: it's the same across retries of one attempt. Create from `context.artifact` (your built image) or `context.snapshotId` when set. |
+| `get(id)` | Yes | The sandbox, or `null` if the provider no longer has it. |
+| `list({ labels })` | Yes | Sandboxes carrying every given label. The router uses it to find and delete sandboxes from creates whose outcome it couldn't confirm. |
+| `delete(id)` | Yes | Deleting a missing sandbox succeeds. |
+| `exec(id, command, options)` | Yes | Starts a process and returns its frames. See [processes](#processes). |
+| `files` | Yes | `read` (with an optional byte range), `write` (creating parent directories), `list`, `mkdir`, `remove` (a missing path succeeds), and `stat` (`null` for a missing path). |
+| `ports.url(id, port)` | Yes | `{ url, auth, token, expiresAt }`, plus `header` when `auth` is `PortAuth.Header`. |
+| `image.strategy(spec)` | Yes | `ImageStrategy.Build`, `Bake`, or `Runtime`, or `null` when you can't run the spec's base. |
+| `image.build(spec, context)` | For `build` | Builds the spec with your service's builder and returns the artifact (`template`, `snapshot`, or `image`), with `startsOnBoot` if it runs the start command itself. `context.artifact(digest)` returns the files of a `copy` step. |
+| `image.remove(artifact)` | No | Deletes a built artifact. |
+| `image.bakeKeepsSize` | No | Set to `true` if sandboxes created from your snapshots keep the size the snapshot was taken at. The router then bakes one artifact per requested size. |
+| `attach(id, processId, { afterSeq })` | No | Reattaches to a process and replays frames after `afterSeq`. |
+| `pty(id, options)` | No | A terminal process with `resize`. |
+| `pause`, `resume`, `stop`, `start`, `setTimeout`, `resize`, `setNetwork` | No | Lifecycle operations. `pause` returns what it actually `kept`; `resume` returns whether it was a `coldRestart`. |
+| `snapshot`, `deleteSnapshot`, `fork` | No | Snapshots and forks. Put `labels` on forked sandboxes too. |
+| `connect(id)` | No | A credential for your service's own API. |
+| `usage(id)` | No | What your service reports for a sandbox: busy CPU time, memory, and egress. Evidence for metering, not the meter. |
+
+Leave out an optional operation you don't support; the router answers `unsupported_by_provider` for it. Declare the matching capability only for operations you implement.
+
+### Processes
+
+A process is one ordered stream of frames: `started`, then any number of `stdout` and `stderr` (or `data` for a terminal), then exactly one `exit` or `error`. Each frame has a `seq` one higher than the last.
+
+- Report the exit code your service gives you. Never infer a timeout from a signal; use `reason: ExitReason.Timeout` only when the process ran past `timeoutMs`.
+- When output passes `limits.maxOutputBytes`, end with `ExitReason.OutputCap` rather than truncating.
+- `kill` is idempotent, and `detach` stops delivering frames without ending the process.
+- On `attach`, replay the frames after `afterSeq`, or send one `gap` frame for what you can't replay. Never drop frames silently.
+
+For services with callback-style SDKs, `createFrameQueue({ maxOutputBytes })` numbers frames for you and enforces the output cap: call `started`, `stdout`, `stderr`, `data`, `exit`, `error`, or `gap` as events arrive, and return its `frames`.
+
+## Check your provider
+
+`runProviderConformance` runs the contract against your real service. It creates sandboxes, exercises files, every frame kind, stdin, kill, timeouts, the output cap, reattach, ports, and each capability you declare, then deletes everything it created:
+
+```ts conformance.ts
+import { Capability } from '@finalai/sandbox-router';
+import { ConformanceStatus, runProviderConformance } from '@finalai/sandbox-router/conformance';
+import { acme } from './acme.js';
+
+const report = await runProviderConformance({
+  provider: acme({ apiKey: process.env.ACME_API_KEY! }),
+  include: [Capability.Image, Capability.NetworkPolicy],
+  onCase: (result) => {
+    if (result.status === ConformanceStatus.Failed) console.error(result.name, result.message);
+  },
+});
+
+console.log('passed:', report.passed, 'verified:', report.verified);
+if (!report.passed) process.exit(1);
+```
+
+| Option | What it does |
+| --- | --- |
+| `provider` | The provider to check. |
+| `spec` | Overrides for the spec test sandboxes are created with. |
+| `providerOptions` | Your provider's options for those creates. |
+| `include` | Also run the cases for declared `image` (a container image base) and `networkPolicy` capabilities, which create extra sandboxes. These are the only two it accepts. |
+| `timeoutMs` | Time limit per case. Default 180 seconds. |
+| `onCase` | Called with each case's result as it finishes. |
+
+The kit doesn't verify GPUs, so a declared `gpu` capability never appears in `verified`.
+
+The report has `passed` (every required case passed), `verified` (declared capabilities whose cases passed), and each case's `name`, `capability`, `status` (`passed`, `failed`, or `skipped`), `message`, and `durationMs`. Capabilities count only once verified: run conformance in your CI against a real account, and fix failures in the provider rather than removing the capability.

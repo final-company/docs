@@ -1,0 +1,119 @@
+---
+title: "BYOK and managed billing"
+description: "Run sandboxes on your own provider accounts with keys stored as project secrets, on Final's provider accounts, or both."
+icon: "key"
+---
+
+With the hosted router, every sandbox runs in one of two billing modes:
+
+| Mode | Whose provider account | Who bills you |
+| --- | --- | --- |
+| `managed` | Final's | Final, at the provider's list-equivalent price plus a platform share. |
+| `byok` | Yours, using a key you store as a project secret | The provider bills your account directly. Final charges a small fee on the list-equivalent price. |
+
+Both prices appear on every offer in the [catalog](/sandbox-router/catalog-and-pricing) as `price.managed` and `price.byok`, so you can compare them before you create anything. `sandbox.info.billing.mode` tells you which mode a sandbox uses, and `billing.credential` names the secret for `byok`.
+
+An in-process router always uses your own keys, which you pass to each provider directly. Everything on this page applies to the hosted router.
+
+## Store a provider key
+
+<Steps>
+  <Step title="Create a project secret">
+    In the [Final dashboard](https://console.final.ai), go to **Developer** > **Secrets** and create a secret with your provider key, such as `E2B_API_KEY`. See [secrets](/operate/authentication#use-secrets-in-your-code).
+  </Step>
+  <Step title="Point the router at it">
+    Tell the router which secret holds the key for which provider:
+
+    ```ts
+    await router.providers.setCredential({
+      provider: 'e2b',
+      secret: 'E2B_API_KEY',
+      mode: 'prioritized',
+    });
+    ```
+
+    The router stores only the secret's name. Your key stays in your project's secrets, and it's read when a sandbox is created on that provider.
+  </Step>
+  <Step title="Check it">
+    ```ts
+    const providers = await router.providers.list();
+    console.log(providers.find((p) => p.name === 'e2b')?.credential);
+    // { secret: 'E2B_API_KEY', mode: 'prioritized' }
+    ```
+  </Step>
+</Steps>
+
+`mode` sets the default order for that provider:
+
+- `'prioritized'` (the default): use your key first, and Final's account if a create with your key fails with a [retryable error](/sandbox-router/routing#fallbacks).
+- `'fallback'`: use Final's account first, and your key only after it fails.
+
+To stop using your key, remove it. The secret itself stays in your project:
+
+```ts
+await router.providers.removeCredential({ provider: 'e2b' });
+```
+
+## Choose a billing mode per request
+
+`routing.byok` overrides the stored mode for one create:
+
+| `byok` | Tries |
+| --- | --- |
+| `'first'` | Your key, then Final's account. |
+| `'fallback'` | Final's account, then your key. |
+| `'only'` | Only your key. Providers where you haven't stored one are excluded. |
+| `'off'` | Only Final's account. |
+
+Without `byok`, each provider follows its stored `mode`, and providers without a stored key use Final's account.
+
+```ts
+const sandbox = await router.sandboxes.create({
+  routing: { sort: 'price', byok: 'only' },
+});
+```
+
+Each offer lists the billing modes it can be created with in `modes`. Routing ranks each offer by the price of the mode it would try first, and skips any mode priced above `maxPricePerHour`. An offer is excluded with the `credential` check when none of its modes is one you allow.
+
+## Pass secrets to a sandbox
+
+`secretRefs` sets environment variables in the sandbox from your project's secrets, so the values never pass through your code. Each key is an environment variable name, and each value the name of a secret:
+
+```ts
+const sandbox = await router.sandboxes.create({
+  secretRefs: { NPM_TOKEN: 'ACME_NPM_TOKEN', GITHUB_TOKEN: 'CI_GITHUB_TOKEN' },
+});
+```
+
+Use `env` for values that aren't secret. `secretRefs` needs the hosted router; an in-process router rejects it with `invalid_request`.
+
+## Spend limits
+
+Cap what your project spends on sandboxes each month, in US dollars:
+
+```ts
+await router.spendLimit.set({ monthlyCap: '500' });
+
+const { monthlyCap, monthToDate } = await router.spendLimit.get();
+console.log(`${monthToDate} of ${monthlyCap ?? 'no cap'} spent this month`);
+
+await router.spendLimit.remove();
+```
+
+`monthlyCap` is `null` when no cap is set. When a create would take your project past the cap, it fails with `budget_exceeded` (HTTP `402`) and nothing is created:
+
+```ts
+import { isSandboxRouterError, SandboxRouterErrorCode } from '@finalai/sandbox-router';
+
+try {
+  await router.sandboxes.create();
+} catch (error) {
+  if (isSandboxRouterError(error) && error.code === SandboxRouterErrorCode.BudgetExceeded) {
+    console.error('Sandbox spend limit reached');
+  }
+}
+```
+
+## Track spending
+
+`sandbox.usage()` and `router.usage.get({ from, to })` return usage windows and charges. Each charge records its `billing` mode, the provider's `listAmount`, your `customerAmount`, and the `priceVersion` it used. See [usage costs](/sandbox-router/catalog-and-pricing#usage-costs).
