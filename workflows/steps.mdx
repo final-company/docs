@@ -45,7 +45,7 @@ const triage = await step.ai('classify', {
 });
 ```
 
-`step.ai(id, { model, prompt, system?, output, timeout? })` makes one call to `model` whose answer must match `output`, a Zod schema, and resolves to the parsed answer. It's billed to your project's inference sources. An answer that doesn't match fails the step with `invalid_output`. The timeout is one hour by default.
+`step.ai(id, { model, prompt, system?, output, timeout? })` makes one call to `model` whose answer must match `output`, a Zod schema, and resolves to the parsed answer. It runs on Final's serverless harness, billed to your project's Final credits. An answer that doesn't match fails the step with `invalid_output`. The timeout is one hour by default.
 
 ## Run an agent
 
@@ -59,7 +59,7 @@ const review = await step.agent('review-pr', {
 });
 ```
 
-`step.agent(id, { agent, model, prompt, provide?, output?, timeout? })` runs a published agent, by name, once on `model` with `prompt`.
+`step.agent(id, { agent, model, prompt, provide?, output?, timeout? })` runs a published agent, by name, once on `model` with `prompt`. It runs on Final's serverless harness, billed to your project's Final credits, whatever harness the agent recommends.
 
 `model` is required on both steps; there is no default model.
 

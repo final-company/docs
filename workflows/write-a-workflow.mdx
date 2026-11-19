@@ -37,7 +37,7 @@ export default defineWorkflow({
 | `require` | `integrations`: what the workflow needs, by key. See [integrations](#integrations). |
 | `triggers` | What starts runs automatically. See [Triggers](/workflows/triggers). You can always start a run by hand. |
 | `retries` | Default attempts for each step, including the first. |
-| `concurrency` | Limits on concurrent runs: `{ scope: 'workflow' \| 'tenant', limit }`. |
+| `concurrency` | How many of the workflow's steps may run at once, across all its runs. |
 | `run` | `({ input, step, integrations, run }) => result`. The result is stored as JSON. |
 
 ## Integrations

@@ -33,10 +33,8 @@ A run is `queued`, `running`, `waiting` (on a sleep, an event or a person), `com
 
 ## Concurrency
 
-Limit how many runs execute at once with `concurrency` in the definition:
+Limit how many of the workflow's steps run at once, across all its runs, with `concurrency` in the definition:
 
 ```ts
-concurrency: [{ scope: 'workflow', limit: 1 }],
+concurrency: 1,
 ```
-
-`'workflow'` limits this workflow's runs; `'tenant'` limits runs across your project.
