@@ -21,7 +21,7 @@ Your apps still send to `https://api.final.ai/v1/o11y/otlp` with the same keys. 
 
 **In Final's control plane:** configuration (judges, rubrics, run settings, actions, datasets' schemas, suites, dashboards, saved queries), versions, job state, IDs, metrics such as counts, rates, costs and latencies, and references to content in the data plane. Issue text that the detection agent or a person writes, such as the observed facts and suspected cause, and judge rubrics live in the control plane.
 
-The control plane reads content only through your data plane's evidence API, when work needs it: a judge evaluating a trace, the observability agent reading a span, or the console showing one. The data plane accepts these calls only from Final's control plane. Judges and agents that use models send the evidence they read to the named model, as in managed mode.
+The control plane reads content only through your data plane's evidence API, when work needs it: a judge evaluating a trace, the observability agent reading a span, or the console showing one. The data plane accepts these calls only from Final's control plane; see [signed calls](#signed-calls). Judges and agents that use models send the evidence they read to the named model, as in managed mode.
 
 ## How it connects
 
@@ -30,12 +30,18 @@ The control plane reads content only through your data plane's evidence API, whe
     [Deploy the data plane](/o11y/byoc/aws) in your AWS account. It runs as containers behind your load balancer and TLS certificate.
   </Step>
   <Step title="Register">
-    An organization admin registers the data plane's endpoint, region and public key with `register_data_plane`. From then on, the project's telemetry goes to it.
+    An organization admin registers the data plane's endpoint, region and public key with `register_data_plane`. From then on, telemetry goes to it. An organization has one data plane: registering another, in a new region say, revokes the previous registration.
   </Step>
   <Step title="Operate">
     `get_data_plane` shows its status (`pending`, `active`, `unreachable` or `revoked`) and when Final last reached it. See the [runbooks](/o11y/byoc/runbooks).
   </Step>
 </Steps>
+
+## Signed calls
+
+Every call between Final's control plane and your data plane is signed, in both directions: Final's evidence reads, queries and deletions, and the data plane's reports back to Final. The sender signs each request as a compact JWS with EdDSA (Ed25519). The signature covers the method, the path, a SHA-256 digest of the exact body, the time and a one-time nonce. The receiver verifies it with the sender's pinned public key, and refuses a request that is signed for another method, path or body, signed more than five minutes from its own clock, or replayed.
+
+Each side pins the other's public key when you set the data plane up. Final pins the data plane's key when you register it with `register_data_plane`, and your deployment pins Final's control plane keys, which you confirm with Final out of band. A request signed with any other key is refused. TLS on your load balancer protects the connection; the signatures authenticate each request.
 
 ## What stays the same
 

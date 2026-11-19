@@ -3,39 +3,51 @@ title: "Integrations"
 description: "Record OpenAI, Anthropic, the Vercel AI SDK, agent frameworks, LangChain and MCP servers with one call each."
 ---
 
-`@finalai/o11y/integrations` records model clients, agent frameworks and MCP servers. Call `init` (or `initWorkers`) first; integrations use its tracer.
+Each integration is its own package. It depends on `@finalai/o11y` and is typed against the library it records, which you install yourself. Call `init` (or `initWorkers`) first; integrations record with the tracer provider it sets up.
 
 Every model call is recorded once. A wrapper inside a call that is already recorded (an AI SDK model call, an OpenInference LLM span, or another wrapper) records nothing, so stacking integrations doesn't double-count usage or cost.
 
-| Library | Integration |
-| --- | --- |
-| `openai` | `wrapOpenAI(client)` |
-| `@anthropic-ai/sdk` | `wrapAnthropic(client)` |
-| Vercel AI SDK 6 and 7 (`ai`) | `aiSdkTelemetry()` |
-| OpenAI Agents SDK (`@openai/agents`) | `openAIAgentsTracingProcessor()` |
-| Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) | `traceClaudeAgentQuery(query)` |
-| LangChain.js and LangGraph.js | `instrumentLangChain(module)`, through OpenInference |
-| MCP servers (`@modelcontextprotocol/sdk` 1.x, `@modelcontextprotocol/server` 2.x) | `instrumentMcpServer(server)` |
+| Library | Package | Integration |
+| --- | --- | --- |
+| `openai` 7 | `@finalai/o11y-openai` | `wrapOpenAI(client)` |
+| `@anthropic-ai/sdk` 1 | `@finalai/o11y-anthropic` | `wrapAnthropic(client)` |
+| Vercel AI SDK 7 (`ai`) | `@finalai/o11y-ai-sdk` | `finalTelemetryIntegration()` or `aiSdkTelemetry()` |
+| OpenAI Agents SDK 0.22 (`@openai/agents`) | `@finalai/o11y-openai-agents` | `openAIAgentsTracingProcessor()` |
+| Claude Agent SDK 0.3 (`@anthropic-ai/claude-agent-sdk`) | `@finalai/o11y-claude-agent-sdk` | `traceClaudeAgentQuery(query)` |
+| LangChain.js and LangGraph.js (`@langchain/core` 1) | `@finalai/o11y-langchain` | `instrumentLangChain(module)`, through OpenInference |
+| MCP servers (`@modelcontextprotocol/server` 2, `@modelcontextprotocol/sdk` 1.29+) | `@finalai/o11y-mcp` | `instrumentMcpServer(server)` |
 
 ## OpenAI
 
+```sh
+npm install @finalai/o11y @finalai/o11y-openai openai
+```
+
 ```ts
-import { wrapOpenAI } from '@finalai/o11y/integrations';
+import { init } from '@finalai/o11y/node';
+import { wrapOpenAI } from '@finalai/o11y-openai';
 import OpenAI from 'openai';
 
+init({ environment: 'production', apiKey: process.env.FINAL_API_KEY });
 const openai = wrapOpenAI(new OpenAI());
 ```
 
-`chat.completions.create`, `chat.completions.parse` and `responses.create` and `responses.parse` each become an `llm` span with the model, request parameters, the messages the model saw, tools offered, tool calls, output, usage (including cached and reasoning tokens) and the finish reason. Streams are recorded as they're consumed, and the span ends with the stream. The wrapper returns a proxy; the original client is unchanged.
+`chat.completions.create`, `chat.completions.parse`, `responses.create` and `responses.parse` each become an `llm` span with the model, the messages the model saw, tools offered, tool calls, output and usage (including cached and reasoning tokens). Streams are recorded as they're consumed, and the span ends with the stream, including when you stop reading early. Pass `stream_options: { include_usage: true }` to record usage for streamed chat completions. The wrapper returns a proxy; the original client is unchanged, and wrapping a client twice still records each call once.
 
-Pass `{ recordInput: false }` or `{ recordOutput: false }` to leave prompts or completions out.
+Pass `{ recordInput: false }` or `{ recordOutput: false }` to leave prompts or completions out. `chatCompletionResult` and `responsesResult` return what is recorded for a response.
 
 ## Anthropic
 
+```sh
+npm install @finalai/o11y @finalai/o11y-anthropic @anthropic-ai/sdk
+```
+
 ```ts
 import Anthropic from '@anthropic-ai/sdk';
-import { wrapAnthropic } from '@finalai/o11y/integrations';
+import { init } from '@finalai/o11y/node';
+import { wrapAnthropic } from '@finalai/o11y-anthropic';
 
+init({ environment: 'production', apiKey: process.env.FINAL_API_KEY });
 const anthropic = wrapAnthropic(new Anthropic());
 
 const message = await anthropic.messages.create({
@@ -45,40 +57,62 @@ const message = await anthropic.messages.create({
 });
 ```
 
-`messages.create` and `messages.stream` become `llm` spans with usage including cache reads and writes, tools offered, tool calls and output. It takes the same options as `wrapOpenAI`.
+`messages.create` and `messages.stream`, and their `beta` versions, become `llm` spans with the model, usage including cache reads and writes, tools offered, tool calls and output. Input tokens include cache reads and writes. It takes the same `recordInput` and `recordOutput` options as `wrapOpenAI`. `anthropicMessageResult` returns what is recorded for a message.
 
 ## Vercel AI SDK
 
-Pass `aiSdkTelemetry()` as the call's telemetry settings:
-
-```ts
-import { aiSdkTelemetry } from '@finalai/o11y/integrations';
-import { generateText } from 'ai';
-
-await generateText({ model, prompt, telemetry: aiSdkTelemetry() }); // AI SDK 7
-await generateText({ model, prompt, experimental_telemetry: aiSdkTelemetry() }); // AI SDK 6
+```sh
+npm install @finalai/o11y @finalai/o11y-ai-sdk ai
 ```
 
-Each generation is a span, each model call an `llm` span with usage, and each tool execution a `tool` span. Options: `functionId`, `recordInputs` and `recordOutputs` (both default `true`). In AI SDK 7, `finalTelemetryIntegration()` is the integration on its own, for your `telemetry.integrations`.
+Register the integration for every call, or pass telemetry settings to one call:
+
+```ts
+import { init } from '@finalai/o11y/node';
+import { aiSdkTelemetry, finalTelemetryIntegration } from '@finalai/o11y-ai-sdk';
+import { generateText, registerTelemetry } from 'ai';
+
+init({ environment: 'production', apiKey: process.env.FINAL_API_KEY });
+
+// Every call:
+registerTelemetry(finalTelemetryIntegration());
+// Or one call:
+await generateText({ model, prompt, telemetry: aiSdkTelemetry({ functionId: 'answer' }) });
+```
+
+Each generation is an `agent` span, each model call an `llm` span with usage, and each tool execution a `tool` span. Options: `functionId` (recorded as `ai.telemetry.functionId`), `recordInputs` and `recordOutputs` (both default `true`); per-call `recordInputs: false` and `recordOutputs: false` apply as well. A wrapped OpenAI or Anthropic client called inside a model call runs in that call's context, so the call is recorded once.
 
 ## OpenAI Agents SDK
 
-```ts
-import { addTraceProcessor } from '@openai/agents';
-import { openAIAgentsTracingProcessor } from '@finalai/o11y/integrations';
+```sh
+npm install @finalai/o11y @finalai/o11y-openai-agents @openai/agents
+```
 
+```ts
+import { init } from '@finalai/o11y/node';
+import { openAIAgentsTracingProcessor } from '@finalai/o11y-openai-agents';
+import { addTraceProcessor } from '@openai/agents';
+
+init({ environment: 'production', apiKey: process.env.FINAL_API_KEY });
 addTraceProcessor(openAIAgentsTracingProcessor());
 ```
 
-Agent runs, generations, function and MCP tool calls and handoffs become spans. An Agents SDK group ID becomes the session. Don't also wrap the OpenAI client the Agents SDK uses: each model call would be recorded twice.
+Each Agents SDK trace becomes an `agent` span, with its group ID as the session. Agent spans become `agent` spans, function and MCP tool calls `tool` spans, and response and generation spans `llm` spans with model, usage, tool calls and output. Handoffs, guardrails and custom spans keep their data in `openai_agents.span_data`. Use `setTraceProcessors([openAIAgentsTracingProcessor()])` instead to stop sending traces to OpenAI as well. Don't also wrap the OpenAI client the Agents SDK uses: this processor already records its model calls.
 
 ## Claude Agent SDK
+
+```sh
+npm install @finalai/o11y @finalai/o11y-claude-agent-sdk @anthropic-ai/claude-agent-sdk
+```
 
 Wrap the `query()` you iterate:
 
 ```ts
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { traceClaudeAgentQuery } from '@finalai/o11y/integrations';
+import { init } from '@finalai/o11y/node';
+import { traceClaudeAgentQuery } from '@finalai/o11y-claude-agent-sdk';
+
+init({ environment: 'production', apiKey: process.env.FINAL_API_KEY });
 
 const prompt = 'Find the flaky test in this repository.';
 for await (const message of traceClaudeAgentQuery(query({ prompt }), { prompt })) {
@@ -86,28 +120,42 @@ for await (const message of traceClaudeAgentQuery(query({ prompt }), { prompt })
 }
 ```
 
-The run is an `agent` span, each model turn an `llm` span with usage, and each tool use a `tool` span. A subagent's turns nest under the Task tool that started it. Options: `name`, `prompt` (recorded as the run's input) and `recordOutput`.
+Messages pass through unchanged. The run is an `agent` span with the session ID, model, cost and turn count; each model turn is an `llm` span with usage, tool calls and output, and each tool use a `tool` span. A subagent's turns nest under the Task tool that started it. Options: `name` (default `claude agent`), `prompt` (recorded as the run's input) and `recordOutput` (default `true`).
 
 ## LangChain.js and LangGraph.js
 
-LangChain is traced through OpenInference. Install `@arizeai/openinference-instrumentation-langchain`, then pass the callback manager module:
-
-```ts
-import { instrumentLangChain } from '@finalai/o11y/integrations';
-
-await instrumentLangChain(await import('@langchain/core/callbacks/manager'));
+```sh
+npm install @finalai/o11y @finalai/o11y-langchain @langchain/core
 ```
 
-Chains, LLM calls, tools and retrievers become spans that Final reads as OpenInference.
+LangChain is traced through OpenInference's LangChain instrumentation, which the package includes. Pass the callback manager module, imported as a namespace, after `init`:
+
+```ts
+import { init } from '@finalai/o11y/node';
+import { instrumentLangChain } from '@finalai/o11y-langchain';
+import * as CallbackManagerModule from '@langchain/core/callbacks/manager';
+
+init({ environment: 'production', apiKey: process.env.FINAL_API_KEY });
+instrumentLangChain(CallbackManagerModule);
+```
+
+Chains, agents, retrievers and tools become OpenInference spans, and chat models `LLM` spans with model, usage and tool calls. It returns the `LangChainInstrumentation`; pass your own as `instrumentation` to use your own OpenInference trace configuration.
 
 ## MCP servers
 
-Instrument your server before registering tools; each tool call becomes a `tool` span:
+```sh
+npm install @finalai/o11y @finalai/o11y-mcp @modelcontextprotocol/server
+```
+
+Instrument your server before registering tools; each tool call becomes a `tool` span that continues the caller's trace context from the request `_meta`:
 
 ```ts
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { instrumentMcpServer } from '@finalai/o11y/integrations';
+import { init } from '@finalai/o11y/node';
+import { instrumentMcpServer } from '@finalai/o11y-mcp';
+import { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod';
+
+init({ environment: 'production', apiKey: process.env.FINAL_API_KEY });
 
 const server = instrumentMcpServer(new McpServer({ name: 'docs', version: '1.0.0' }), {
   serverName: 'docs',
@@ -120,7 +168,7 @@ server.registerTool(
 );
 ```
 
-It works with `registerTool` on `@modelcontextprotocol/sdk` 1.x and `@modelcontextprotocol/server` 2.x, with Zod 4 schemas.
+It works with `registerTool` on an `McpServer` from `@modelcontextprotocol/server` 2.x or `@modelcontextprotocol/sdk` 1.x, with Zod 4 schemas. Both are optional peer dependencies: install the one your server uses.
 
 ### What the calling agent reports
 

@@ -18,7 +18,7 @@ Categorical and binary judges list their `choices` (2 to 50 labels, each with an
 
 ### Agentic
 
-An agentic judge runs as a short-lived Final agent with read-only access to a frozen snapshot of the evidence. It must cite what it relied on: each citation names a trace and span and quotes the excerpt, and Final checks citations against the snapshot. Every agentic judge names its model; there is no default.
+An agentic judge runs as a short-lived Final agent with read-only access to a frozen snapshot of the evidence. It must cite what it relied on: each citation names a trace and span, quotes the excerpt and links to it as `final://o11y/<project>/trace/<trace>#span=<span>`, and Final checks citations against the snapshot. Every agentic judge names its model; there is no default.
 
 ```ts
 import { createO11yClient } from '@finalai/o11y/client';

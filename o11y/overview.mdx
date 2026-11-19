@@ -10,7 +10,7 @@ Final Observability records what your AI agents and workflows do, scores it, and
 
 ```ts
 import { SpanKind, init, observe, setSession } from '@finalai/o11y/node';
-import { wrapOpenAI } from '@finalai/o11y/integrations';
+import { wrapOpenAI } from '@finalai/o11y-openai';
 import OpenAI from 'openai';
 
 init({ environment: 'production' }); // reads FINAL_API_KEY

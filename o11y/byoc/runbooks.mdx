@@ -17,6 +17,8 @@ The data plane acknowledges a request only after the raw batch is written to S3 
 
 **The data plane is down or unreachable.** `get_data_plane` shows `unreachable`. Exporters get errors and retry with their own backoff, so keep their queues large enough to ride out an outage. Restore the data plane (check its containers' health, the load balancer's targets and PostgreSQL), then confirm `get_data_plane` returns `active`.
 
+**`get_data_plane` shows `unreachable` but the data plane is up.** Calls in either direction are [signed](/o11y/byoc/overview#signed-calls) and refused when a signature doesn't verify. Check that the data plane's clock is within five minutes of real time, that the public key registered with Final matches the data plane's signing key, and that your deployment pins Final's current control plane keys.
+
 **Ingest is accepted but traces don't appear.** Processing is behind or stopped. Check the data plane's logs and its ClickHouse connection. When it recovers, processing resumes from its checkpoint and catches up; nothing needs to be resent.
 
 **ClickHouse lost data.** Raw batches in S3 are the source of truth within raw retention. Restore ClickHouse, then [reproject](#reprojection) the affected range.
@@ -46,6 +48,7 @@ Retention deletes expired data the same way, per project and per kind of data.
 ## Rotate credentials
 
 - **Data plane key:** register again with the new public key; see [rotate the key](/o11y/byoc/aws#rotate-the-key).
+- **Final's control plane keys:** pin the new key alongside the old one, then remove the old one; see [rotate the key](/o11y/byoc/aws#rotate-the-key).
 - **Ingest keys:** `rotate_ingest_key`. Ingest keys are managed by Final, so rotating one needs no change in your account.
 
 ## Revoke
