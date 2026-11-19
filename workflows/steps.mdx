@@ -39,25 +39,29 @@ In a test run, the integration validates the call without carrying it out.
 
 ```ts
 const triage = await step.ai('classify', {
+  model: 'deepseek-v4.1-flash',
   prompt: `Classify this support email:\n${JSON.stringify(email)}`,
   output: z.object({ severity: z.enum(['low', 'high']), summary: z.string() }),
 });
 ```
 
-`step.ai(id, { prompt, system?, model?, output, timeout? })` makes one model call whose answer must match `output`, a Zod schema, and resolves to the parsed answer. It's billed to your project's inference sources. An answer that doesn't match fails the step with `invalid_output`. The timeout is one hour by default.
+`step.ai(id, { model, prompt, system?, output, timeout? })` makes one call to `model` whose answer must match `output`, a Zod schema, and resolves to the parsed answer. It runs on Final's serverless harness, billed to your project's Final credits. An answer that doesn't match fails the step with `invalid_output`. The timeout is one hour by default.
 
 ## Run an agent
 
 ```ts
 const review = await step.agent('review-pr', {
   agent: 'acme/pr-reviewer',
+  model: 'deepseek-v4.1-flash',
   prompt: `Review pull request ${input.prNumber}.`,
   provide: { integrations: { github: integrations.github } },
   output: z.object({ approve: z.boolean(), comments: z.array(z.string()) }),
 });
 ```
 
-`step.agent(id, { agent, prompt, provide?, model?, output?, timeout? })` runs a published agent, by name, once with `prompt`.
+`step.agent(id, { agent, model, prompt, provide?, output?, timeout? })` runs a published agent, by name, once on `model` with `prompt`. It runs on Final's serverless harness, billed to your project's Final credits, whatever harness the agent recommends.
+
+`model` is required on both steps; there is no default model.
 
 - `provide` fills the agent's [integration requirements](/build/requirements) from the workflow's own integrations.
 - With `output`, it resolves to the agent's result parsed with that schema; without it, to `{ text }`.

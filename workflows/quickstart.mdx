@@ -53,6 +53,7 @@ export default defineWorkflow({
       createdAfter: since,
     });
     const digest = await step.ai('summarize', {
+      model: 'deepseek-v4.1-flash',
       prompt: `Summarize these new issues in at most five bullets:\n${JSON.stringify(issues)}`,
       output: z.object({ bullets: z.array(z.string()) }),
     });

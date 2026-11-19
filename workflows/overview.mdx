@@ -23,6 +23,7 @@ export default defineWorkflow({
       id: input.messageId,
     });
     const triage = await step.ai('classify', {
+      model: 'deepseek-v4.1-flash',
       prompt: `Classify this support email:\n${JSON.stringify(email)}`,
       output: z.object({ severity: z.enum(['low', 'high']), summary: z.string() }),
     });
