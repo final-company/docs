@@ -4,7 +4,9 @@ description: "Search offers across providers with price quotes, measured create 
 icon: "table-list"
 ---
 
-The catalog lists an **offer** for each provider and region: what your request would get there, what it would cost, how fast and reliably that provider has been creating sandboxes, and what it can do. Routing ranks these same offers, so the catalog shows you exactly what the router sees.
+The router builds an **offer** for each provider and region: what your request would get there, what it would cost, how fast and reliably that provider has been creating sandboxes, and what it can do. Routing ranks these same offers, so searching them shows you exactly what the router sees.
+
+Use the catalog, not these docs, for facts about a provider. Prices, isolation, hardware, limits, and capabilities change, and the catalog is what routing uses.
 
 ## Search offers
 
@@ -33,12 +35,63 @@ for (const offer of offers) {
 
 Search options are `cpu`, `memoryMib`, `diskGib`, `size`, `gpu`, `region`, `require`, `isolation`, `sort`, `maxPricePerHour`, and `byok`, with the same meaning as on [create](/sandbox-router/sandboxes#create-options) and [routing](/sandbox-router/routing#routing-options). To see why an offer is missing, [dry run](/sandbox-router/routing#dry-run-a-request) a full create request with `router.offers.match`.
 
-The hosted catalog is public: `GET https://api.final.ai/v1/sandbox-offers` answers without an API key. With a key, offers also reflect the provider keys you've stored.
+The hosted offers are public: `GET https://api.final.ai/v1/sandbox-offers` answers without an API key. With a key, offers also reflect the provider keys you've stored.
+
+## Where prices come from
+
+Providers themselves don't carry prices. An offer's price, isolation, and hardware come from one of two places:
+
+- **Final's catalog**, which lists each provider's published list prices as a rate card, along with its isolation and hardware where known. It's public at `GET https://api.final.ai/v1/sandbox-catalog`.
+- **The provider's own API**, for providers that report prices for a specific request. The `final` provider prices this way. A price the provider's API reports takes precedence over the catalog's rate card.
+
+When neither knows something, the field is `null`: an offer's prices, `priceVersion`, `billingModel`, `isolation`, and `hardware` can all be `null`. Routing treats unknown values conservatively:
+
+- With `maxPricePerHour` set, an offer whose price is unknown is excluded with the `price` check.
+- With `isolation` set, an offer whose isolation is unknown is excluded with the `isolation` check.
+- Sorting by price ranks offers with unknown prices last.
+
+### In-process routers
+
+An in-process router fetches Final's public catalog by default, for prices, isolation, hardware, and [measured performance](#measured-performance). It refreshes every few minutes and needs no API key. Two options change that:
+
+```ts
+import { BillingModel, createSandboxRouter } from '@finalai/sandbox-router';
+import { e2b } from '@finalai/sandbox-router-e2b';
+
+const router = createSandboxRouter({
+  providers: [e2b({ apiKey: process.env.E2B_API_KEY! })],
+  catalog: 'none',
+  catalogEntries: [
+    {
+      provider: 'e2b',
+      rateCard: {
+        provider: 'e2b',
+        effectiveFrom: '2026-11-01',
+        observedAt: '2026-11-01',
+        sourceUrl: 'https://intranet.example.com/contracts/sandboxes',
+        billingModel: BillingModel.ProvisionedPerSecond,
+        cpuHour: '0.04', // Your negotiated rates
+        memoryGibHour: '0.012',
+        notes: [],
+        sourceQuotes: [],
+        openQuestions: [],
+      },
+      isolation: null,
+      hardware: null,
+    },
+  ],
+});
+```
+
+- `catalog: 'none'` stops fetching the public catalog. Offers then carry only what the providers' own APIs report, plus any `catalogEntries`.
+- `catalogEntries` supplies your own entries, such as the rates you negotiated. Each has the `provider`, a `rateCard` (or `null`), `isolation`, and `hardware`, and replaces the public entry for that provider. A rate card has the same shape as a [price version's](#price-versions) `card`.
+
+If the public catalog can't be reached, the router carries on without it.
 
 ## The offer object
 
 <ResponseField name="provider" type="string">
-  The provider's name, such as `e2b`.
+  The provider's name, such as `final`.
 </ResponseField>
 
 <ResponseField name="region" type="string">
@@ -46,30 +99,36 @@ The hosted catalog is public: `GET https://api.final.ai/v1/sandbox-offers` answe
 </ResponseField>
 
 <ResponseField name="quote" type="QuoteIface">
-  What your request gets here at the provider's list price.
+  What your request gets here, at list price.
 
   <Expandable title="properties">
-    <ResponseField name="hourlyRunning" type="string">List price of one running hour of the granted size, in US dollars.</ResponseField>
-    <ResponseField name="hourlyPaused" type="string | null">List price of one hour paused or stopped; `null` where nothing is kept.</ResponseField>
-    <ResponseField name="perCreate" type="string">A fixed charge per create, `'0'` for most providers.</ResponseField>
-    <ResponseField name="granted" type="{ cpu, memoryMib, diskGib }">The resources you'd actually get. Providers that only sell certain sizes round up.</ResponseField>
+    <ResponseField name="granted" type="{ cpu, memoryMib, diskGib }">The resources you'd actually get. Providers round up to the sizes they offer.</ResponseField>
     <ResponseField name="applied" type="string[]">Request fields the provider honors exactly as given.</ResponseField>
     <ResponseField name="ignored" type="{ field, reason }[]">Fields the provider accepts but changes or doesn't honor, and why, such as `rounded up to 4`.</ResponseField>
     <ResponseField name="rejected" type="{ field, reason }[]">Fields the provider can't satisfy. An offer with any rejected field isn't eligible.</ResponseField>
-    <ResponseField name="size" type="string | null">The named size chosen, for providers that sell fixed sizes.</ResponseField>
-    <ResponseField name="priceVersion" type="string">The [price version](#price-versions) the quote uses.</ResponseField>
+    <ResponseField name="size" type="string | null">The named size chosen, for providers that offer fixed sizes.</ResponseField>
+    <ResponseField name="hourlyRunning" type="string | null">List price of one running hour of the granted size, in US dollars.</ResponseField>
+    <ResponseField name="hourlyPaused" type="string | null">List price of one hour paused or stopped.</ResponseField>
+    <ResponseField name="perCreate" type="string | null">A fixed charge per create.</ResponseField>
+    <ResponseField name="priceVersion" type="string | null">The [price version](#price-versions) the prices come from.</ResponseField>
   </Expandable>
+
+  The prices are `null` when [no price is known](#where-prices-come-from).
+</ResponseField>
+
+<ResponseField name="modes" type="('byok' | 'managed')[]">
+  The billing modes this offer can be created with: `byok` when your key for the provider can be used, `managed` when Final's account can. See [BYOK and managed billing](/sandbox-router/byok-and-billing).
 </ResponseField>
 
 <ResponseField name="price" type="{ managed: string | null; byok: string | null }">
-  What one running hour costs **you**, per billing mode, including Final's share or fee. `managed` is the price on Final's provider account; `byok` is the price with your own key. Either is `null` where that mode isn't available. Routing ranks and caps by these prices, not by the list price. See [BYOK and managed billing](/sandbox-router/byok-and-billing).
+  What one running hour costs **you**, per billing mode, including Final's share or fee. Either is `null` where that mode isn't available or the price is unknown. Routing ranks and caps by these prices, not by the list price.
 </ResponseField>
 
-<ResponseField name="priceVersion" type="string">
-  The immutable price version, such as `e2b@2026-11-17`.
+<ResponseField name="priceVersion" type="string | null">
+  The immutable price version the prices come from.
 </ResponseField>
 
-<ResponseField name="billingModel" type="BillingModel">
+<ResponseField name="billingModel" type="BillingModel | null">
   How the provider charges:
 
   | Value | Charges |
@@ -84,8 +143,8 @@ The hosted catalog is public: `GET https://api.final.ai/v1/sandbox-offers` answe
   Measured performance; `null` when there's no data. See [measured performance](#measured-performance).
 </ResponseField>
 
-<ResponseField name="isolation" type="Isolation">
-  How strongly a sandbox is separated from other tenants on the same host: `shared` (a container sharing the host kernel), `filtered` (a container behind a user-space kernel or syscall filter), or `dedicated` (its own kernel in a virtual machine). Set `isolation` on a request to require at least a given level.
+<ResponseField name="isolation" type="Isolation | null">
+  How strongly a sandbox is separated from other tenants on the same host: `shared` (a container sharing the host kernel), `filtered` (a container behind a user-space kernel or syscall filter), or `dedicated` (its own kernel in a virtual machine). `null` when unknown. Set `isolation` on a request to require at least a given level.
 </ResponseField>
 
 <ResponseField name="capabilities" type="Capability[]">
@@ -97,7 +156,7 @@ The hosted catalog is public: `GET https://api.final.ai/v1/sandbox-offers` answe
 </ResponseField>
 
 <ResponseField name="limits" type="ProviderLimitsIface">
-  The provider's limits: `maxCpu` and `maxMemoryMib`, and where they apply, `maxDiskGib`, `minCpu`, `minMemoryMib`, `cpuStep`, `memoryStepMib`, `maxOutputBytes` (output one process may produce before it ends with `output_cap`), `maxLifetimeS`, and `maxIdleS`.
+  The provider's limits: `maxCpu` and `maxMemoryMib`, and where they apply, `maxDiskGib`, `minCpu`, `minMemoryMib`, `cpuStep`, `memoryStepMib`, `sizes` (the named sizes on offer), `maxOutputBytes` (output one process may produce before it ends with `output_cap`), `maxLifetimeS`, and `maxIdleS`.
 </ResponseField>
 
 <ResponseField name="image" type="{ strategy, state } | null">
@@ -119,18 +178,11 @@ The hosted router records every create attempt, along with small regular test cr
 | `lastSeenAt` | When the offer last created a sandbox. |
 | `samples` | How many attempts the numbers are based on. |
 
-The `'latency'` and `'balanced'` sorts rank by these numbers. An in-process router can use them too: pass `catalog: 'public'` and it reads them from the public catalog, refreshing every few minutes. If the catalog can't be reached, it ranks on price alone.
-
-```ts
-const router = createSandboxRouter({
-  providers: [e2b({ apiKey: process.env.E2B_API_KEY! })],
-  catalog: 'public',
-});
-```
+The `'latency'` and `'balanced'` sorts rank by these numbers. An in-process router reads them from the public catalog unless you set `catalog: 'none'`; without them, it ranks on price alone.
 
 ## Price versions
 
-Each provider's prices are published as an immutable **price version**, named after the provider and the day the prices took effect, such as `e2b@2026-11-17`. A price change is a new version, never an edit. A sandbox pins the version current when it was created (`sandbox.info.price.priceVersion`), so a later change never reprices a running sandbox.
+Prices are published as immutable **price versions**, named after the provider and the day the prices took effect, in the form `provider@YYYY-MM-DD`. A price change is a new version, never an edit. A sandbox pins the version current when it was created (`sandbox.info.price.priceVersion`), so a later change never reprices a running sandbox. `priceVersion` is `null` when the sandbox's price is unknown.
 
 ```ts
 const versions = await router.priceVersions.list({ provider: 'e2b' });
@@ -141,7 +193,7 @@ for (const version of versions) {
 }
 ```
 
-Pass `at` (a date) to get the versions in effect then. Each version includes the `billingModel`, the normalized rate `card` (per vCPU-hour, GiB-hour, GiB-month of disk, GB of egress, per create, paused storage, snapshot storage, or fixed sizes), the `sourceUrl` it came from, `sourceQuotes` with the provider's own words, and `openQuestions` where the provider's pricing is ambiguous. `GET /v1/sandbox-price-versions` is public.
+Pass `at` (a date) to get the versions in effect then. Each version includes the `billingModel`, the normalized rate `card` (per vCPU-hour, GiB-hour, GiB-month of disk, GB of egress, per create, paused storage, snapshot storage, or fixed sizes), the `sourceUrl` it came from, `sourceQuotes` with the provider's own words, and `openQuestions` where the provider's pricing is ambiguous. `GET /v1/sandbox-price-versions` is public. An in-process router lists the current card of each configured provider from its catalog.
 
 ## Usage costs
 

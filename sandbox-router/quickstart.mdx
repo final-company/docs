@@ -52,7 +52,7 @@ In this guide you create a sandbox on the cheapest provider that fits, run a com
         });
         ```
 
-        The in-process router only chooses among the providers you pass, and calls them directly with your keys. To add more, install their packages and add them to the list:
+        The in-process router only chooses among the providers you pass, and calls them directly with your keys. It reads prices and measured performance from Final's public catalog, which needs no Final account; see [in-process routers](/sandbox-router/catalog-and-pricing#in-process-routers) to turn that off or supply your own rates. To add more, install their packages and add them to the list:
 
         ```ts
         import { daytona } from '@finalai/sandbox-router-daytona';
@@ -94,7 +94,7 @@ In this guide you create a sandbox on the cheapest provider that fits, run a com
     ```
 
     ```text
-    sbr_... on e2b 0.17 USD/h
+    sbr_... on <provider> <price> USD/h
     0 Hello from Linux x86_64
     ```
 

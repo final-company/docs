@@ -38,7 +38,7 @@ A sandbox handle works the same way on every provider. Operations that need a [c
 </ParamField>
 
 <ParamField path="env" type="Record<string, string>">
-  Environment variables for every command.
+  Environment variables for every command. They override the image's `env`, including for its start command.
 </ParamField>
 
 <ParamField path="secretRefs" type="Record<string, string>">
@@ -100,7 +100,7 @@ A sandbox handle works the same way on every provider. Operations that need a [c
 | `state` | `creating`, `running`, `paused`, `stopped`, `deleted`, `failed`, or `unknown`. |
 | `nativeState`, `nativeError` | The provider's own state and error text, verbatim. `state` is `unknown` when the provider reports a state with no equivalent. |
 | `granted` | The `cpu`, `memoryMib`, and `diskGib` the provider granted. |
-| `price` | `hourly`, what one running hour costs you, and the `priceVersion` pinned at create. |
+| `price` | `hourly`, what one running hour costs you, and the `priceVersion` pinned at create. Both are `null` when the price is unknown. |
 | `billing` | `mode` (`byok` or `managed`) and, for `byok`, the `credential` secret name. |
 | `capabilities` | What this sandbox's provider supports. |
 | `image` | The image `strategy` used, or `null`. |
@@ -112,13 +112,11 @@ A sandbox handle works the same way on every provider. Operations that need a [c
 ## Find sandboxes
 
 ```ts
-import { SandboxState } from '@finalai/sandbox-router';
-
 const sandbox = await router.sandboxes.get('sbr_...');
 
 const running = await router.sandboxes.list({
   provider: 'e2b',
-  state: SandboxState.Running,
+  state: 'running',
   labels: { purpose: 'ci' },
 });
 ```
@@ -156,7 +154,7 @@ Not every provider can keep memory. `kept` tells you what the provider actually 
 
 ### Stop and start
 
-`stop()` shuts the sandbox down and keeps its files; `start()` boots it again. Running processes don't survive. Use it when you don't need memory kept and the provider charges less for a stopped sandbox than a paused one; the quote's `hourlyPaused` shows the rate.
+`stop()` shuts the sandbox down and keeps its files; `start()` boots it again. Running processes don't survive. Use it when you don't need memory kept.
 
 ### Timeouts
 
@@ -225,7 +223,7 @@ void (async () => {
 })();
 
 // ...later
-await server.kill(); // or server.kill(ProcessSignal.Kill)
+await server.kill(); // or server.kill('SIGKILL')
 const exit = await server.wait(); // { exitCode, signal, reason }
 ```
 
@@ -236,7 +234,7 @@ const exit = await server.wait(); // { exitCode, signal, reason }
 | `write(data)` | Writes a string or bytes to stdin. Start the process with `stdin: true`. |
 | `closeStdin()` | Closes stdin. |
 | `wait()` | Resolves with `{ exitCode, signal, reason }` when the process ends. |
-| `kill(signal?)` | Sends `ProcessSignal.Term`, `Kill`, `Int`, or `Hup`. Killing a process that already ended succeeds. |
+| `kill(signal?)` | Sends `'SIGTERM'`, `'SIGKILL'`, `'SIGINT'`, or `'SIGHUP'`. Killing a process that already ended succeeds. |
 | `lastSeq()` | The sequence number of the last frame received. |
 | `gaps()` | Output the provider lost and couldn't replay after a reattach, as frame ranges. |
 | `detach()` | Stops receiving output. The process keeps running. |
@@ -327,11 +325,13 @@ Get a URL for a port the sandbox serves (requires `publicPorts`). Declare the po
 ```ts
 import { PortAuth } from '@finalai/sandbox-router';
 
-const { url, auth, token, expiresAt } = await sandbox.ports.url(3000);
+const { url, auth, token, header, expiresAt } = await sandbox.ports.url(3000);
 
-const response = await fetch(url, {
-  headers: auth === PortAuth.Bearer && token != null ? { authorization: `Bearer ${token}` } : {},
-});
+const headers: Record<string, string> = {};
+if (token != null && auth === PortAuth.Bearer) headers.authorization = `Bearer ${token}`;
+if (token != null && auth === PortAuth.Header && header != null) headers[header] = token;
+
+const response = await fetch(url, { headers });
 ```
 
 How a caller gets access depends on the provider:
@@ -342,6 +342,7 @@ How a caller gets access depends on the provider:
 | `bearer` | Send `token` in an `Authorization: Bearer` header. |
 | `cookie` | Open the URL in a browser and sign in; the provider sets a session cookie. |
 | `url` | The URL itself carries the access token. Treat it as a secret. |
+| `header` | Send `token` in the request header named by `header`. |
 
 `expiresAt` is when the URL or token stops working, if it does.
 

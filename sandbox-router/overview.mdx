@@ -32,7 +32,7 @@ The same SDK and the same provider code run in two modes. Pick one when you crea
 | Calls | Final's API at `https://api.final.ai/v1` | Each provider's API directly, from your process |
 | Final account | Required | Not needed |
 | Provider accounts | Your own keys stored as project secrets, or Final's accounts billed through Final | Your own keys, passed to each provider |
-| Routing data | Live catalog with measured create latency and success rates | Each provider's rate card; optionally the public catalog's measurements |
+| Routing data | Final's catalog, with measured create latency and success rates | Final's public catalog by default, or rate cards you supply |
 | Timeouts | Enforced by the router on every provider | Only on providers with native idle and lifetime timeouts |
 | Usage and billing | Metered per sandbox | Billed by each provider to your accounts |
 
@@ -49,7 +49,7 @@ In-process mode is a good fit when you already have provider accounts and don't 
 | Boat | `boat` | `@finalai/sandbox-router-boat` |
 | [Final VMs](/vm-platform/overview) | `final` | `@finalai/sandbox-router-final` |
 
-Providers differ in what they support: some pause with memory, some only keep files, some can't snapshot or run an arbitrary container image. Each provider declares its capabilities, and the router only offers a capability once it has passed the [conformance checks](/sandbox-router/write-a-provider#check-your-provider). Call `router.providers.list()` or [search the catalog](/sandbox-router/catalog-and-pricing) for the current list; routing excludes providers that lack a capability your request needs.
+Providers differ in what they support, and in their prices, isolation, and hardware. Each provider declares its capabilities, and the router only offers a capability once it has passed the [conformance checks](/sandbox-router/write-a-provider#check-your-provider). Call `router.providers.list()` or [search the catalog](/sandbox-router/catalog-and-pricing) for current details rather than relying on any fixed list; routing excludes providers that lack a capability your request needs.
 
 ## Leaving the router
 
@@ -65,7 +65,7 @@ With those, you can manage the sandbox with the provider's own SDK or dashboard.
 
 | Term | What it means |
 | --- | --- |
-| **Offer** | One provider in one region, with a price quote for your request, its verified capabilities, isolation, hardware, and measured create latency. See [catalog and pricing](/sandbox-router/catalog-and-pricing). |
+| **Offer** | One provider in one region, with the size your request would get, its price where known, verified capabilities, isolation and hardware where known, and measured create latency. See [catalog and pricing](/sandbox-router/catalog-and-pricing). |
 | **Routing** | The rules that choose an offer: which providers, sort order, price ceiling, required capabilities, and fallbacks. See [routing](/sandbox-router/routing). |
 | **Image** | A portable description of a sandbox's starting files and tools that each provider builds in its own way. See [images](/sandbox-router/images). |
 | **Capability** | A feature a provider supports beyond commands and files, such as `pause`, `snapshot`, or `networkPolicy`. |

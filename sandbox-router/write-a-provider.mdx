@@ -15,29 +15,13 @@ Export a factory that takes credentials and returns `defineProvider({...})`. Nev
 ```ts acme.ts
 import * as z from 'zod';
 import {
-  BillingModel,
   Capability,
   defineProvider,
+  fitWithinLimits,
   ImageStrategy,
-  Isolation,
-  quoteFromRateCard,
   SPECIFICATION_VERSION,
   type ProviderLimitsIface,
-  type RateCardIface,
 } from '@finalai/sandbox-router/provider';
-
-const rateCard: RateCardIface = {
-  provider: 'acme',
-  effectiveFrom: '2026-11-01',
-  observedAt: '2026-11-01',
-  sourceUrl: 'https://acme.example/pricing',
-  billingModel: BillingModel.ProvisionedPerSecond,
-  cpuHour: '0.05',
-  memoryGibHour: '0.015',
-  notes: [],
-  sourceQuotes: ['$0.05 per vCPU-hour and $0.015 per GiB-hour, billed per second.'],
-  openQuestions: [],
-};
 
 const limits: ProviderLimitsIface = {
   maxCpu: 8,
@@ -52,12 +36,9 @@ export const acme = (credentials: { apiKey: string }) =>
     name: 'acme',
     regions: ['us-east'],
     capabilities: [Capability.Labels, Capability.Pause, Capability.Resume, Capability.Pty],
-    isolation: Isolation.Dedicated,
-    rateCard,
     limits,
-    hardware: null,
     providerOptions: z.object({ machineClass: z.string().optional() }).strict(),
-    quote: (spec) => quoteFromRateCard({ card: rateCard, limits, spec }),
+    fit: (spec) => fitWithinLimits({ limits, spec }),
     image: {
       strategy: (spec) => (spec.base.kind === 'oci' ? null : ImageStrategy.Runtime),
     },
@@ -65,7 +46,7 @@ export const acme = (credentials: { apiKey: string }) =>
   });
 ```
 
-`defineProvider` checks the static parts and returns the object unchanged. It throws if `specificationVersion` isn't one this router supports, the name isn't lowercase letters, digits, and dashes starting with a letter (up to 32 characters), there are no regions, or the rate card is invalid or names another provider.
+`defineProvider` checks the static parts and returns the object unchanged. It throws if `specificationVersion` isn't one this router supports, the name isn't lowercase letters, digits, and dashes starting with a letter (up to 32 characters), or there are no regions.
 
 ## The contract
 
@@ -75,14 +56,14 @@ export const acme = (credentials: { apiKey: string }) =>
 | --- | --- |
 | `specificationVersion` | `SPECIFICATION_VERSION`. Providers and the router evolve independently; this says which contract you implement. |
 | `name` | The name callers route by. |
-| `regions` | The regions you create in. The router builds one offer per region. |
+| `regions` | The regions you create in. The router builds one offer per region and passes the chosen one to `create` as `context.region`. |
 | `capabilities` | What you support beyond commands and files. Declared here, but a catalog only offers what [conformance](#check-your-provider) verified. |
-| `isolation` | `Isolation.Shared`, `Filtered`, or `Dedicated`. |
-| `rateCard` | List prices in normalized units (`cpuHour`, `memoryGibHour`, `diskGibMonth`, `egressGb`, `perCreate`, `pausedGibMonth`, `snapshotGibMonth`, or fixed `sizes`), with the `billingModel`, the day they took effect, and their source. A price change is a new card with a new `effectiveFrom`. |
-| `limits` | Size limits and steps, plus `maxOutputBytes`, `maxLifetimeS`, and `maxIdleS` where they apply. |
-| `hardware` | Known CPU `chips` and `host`, with a `confidence`, or `null`. |
+| `limits` | Size limits and steps, or the named `sizes` you offer, plus `maxOutputBytes`, `maxLifetimeS`, and `maxIdleS` where they apply. |
 | `providerOptions` | A Zod schema for your entry of `providerOptions`, or `null`. |
-| `quote(spec)` | Pure: what a spec gets here and costs, with `applied`, `ignored`, and `rejected` fields. `quoteFromRateCard` does this from your card and limits. |
+| `fit(spec, context?)` | Pure: the size a spec gets here (`granted`, and the named `size` if any), with `applied`, `ignored`, and `rejected` fields. `context` carries the `region` and your validated `providerOptions`. `fitWithinLimits({ limits, spec })` does this from your limits. |
+| `prices(spec, context)` | Optional. For services whose API reports prices: the `hourlyRunning`, `hourlyPaused`, `perCreate`, `priceVersion`, and `billingModel` for this spec, with `hardware` and a `sourceUrl` if known. A price from here takes precedence over the catalog. |
+
+A provider carries no prices, isolation, or hardware. Those come from Final's catalog, or from `prices` when your service's API reports them. See [where prices come from](/sandbox-router/catalog-and-pricing#where-prices-come-from).
 
 ### Operations
 
@@ -90,15 +71,17 @@ Every operation returns a `ResultIface<T>`: `{ ok: true, value }` or `{ ok: fals
 
 | Operation | Required | Contract |
 | --- | --- | --- |
-| `create(spec, context)` | Yes | Resolves once the sandbox can run a command. Put `context.labels` on the sandbox, and use `context.name` where the provider names sandboxes: it's the same across retries of one attempt. Create from `context.artifact` (your built image) or `context.snapshotId` when set. |
+| `create(spec, context)` | Yes | Resolves once the sandbox can run a command. Put `context.labels` on the sandbox, create in `context.region` when it's set, and use `context.name` where the provider names sandboxes: it's the same across retries of one attempt. Create from `context.artifact` (your built image) or `context.snapshotId` when set. |
 | `get(id)` | Yes | The sandbox, or `null` if the provider no longer has it. |
 | `list({ labels })` | Yes | Sandboxes carrying every given label. The router uses it to find and delete sandboxes from creates whose outcome it couldn't confirm. |
 | `delete(id)` | Yes | Deleting a missing sandbox succeeds. |
 | `exec(id, command, options)` | Yes | Starts a process and returns its frames. See [processes](#processes). |
 | `files` | Yes | `read` (with an optional byte range), `write` (creating parent directories), `list`, `mkdir`, `remove` (a missing path succeeds), and `stat` (`null` for a missing path). |
-| `ports.url(id, port)` | Yes | `{ url, auth, token, expiresAt }`. |
+| `ports.url(id, port)` | Yes | `{ url, auth, token, expiresAt }`, plus `header` when `auth` is `PortAuth.Header`. |
 | `image.strategy(spec)` | Yes | `ImageStrategy.Build`, `Bake`, or `Runtime`, or `null` when you can't run the spec's base. |
 | `image.build(spec, context)` | For `build` | Builds the spec with your service's builder and returns the artifact (`template`, `snapshot`, or `image`), with `startsOnBoot` if it runs the start command itself. `context.artifact(digest)` returns the files of a `copy` step. |
+| `image.remove(artifact)` | No | Deletes a built artifact. |
+| `image.bakeKeepsSize` | No | Set to `true` if sandboxes created from your snapshots keep the size the snapshot was taken at. The router then bakes one artifact per requested size. |
 | `attach(id, processId, { afterSeq })` | No | Reattaches to a process and replays frames after `afterSeq`. |
 | `pty(id, options)` | No | A terminal process with `resize`. |
 | `pause`, `resume`, `stop`, `start`, `setTimeout`, `resize`, `setNetwork` | No | Lifecycle operations. `pause` returns what it actually `kept`; `resume` returns whether it was a `coldRestart`. |

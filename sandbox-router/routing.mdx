@@ -25,7 +25,7 @@ console.log(sandbox.info.provider, sandbox.info.attempts);
 ## Routing options
 
 <ParamField path="provider" type="string">
-  Use only this provider, with no fallback to others. Shorthand for `only: [provider]` with `allowFallbacks: false`. If the provider fails, the create fails.
+  Use only this provider, with no fallback to others. The router can try each of the provider's eligible regions, and `order` has no effect. If the provider fails, the create fails.
 </ParamField>
 
 <ParamField path="order" type="string[]">
@@ -49,7 +49,7 @@ console.log(sandbox.info.provider, sandbox.info.attempts);
 </ParamField>
 
 <ParamField path="maxPricePerHour" type="string">
-  The most one running hour may cost you, in US dollars as a decimal string such as `'0.25'`. Offers above it are excluded. The price compared is the one for the billing mode the router would try first.
+  The most one running hour may cost you, in US dollars as a decimal string such as `'0.25'`. Offers above it, and offers whose price is unknown, are excluded. The cap applies to every billing mode tried: a mode priced above it, or with no known price, is skipped.
 </ParamField>
 
 <ParamField path="require" type="Capability[]">
@@ -70,7 +70,7 @@ Provider names are the ones in `router.providers.list()`: `e2b`, `daytona`, `mod
 
 | `sort` | Ranks offers by |
 | --- | --- |
-| `'price'` (default) | Hourly price for the billing mode tried first, then measured create latency. |
+| `'price'` (default) | Hourly price for the billing mode tried first, then measured create latency. Offers with no known price rank last. |
 | `'latency'` | Measured median create latency, then price. Offers with no measurements rank last. |
 | `'balanced'` | Price, measured create latency, and success rate together, with price weighted most. The router picks among the offers scoring within 10% of the best, favoring the best, so load spreads across near-equal providers. |
 
@@ -87,7 +87,7 @@ Every provider runs commands and reads and writes files. Anything beyond that is
 | `snapshot`, `fork` | [Snapshots and forks](/sandbox-router/sandboxes#snapshots-and-forks). |
 | `pty` | [Interactive terminals](/sandbox-router/sandboxes#open-a-terminal). |
 | `gpu` | GPUs, requested with `gpu: { kind, count }`. |
-| `image` | Arbitrary container images as an [image base](/sandbox-router/images#choose-a-base). |
+| `image` | Container images as an [image base](/sandbox-router/images#choose-a-base). Whether a provider can run a particular image is decided per image; see the offer's `image.strategy`. |
 | `networkPolicy` | [Outbound network rules](/sandbox-router/sandboxes#network-policy). |
 | `publicPorts` | [URLs for ports](/sandbox-router/sandboxes#ports). |
 | `labels` | Labels the provider can list sandboxes by. |
@@ -100,7 +100,6 @@ You don't need to list capabilities your request already implies. The router add
 | Your request has | Needs |
 | --- | --- |
 | `gpu` | `gpu` |
-| An image with a container image base (`image.from(...)`) | `image` |
 | `network` with `egress` other than `'allow-all'` | `networkPolicy` |
 | `atEnd: 'pause'` | `pause` |
 | `timeouts.idleS` or `timeouts.maxS`, in-process only | `idleTimeout` or `maxLifetime` |
@@ -113,13 +112,13 @@ Calling an operation the sandbox's provider doesn't support, such as `sandbox.fo
 
 The router tries offers in ranked order and moves to the next one only when the failure is retryable:
 
-- **Retryable**: the provider is out of capacity, rate-limited, returned a server error, or timed out; or the image couldn't be built on that provider. The router moves on, unless `allowFallbacks` is `false` or the provider was pinned.
+- **Retryable**: the provider is out of capacity, rate-limited, returned a server error, timed out, or didn't answer; or the image couldn't be built on that provider. The router moves on, unless `allowFallbacks` is `false` or the provider was pinned.
 - **Not retryable**: the provider rejected the credentials or the request. The create fails with that error, without trying others.
 - **Start command not ready**: if an [image's start command](/sandbox-router/images#start-command-and-ready-check) doesn't pass its ready check, the router deletes the sandbox and the create fails with `timeout`.
 
-Before moving on after a timeout, the router confirms the timed-out attempt left no sandbox behind, deleting any it finds. If it can't confirm that, it stops and the create fails with `create_outcome_unknown`, so you never end up paying for two sandboxes. `error.attempts` lists what happened at each provider.
+Before moving on after a timeout or a failure with no answer from the provider, the router confirms the attempt left no sandbox behind, deleting any it finds. If it can't confirm that, it stops and the create fails with `create_outcome_unknown`, so you never end up paying for two sandboxes. `error.attempts` lists what happened at each provider.
 
-An offer can be tried with both billing modes: with `byok: 'first'`, a retryable failure with your key is followed by Final's account on the same provider. Set `byok: 'only'` to never use Final's account.
+An offer can be tried with both billing modes: with `byok: 'first'`, a retryable failure with your key is followed by Final's account on the same provider, as long as that mode's price is within `maxPricePerHour`. Set `byok: 'only'` to never use Final's account.
 
 When every attempt fails with a retryable error, the create fails with `provider_unavailable`. `sandbox.info.attempts` on a successful create lists the failed attempts before the one that landed.
 
@@ -162,9 +161,9 @@ if (match.nearest != null) {
 | `provider` | It isn't in `provider` or `only`, or it is in `ignore`. |
 | `region` | Its region isn't in `region` or `routing.regions`. |
 | `capability` | It hasn't verified a capability you required or your request implies. |
-| `isolation` | Its isolation is weaker than `isolation` on the request. |
+| `isolation` | Its isolation is weaker than `isolation` on the request, or unknown. |
 | `resources` | The provider can't grant the CPU, memory, or disk you asked for. |
-| `price` | Its price is above `maxPricePerHour`. |
+| `price` | Its price is above `maxPricePerHour`, or unknown while a cap is set. |
 | `image` | It can't run your image's base, or building the image there failed. |
 | `credential` | No account is available in the billing mode `byok` allows, such as `byok: 'only'` with no stored key. |
 | `snapshot` | You're creating from a snapshot that lives on another provider. |

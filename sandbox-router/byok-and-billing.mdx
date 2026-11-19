@@ -73,7 +73,7 @@ const sandbox = await router.sandboxes.create({
 });
 ```
 
-Routing ranks and caps each offer by the price of the mode it would try first. An offer is excluded with the `credential` check when no account is available in the modes you allow.
+Each offer lists the billing modes it can be created with in `modes`. Routing ranks each offer by the price of the mode it would try first, and skips any mode priced above `maxPricePerHour`. An offer is excluded with the `credential` check when none of its modes is one you allow.
 
 ## Pass secrets to a sandbox
 
@@ -89,7 +89,18 @@ Use `env` for values that aren't secret. `secretRefs` needs the hosted router; a
 
 ## Spend limits
 
-When a create would take your project past its spend limit, it fails with `budget_exceeded` (HTTP `402`) and nothing is created:
+Cap what your project spends on sandboxes each month, in US dollars:
+
+```ts
+await router.spendLimit.set({ monthlyCap: '500' });
+
+const { monthlyCap, monthToDate } = await router.spendLimit.get();
+console.log(`${monthToDate} of ${monthlyCap ?? 'no cap'} spent this month`);
+
+await router.spendLimit.remove();
+```
+
+`monthlyCap` is `null` when no cap is set. When a create would take your project past the cap, it fails with `budget_exceeded` (HTTP `402`) and nothing is created:
 
 ```ts
 import { isSandboxRouterError, SandboxRouterErrorCode } from '@finalai/sandbox-router';

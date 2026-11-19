@@ -22,19 +22,19 @@ const app = image
 const sandbox = await router.sandboxes.create({ image: app, ports: [3000], cpu: 2, memoryMib: 4096 });
 ```
 
-`create` resolves once the steps have run and the start command's ready check passes. Commands you run later start in the image's `workdir` with its `env`. With an in-process router, the `workdir` default applies to handles from the router instance that created the sandbox; pass `cwd` explicitly when you reattach from another process.
+`create` resolves once the steps have run and the start command's ready check passes. Commands you run later start in the image's `workdir` with its `env`. With an in-process router, the `workdir` and `user` defaults apply to handles from the router instance that created the sandbox; pass `cwd` explicitly from other processes.
 
 ## Choose a base
 
 | Base | Builder | Runs on |
 | --- | --- | --- |
 | Default | `image.default()` | Every provider. A Linux shell with coreutils, git, curl, Python 3, and Node.js. |
-| Ubuntu | `image.ubuntu(version?)`, default `'24.04'` | Providers with an Ubuntu image, or that can run a container image. |
-| Node.js | `image.node(version?)`, default `'24'` | Providers with a Node.js image, or that can run a container image. |
-| Python | `image.python(version?)`, default `'3.13'` | Providers with a Python image, or that can run a container image. |
-| Container image | `image.from(reference, options?)` | Only providers with the verified `image` capability. |
+| Ubuntu | `image.ubuntu(version?)`, default `'24.04'` | Providers that can provide that Ubuntu version. |
+| Node.js | `image.node(version?)`, default `'24'` | Providers that can provide that Node.js version. |
+| Python | `image.python(version?)`, default `'3.13'` | Providers that can provide that Python version. |
+| Container image | `image.from(reference, options?)` | Providers that can run that container image. |
 
-The base decides which providers can run an image, so choose the most portable one that works. The default image runs everywhere. Presets map to each provider's closest equivalent: its own Node.js or Python image where it has one, or the matching official container image. An arbitrary container image needs the `image` capability, which rules out providers that only run their own images, such as Boat and Vercel Sandbox.
+The base decides which providers can run an image, so choose the most portable one that works. The default image runs everywhere. For every other base, each provider decides whether and how it can run it. To see which providers can, [dry run](/sandbox-router/routing#dry-run-a-request) the request or search offers with the image: an offer's `image.strategy` is `null` where the provider can't run the base.
 
 If a base rules out every provider, `router.offers.match` says so with the `image` check, and its `nearest` fix suggests switching to the default base.
 
@@ -58,9 +58,9 @@ Steps run in order, in the image's `workdir` with its `env`:
 | `.run(command)` | Runs a shell command. |
 | `.copy(source, destination)` | Copies a local file or directory into the image. `destination` must be an absolute path. |
 | `.mkdir(path)` | Creates a directory and its parents. |
-| `.env(vars)` | Adds environment variables, for the steps and every command in the sandbox. |
-| `.workdir(path)` | Sets the working directory for later steps and commands, and creates it. |
-| `.user(name)` | Runs steps as this user. |
+| `.env(vars)` | Adds environment variables, for the steps, the start command, and every command in the sandbox. A create's `env` overrides them. |
+| `.workdir(path)` | Sets the working directory for the steps and every command, and creates it before the steps run. |
+| `.user(name)` | Runs steps and commands as this user. |
 
 Each method returns a new builder, so you can share a base and extend it in different ways:
 
@@ -99,7 +99,7 @@ For each provider, the router picks one of three strategies:
 | `bake` | For providers without a builder but with snapshots: the router creates a sandbox from the base, runs the steps once, snapshots it, and creates later sandboxes from the snapshot. | Waits for the bake. | Fast. |
 | `runtime` | For providers with neither: the router runs the steps on every create. | Runs the steps. | Runs the steps again. |
 
-Built and baked images are cached per provider and image, so you pay the build time once. `runtime` is always correct but slower, which shows up in the [catalog](/sandbox-router/catalog-and-pricing) as offers whose `image.strategy` is `runtime`. Each offer's `image.state` is `building`, `ready`, or `failed`, and after create, `sandbox.info.image.strategy` tells you which strategy the sandbox used.
+Built and baked images are cached per provider and image, so you pay the build time once. Where a provider's snapshots keep the size they were taken at, the router bakes once per size. `runtime` is always correct but slower, which shows up in the [catalog](/sandbox-router/catalog-and-pricing) as offers whose `image.strategy` is `runtime`. Each offer's `image.state` is `building`, `ready`, or `failed`, and after create, `sandbox.info.image.strategy` tells you which strategy the sandbox used.
 
 If a build fails on one provider, the router [falls back](/sandbox-router/routing#fallbacks) to the next offer. The hosted router then excludes that provider for this image, with the `image` check, until the image changes.
 
