@@ -6,7 +6,7 @@ description: "Ask people an approval or a question outside any conversation, and
 
 A decision is a request waiting for a person's answer. Agents raise them inside sessions and conversations (see [handle approvals](/client/sessions#handle-approvals)). Your own code can also ask people something that isn't part of any chat, like "Refund order 4821?", as a decision in a project. Only the people you ask can answer it. Your code reads the answer, or withdraws the question.
 
-Final also raises these decisions for you when an [integration call](/build/integrations#call-tools-without-a-session) without a conversation needs a person's approval or sign-in.
+Final also raises these decisions for you when an [integration call](/build/integrations#call-tools-without-a-session) without a conversation needs a person's approval or sign-in, and for [Tasks](/tasks/overview): accepting a proposal, approving a plan or a brief change, answering an agent's question, and accepting a result. A Task's decisions carry its `taskId`, are answered only by the person the Task acts for, and stay open when the session that asked ends.
 
 ## Raise a decision
 

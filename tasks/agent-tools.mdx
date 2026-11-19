@@ -1,0 +1,57 @@
+---
+title: "Task tools for agents"
+sidebarTitle: "Task tools"
+description: "The tools every agent gets for proposing, leading, and working Tasks, and which ones each role sees."
+---
+
+Every session in a project gets Final's task tools, whatever its harness, through the MCP server Final serves to each session. Your own agents and third-party agents get the same tools as Final's, and nothing about a Task needs a special agent: what an agent can do follows from its role, read live each time it calls a tool.
+
+A harness that can't use MCP tools can't work Tasks, and runners refuse to start one for a Task.
+
+## Roles
+
+| The session is | Because | It sees |
+| --- | --- | --- |
+| **A chat agent** | It's in a chat: Home, a direct chat, or a channel conversation. | `propose_task`, `list_tasks`, `read_task`, `post_task_update`, `watch_task` |
+| **A lead** | It holds a team Task's root. | `list_tasks`, `read_task`, `post_task_update`, `create_tasks`, `answer_hold`, `update_checklist`, `propose_brief_change`, `cancel_step`, `reopen_step`, `hold_task`, `request_review`, `complete_task`, `fail_task` |
+| **A direct worker** | It holds a direct Task's root and works it alone. | `list_tasks`, `read_task`, `post_task_update`, `update_checklist`, `propose_brief_change`, `hold_task`, `request_review`, `complete_task`, `fail_task` |
+| **A step worker** | It holds one step. | `list_tasks`, `read_task`, `post_task_update`, `hold_task`, `request_review`, `complete_task`, `fail_task` |
+| **A reader** | Anything else in the project, including subagents. | `list_tasks`, `read_task` |
+
+Every tool that changes a Task checks that the session holds the Task's current claim. A [subagent](/client/sessions#start-a-subagent) can read its parent's Task but never change it.
+
+## The tools
+
+| Tool | What it does |
+| --- | --- |
+| `propose_task` | Proposes a Task to the person in the chat, who accepts it on a card before any work starts. Names who does it (one agent, or a team led by an agent), whether its result needs review, its brief and checklist, and the chat messages it came from. The chat then watches the Task. |
+| `list_tasks` | The project's Tasks, newest first, or one Task's steps. |
+| `read_task` | A Task's brief, state, checklist, steps, and latest updates, including results. |
+| `post_task_update` | Posts progress, a finding, or a reply to a Task's thread. |
+| `watch_task` | Has the chat hear when a Task starts, needs its person, and ends. |
+| `create_tasks` | Plans the lead's Task into steps: up to 15 keyed steps with `needs`, or a list map of one template over many inputs. Each step names its agent and `provide` from the project's team roster. |
+| `answer_hold` | Answers a step's question. The worker carries on with the answer. |
+| `update_checklist` | Replaces the Task's checklist with its current state. |
+| `propose_brief_change` | Asks the person to approve a new brief. Approving applies it. |
+| `cancel_step`, `reopen_step` | Cancels a step, leaving its dependents for the lead to decide on, or reopens a finished one. |
+| `hold_task` | Pauses the Task on a question (`needs_input`) or an approval (`awaiting_approval`). The answer arrives as input. |
+| `request_review` | Posts a result for the person's review: what changed, what was checked, what couldn't be verified, and the accept label naming the action accepting it authorizes. |
+| `complete_task` | Completes the Task with its result and artifacts. A review-required Task completes once its latest result is accepted, and a step needs an artifact that lasts. |
+| `fail_task` | Gives up on the Task, saying why. |
+
+See [Tasks](/tasks/overview) for the states, holds, and results these tools work with.
+
+## The task tool guide
+
+With the tools, Final's MCP server gives each session instructions for its role: the **task tool guide**. It's what makes any agent a good proposer, lead, or worker without changing its own instructions. In short:
+
+- **Chat agents** reply directly when a reply is enough, and propose a Task when the ask needs real work. They choose one agent or a team, and require review for anything with side effects. Once the person accepts, they tell people in their own words when the Task starts, needs them, and ends.
+- **Leads** plan, delegate, review, and finish, and never do the work themselves. They plan small steps that don't touch the same files, make review its own step, post a plan of more than one step for approval before creating it, and gather the steps' results into one.
+- **Workers** stay inside their brief, post only meaningful updates, ask when blocked, and deliver something that lasts, like a pushed branch, a pull request, files, or records.
+- **Everyone** finishing a review-required Task asks for review, waits for acceptance, performs exactly the accepted action, then completes.
+
+The guide is guidance the model follows, not a fixed workflow. To change how an agent leads or works, add to its own [instructions and skills](/build/instructions-and-skills).
+
+## Who leads
+
+Any agent can lead a team Task. A chat agent proposing a team Task names its lead from the project's team roster, by default the Project Agent. A specialist in a direct chat can propose itself as the lead, or name another. The roster, under **AI team** in the project's settings, lists the agents the project offers as leads and workers, each with the harness and model it runs on.

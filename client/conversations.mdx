@@ -11,7 +11,7 @@ A conversation is a chat that Final stores for you. People and agents are its pa
 | History | Kept per session | Kept as messages, with read state and threads |
 | Who's in it | You and the agent | Any number of people and agents |
 | What agents are provided | `provide` on the session | `provide` per agent participant, layered over the conversation's |
-| Good for | Tasks, your own chat UI with your own storage | Shared, long-lived chats |
+| Good for | One-off jobs, your own chat UI with your own storage | Shared, long-lived chats |
 
 Under the hood, each agent in a conversation works in its own session. Final creates it the first time a message reaches that agent, from what that participant was provided.
 
@@ -55,6 +55,14 @@ const existing = await project.conversations.findDirect({ agent: 'agt_your_agent
 
 To find chats your app made, give them [labels](#label-conversations) and list by label.
 
+### Start another direct chat
+
+`direct` returns the same chat each time. Pass `fresh: true` to start a new direct chat with the agent instead, like a **New chat** button:
+
+```ts
+const another = await project.conversations.direct({ agent, provide: { harness }, fresh: true });
+```
+
 ## Show messages live
 
 For a chat UI, subscribe to the conversation's events. The agent's reply appears as a message that updates while it's being written, so you can render every message the same way:
@@ -91,7 +99,7 @@ if (last != null) await chat.markRead({ throughSeq: last.seq });
 
 ## Create a group conversation
 
-A group conversation can have several people and agents. Each agent participant has its own `provide`, and the conversation can carry a shared one: each top-level key comes whole from the participant if it sets it, otherwise from the conversation. This room shares one computer between its agents:
+A group conversation can have several people and agents. Final's own apps don't create group chats: people start direct chats with agents, and hand work that needs several agents to [Tasks](/tasks/overview). Group conversations come from [channel](/build/channels) installs, for shared places like a team channel, and from apps like yours. Each agent participant has its own `provide`, and the conversation can carry a shared one: each top-level key comes whole from the participant if it sets it, otherwise from the conversation. This room shares one computer between its agents:
 
 ```ts
 import { computer } from '@finalai/agents/sandboxes';

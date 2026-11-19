@@ -25,6 +25,7 @@ A duration is a string of one or more number-and-unit parts, such as `'90s'`, `'
 | Step attempt timeout (`timeout`) | 5 minutes |
 | `step.ai` timeout | 1 hour |
 | `step.agent` timeout | 24 hours |
+| `step.task` timeout | 7 days |
 | `step.call` approval or sign-in wait (`decisionTimeout`) | 24 hours |
 | `step.approval` timeout | 7 days |
 
@@ -40,9 +41,12 @@ A duration is a string of one or more number-and-unit parts, such as `'90s'`, `'
 | `step_outcome_unknown` | A step with `maxAttempts: 1` may or may not have run; it isn't run again. |
 | `decision_timeout` | Nobody answered a call's approval or sign-in in time. |
 | `too_many_decisions` | A tool call kept asking for approvals or sign-ins. |
-| `model_required` | A model or agent step named no `model`. |
+| `model_required` | A model or agent step named no `model`, or a task step's harness names none. |
+| `agent_required`, `harness_required` | A task step named no `agent`, or no `provide.harness`. |
 | `invalid_output` | A model's or agent's answer didn't match `output`. |
 | `agent_timeout` | An agent step didn't finish within its `timeout`. |
+| `task_failed`, `task_canceled` | A task step's Task failed, with its reason as the message, or was canceled. |
+| `task_timeout` | A task step's Task was still open after its `timeout`. |
 | `conversation_required` | A call needed a person's answer, and the run acts for nobody. |
 
 A call that your project's policy refuses, or that a person declines, fails with the platform's own code for that refusal.

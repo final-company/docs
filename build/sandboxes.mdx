@@ -4,7 +4,7 @@ sidebarTitle: "Compute and sandboxes"
 description: "Require files, a shell, or a screen by capability, and provide a cloud computer, a Final Device, or another provider's sandbox."
 ---
 
-With compute, the agent can run shell commands, read and write files, and run your tests, the way a developer would in a terminal. The agent requires compute by **capability**; the caller provides a **sandbox** for each capability: a Final computer, a person's own machine running Final Device, a Daytona sandbox, or the caller's own process.
+With compute, the agent can run shell commands, read and write files, and run your tests, the way a developer would in a terminal. The agent requires compute by **capability**; the caller provides a **sandbox** for each capability: a computer placed by the [Sandbox Router](/sandbox-router/overview) on Final or another provider, a person's own machine running Final Device, or the caller's own process.
 
 ## Require compute
 
@@ -67,7 +67,7 @@ console.log(await response!.text());
 
 - **Creating a sandbox boots nothing.** The machine starts the first time the agent or your code uses it.
 - **A [sandbox setup](/build/sandbox-setups)** says what should be on the machine: repositories, variables, setup steps, services, and named commands. It works on any provider.
-- **`ownedBy`** ties the sandbox to a session or conversation, and it's deleted with its owner. Choosing the session's `id` up front lets you create the sandbox first. Without an owner, the sandbox lives until you call `box.delete()`.
+- **`ownedBy`** ties the sandbox to a session, a conversation, or a [Task](#sandboxes-for-tasks), and it's deleted with its owner. Choosing the session's `id` up front lets you create the sandbox first. Without an owner, the sandbox lives until you call `box.delete()`.
 - **`idempotencyKey`** makes a retried create return the sandbox the first call made.
 
 Leave `compute` out and the model's files and shell run in the calling process, in its working directory. See [where code and compute run](/build/where-code-runs).
@@ -81,8 +81,26 @@ A sandbox's disk lasts as long as the sandbox does, so you choose by what you pr
 | A fresh machine per task | A new sandbox owned by the session. |
 | One machine shared by every agent in a chat | A sandbox owned by the conversation, in the conversation's `provide`. |
 | A long-lived machine for a team or a schedule | A sandbox with no owner, provided by id to every session that should use it. |
+| One machine for a Task and its steps | A sandbox owned by the Task. See [sandboxes for Tasks](#sandboxes-for-tasks). |
 
 A computer pauses when it has been idle for its `idleTimeoutSeconds`, keeping its disk and processes, and resumes on next use.
+
+## Sandboxes for Tasks
+
+A [Task](/tasks/overview)'s machines belong to the Task, not to the sessions working it. A session that fails and is replaced picks up the same machine, with its checkout and branches. A Task's sandboxes are deleted when it completes or is canceled; reopening a failed Task keeps them.
+
+Each step's `workspace` says where it works:
+
+| Workspace | Machine | Good for |
+| --- | --- | --- |
+| `shared` | The root's sandbox. Each step works in its own Git worktree and branch. Steps that share it must run the same agent, since a sandbox's outbound identity is its own. | Several agents coding on one machine, with integrate and review steps working on the local branches. |
+| `fork` | A copy of the root's sandbox, made when the step starts, on a provider that can fork. | Best-of-N attempts and isolated experiments. |
+| `own` | The step's own sandbox. | Heavy, untrusted, or conflicting work. |
+| `none` | No machine: Final's Workers runtime. | Research, analysis, and writing; wide fan-out. |
+
+`exclusiveKey` keeps steps that would fight over ports or services from running at once. A runner creates a Task's sandboxes with `ownedBy: { task: taskId }`, and copies one for a `fork` step with `project.sandboxes.fork(sandboxId, { task: stepId, idempotencyKey })`; the copy belongs to the step. `project.sandboxes.list({ task })` lists a Task's sandboxes.
+
+Project viewers can read a Task's sandboxes, without waking them, through `project.tasks.sandboxes(taskId)`: `files`, `file`, `searchFiles`, `processes`, and `preview`. Their spend counts toward the Task's budget.
 
 ## Ask before commands run
 
@@ -124,24 +142,35 @@ const laptop = await project.sandboxes.create(device({ deviceId: '6f1c2a7e-3b4d-
 
 Pass `pairing` with a pairing code the owner approved instead of `deviceId`. A device takes no sandbox setup. If it's paused or offline, the agent can't reach it; Final never moves the work to another machine. Commands run as the machine's operating system account with all of its access, so keep the permission mode on `ask` until you trust the agent.
 
-## Use another provider
+## Route across providers
 
-Any sandbox provider works the same way. Daytona sandboxes run in your own Daytona account:
+Computers go through the [Sandbox Router](/sandbox-router/overview). By default they run on Final VMs. Add routing preferences to the computer's environment and the router places each sandbox on whichever provider meets them, such as E2B, Daytona, Modal, Vercel Sandbox, or Final, with Final's account or your own provider key:
 
 ```ts
-import { daytona } from '@finalai/daytona-agent-provider/sandboxes';
-
 const box = await project.sandboxes.create(
-  daytona({ credential: { secretRef: 'DAYTONA_API_KEY' }, image: 'node:26' }),
+  {
+    provider: 'computer',
+    environment: { routing: { only: ['e2b', 'daytona'], sort: 'price', byok: 'first' } },
+  },
   { setup },
 );
 ```
 
-`daytona(...)` holds only Daytona's own options, like `snapshot`, `resources`, `region`, and `autoStopMinutes`; see the [`@finalai/daytona-agent-provider` README](https://www.npmjs.com/package/@finalai/daytona-agent-provider). `project.sandboxes.providers()` lists the providers your project can create sandboxes on, each with the JSON Schema of its options.
+`routing` takes the router's `only`, `order`, `ignore`, `sort`, `byok`, `maxPricePerHour`, and `require`; see [routing](/sandbox-router/routing) and [your own keys and billing](/sandbox-router/byok-and-billing). Naming `only` lifts the default pin to Final VMs. The same sandbox setup, the same agent, and the same tools work wherever a sandbox lands. In the dashboard, the project's **Sandboxes for agents** settings choose these preferences, your provider keys, and a monthly spend limit for the sandboxes Final starts for the project's agents.
 
-### Run your own provider
+What a placed sandbox offers depends on the provider it landed on, never on the registration alone. An agent never gets a tool its sandbox can't serve.
 
-A sandbox provider is code that creates, attaches, parks, and deletes machines, written against the provider contract in `@finalai/agent-provider`. Serve it at a URL with `serveSandboxProvider` from `@finalai/agent-provider/sandbox/remote`, then register that URL in your project:
+### Computer use on any provider
+
+Computer use is a routing requirement, not a choice of provider. Set `computerUse: true` and the router places the sandbox only on a provider with a verified desktop, starting from its `desktop` image when you name none. The agent drives the desktop through the router's provider-neutral computer-use API, so the same agent works on an E2B, Daytona, or Final desktop, with the project's other routing preferences still applied.
+
+<Note>
+`@finalai/daytona-agent-provider` is deprecated. Route to Daytona with `routing: { only: ['daytona'], byok: 'only' }` and your Daytona key stored with the router instead.
+</Note>
+
+## Run your own provider
+
+`project.sandboxes.providers()` lists the providers your project can create sandboxes on, each with the JSON Schema of its options. To add your own, write a sandbox provider: code that creates, attaches, parks, and deletes machines, and optionally forks them, written against the provider contract in `@finalai/agent-provider`. Serve it at a URL with `serveSandboxProvider` from `@finalai/agent-provider/sandbox/remote`, then register that URL in your project:
 
 ```ts
 await project.sandboxProviders.register({
@@ -153,14 +182,14 @@ await project.sandboxProviders.register({
 const box = await project.sandboxes.create({ provider: 'acme-vms', environment: { size: 'large' } });
 ```
 
-Final reads the provider's discovery document when you register it, and authenticates every call with a [platform identity assertion](/build/integrations#verify-calls-from-final), which `serveSandboxProvider` verifies. `forwardSecrets` names project secrets the provider receives, resolved in the sandbox's project. Registrations in a parent project are available to the projects below it. The [`@finalai/agent-provider` README](https://www.npmjs.com/package/@finalai/agent-provider) covers the contract, the wire, and the conformance kit that checks a provider; `@finalai/agent-provider/testing/mcp` has an in-process harness for testing a provider's MCP channels.
+Final reads the provider's discovery document when you register it, and authenticates every call with a [platform identity assertion](/build/integrations#verify-calls-from-final), which `serveSandboxProvider` verifies. `forwardSecrets` names project secrets the provider receives, resolved in the sandbox's project. Registrations in a parent project are available to the projects below it. The [`@finalai/agent-provider` README](https://www.npmjs.com/package/@finalai/agent-provider) covers the contract, the wire, and the conformance kit that checks a provider; `@finalai/agent-provider/testing/mcp` has an in-process harness for testing a provider's MCP channels. A provider that implements `fork` reports the `fork` feature in its discovery document; [`fork` workspaces](#sandboxes-for-tasks) need one.
 
 ## Computer options
 
 `computer()` holds only what Final's computers control. What goes on the machine is the [sandbox setup](/build/sandbox-setups).
 
 <ParamField path="image" type="string">
-  An OCI image reference such as `docker.io/library/node:26-bookworm`. Defaults to Final's sandbox image.
+  An OCI image reference such as `docker.io/library/node:26-bookworm`, a registered router image (`simg_...`), or `desktop` for the router's desktop image. Defaults to Final's sandbox image.
 </ParamField>
 
 <ParamField path="build" type="{ steps, verify }">
@@ -177,6 +206,14 @@ Final reads the provider's discovery document when you register it, and authenti
 
 <ParamField path="idleTimeoutSeconds" type="number">
   Idle time before the computer pauses, keeping its disk and processes. Between 60 seconds and 7 days.
+</ParamField>
+
+<ParamField path="routing" type="{ only?, order?, ignore?, sort?, byok?, maxPricePerHour?, require? }">
+  Where the router may place the computer. See [route across providers](#route-across-providers).
+</ParamField>
+
+<ParamField path="computerUse" type="boolean">
+  Place the computer only on a provider with a verified desktop, for an agent that requires `computerUse`. See [computer use on any provider](#computer-use-on-any-provider).
 </ParamField>
 
 To create, snapshot, or manage VMs directly from your own code, see [Final VMs](/vm-platform/overview).

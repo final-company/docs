@@ -1,6 +1,6 @@
 ---
 title: "Steps"
-description: "Every step a workflow can take: run code, call a tool, ask a model, run an agent, ask a person, sleep, and wait for an event."
+description: "Every step a workflow can take: run code, call a tool, ask a model, run an agent, hand work to a Task, ask a person, sleep, and wait for an event."
 ---
 
 Every step takes an id first. A finished step's result is stored, so a replay of the run reads it instead of running the step again. Step ids follow [the rules for replays](/workflows/write-a-workflow#how-a-run-executes). Durations are strings such as `'90s'`, `'1h30m'` or `'2d'`, or milliseconds.
@@ -66,6 +66,34 @@ const review = await step.agent('review-pr', {
 - `provide` fills the agent's [integration requirements](/build/requirements) from the workflow's own integrations.
 - With `output`, it resolves to the agent's result parsed with that schema; without it, to `{ text }`.
 - The run waits for as long as the agent takes, including while the agent waits on a person, up to `timeout` (24 hours by default). A timeout fails the step with `agent_timeout`.
+
+## Hand work to a Task
+
+```ts
+const fix = await step.task('fix-flaky-test', {
+  title: `Fix the flaky test ${input.testName}`,
+  brief: `## Outcome\nThe test passes 50 runs in a row.\n## Never\nSkip or retry the test.`,
+  agent: 'acme/test-fixer',
+  provide: {
+    harness: { harness: 'pi', configuration: { model: 'gpt-6.1-sol' } },
+    integrations: { repo: integrations.github },
+  },
+  review: 'required',
+  budget: 20,
+});
+```
+
+`step.task(id, { title, brief, agent, provide, review, team?, budget?, labels?, workspace?, timeout? })` creates a [Task](/tasks/overview) in the workflow's project and waits until it's done. Use it for work that needs an agent's own session, a machine, a team, or a person's review, and `step.agent` for a single answer.
+
+- **It starts ready.** The published workflow is the approval, so there's no proposal to accept. The Task acts for the person the run acts for.
+- **`agent` and `provide.harness` are required**, with a model in the harness's `configuration`; there is no default model. `agent` is a published agent's name. `provide` is what its sessions get, in `sessions.create`'s shape: `compute` maps capabilities to sandbox ids, and `integrations` come from the workflow's own.
+- **`review`** is `'required'` when a person must accept the result before the Task completes, or `'none'`.
+- **`team: true`** makes the agent a lead that plans steps for other agents.
+- **`budget`** caps the Task's spend in USD, on models and sandboxes together. `labels` and `workspace` are the Task's.
+
+It resolves to `{ taskId, result }` once the Task completes. A failed Task fails the step with `task_failed`, a canceled one with `task_canceled`, and one still open after `timeout` (seven days by default) with `task_timeout`. A step without an agent, harness, or model fails with `agent_required`, `harness_required`, or `model_required` before it creates anything.
+
+For recurring or event-driven Tasks, put a task step in a workflow with a [schedule, webhook, or integration event trigger](/workflows/triggers).
 
 ## Ask a person
 
