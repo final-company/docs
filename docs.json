@@ -186,6 +186,90 @@
         ]
       },
       {
+        "tab": "Observability",
+        "icon": "chart-line",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "o11y/overview",
+              "o11y/quickstart",
+              "o11y/quickstart-otlp",
+              "o11y/quickstart-workers",
+              "o11y/final-agents-and-workflows"
+            ]
+          },
+          {
+            "group": "Instrument",
+            "pages": [
+              "o11y/integrations",
+              "o11y/tracing-patterns",
+              "o11y/context",
+              "o11y/dual-export"
+            ]
+          },
+          {
+            "group": "Evaluate",
+            "pages": [
+              "o11y/judges",
+              "o11y/online-evaluation",
+              "o11y/judge-actions",
+              "o11y/alignment",
+              "o11y/datasets-and-prompts"
+            ]
+          },
+          {
+            "group": "Test and fix",
+            "pages": [
+              "o11y/tests",
+              "o11y/tests-in-ci",
+              "o11y/issues"
+            ]
+          },
+          {
+            "group": "Analyze",
+            "pages": [
+              "o11y/agent",
+              "o11y/dashboards-and-sql"
+            ]
+          },
+          {
+            "group": "MCP",
+            "pages": [
+              "o11y/mcp",
+              "o11y/mcp-tools"
+            ]
+          },
+          {
+            "group": "Administer",
+            "pages": [
+              "o11y/administration"
+            ]
+          },
+          {
+            "group": "BYOC data plane",
+            "pages": [
+              "o11y/byoc/overview",
+              "o11y/byoc/aws",
+              "o11y/byoc/runbooks"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "o11y/reference/ingest",
+              "o11y/reference/attributes",
+              "o11y/reference/observations",
+              "o11y/reference/trace-health",
+              "o11y/reference/sql",
+              "o11y/reference/events",
+              "o11y/reference/scopes",
+              "o11y/reference/errors"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Final Device",
         "icon": "laptop",
         "groups": [

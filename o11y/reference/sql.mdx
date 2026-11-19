@@ -1,0 +1,44 @@
+---
+title: "SQL catalog and limits"
+sidebarTitle: "SQL"
+description: "The SQL catalog, query rules, result shape and limits for sql_query."
+---
+
+`sql_query` runs ClickHouse SQL over a versioned catalog of views scoped to your project. `discover_schema` returns the catalog's version, its tables and every column with a description.
+
+## Catalog
+
+| Area | Tables |
+| --- | --- |
+| Telemetry | `traces`, `spans`, `observations`, `conversation_items`, `trace_tags`, `trace_health`, `model_usage` |
+| Evaluation | `scores`, `judge_reviews`, `judges`, `labels` |
+| Product objects | `issues`, `issue_evidence`, `datasets`, `examples`, `test_runs`, `test_results` |
+
+Judges, labels, issues, datasets and test runs are configured in Final's control plane and copied into the catalog, so SQL can join them with telemetry. Use `discover_schema` for exact column names rather than guessing.
+
+You only see your project's rows. Isolation is enforced by the database itself, so joins, subqueries and unions can't reach other projects. Deleted traces disappear from every table as soon as deletion is requested.
+
+## Queries
+
+- One statement: `SELECT` or `WITH`, with an optional trailing `;`. Anything else is rejected with `invalid_request` before it runs. A `WITH` clause can't redefine a catalog table.
+- `{start_time}` and `{end_time}` are replaced with the request's `from` and `to`; dashboards fill them from their time range. Without `from`, the range starts at the beginning; without `to`, it ends now.
+- `environment` limits the query to one environment.
+
+The result has `queryId`, the `columns` with their types, the `rows`, `rowCount`, `truncated` (true when a row or byte cap was hit), and `elapsedMs` and `bytesRead` when they're known.
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Time | 30 seconds |
+| Memory | 2 GiB |
+| Result | 10,000 rows or 25 MiB |
+| Rate | Burst of 40, then 4 queries per second per project |
+
+| Error | Status | Cause |
+| --- | --- | --- |
+| `invalid_request` | 400 | Not a single read-only `SELECT` or `WITH` statement over the catalog. |
+| `query_rate_limited` | 429 | Over the rate. Retry after a pause. |
+| `query_memory_limit` | 422 | The query needed more than 2 GiB. Aggregate earlier or narrow the time range. |
+| `query_timeout` | 504 | The query ran past 30 seconds. Narrow the time range or filter on time and environment. |
+

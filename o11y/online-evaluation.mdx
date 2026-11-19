@@ -1,0 +1,90 @@
+---
+title: "Online evaluation"
+description: "Run judges on new traces as they finish, with environments, conditions, sampling, session scoring and backfills."
+---
+
+Online evaluation runs a judge's production version on new traces as they finish. Run settings belong to a judge version: set them on the draft, publish, and promote.
+
+## Run settings
+
+```ts
+import { ConditionField, ConditionJoin, ConditionOperator, SessionTrigger } from '@finalai/o11y/contract';
+
+await project.judges.setJudgeRunSettings({
+  judgeId,
+  runSettings: {
+    online: true,
+    environments: ['production'],
+    samplingPercent: 20,
+    conditions: {
+      join: ConditionJoin.And,
+      conditions: [{ field: ConditionField.SpanName, op: ConditionOperator.Eq, value: 'answer' }],
+    },
+    budgetUsd: 50,
+  },
+});
+```
+
+| Setting | What it does |
+| --- | --- |
+| `online` | Run on new traces. |
+| `environments` | Required when `online` is true. Only traces from these environments are evaluated. |
+| `conditions` | Optional condition groups (the same fields and operators as [deterministic judges](/o11y/judges#deterministic)) a trace must match. |
+| `samplingPercent` | 0 to 100. |
+| `sessionTrigger` | For session-scoped judges: when to score a session. See [session scoring](#session-scoring). |
+| `budgetUsd` | A spend cap for this judge. Evaluations over it are recorded as `skipped_budget`. |
+
+Then publish the draft and promote the version. Only the production version runs online.
+
+## When a trace is evaluated
+
+A trace is evaluated once, when its root span has ended and a short grace period for late child spans has passed. Then Final matches every online judge against it: environment, conditions, then sampling. Each match creates one evaluation, and a retried or duplicated batch never evaluates the same trace twice with the same judge version.
+
+Keep roots short. A trace whose root never ends is never evaluated; split long-running work with [linked traces](/o11y/tracing-patterns#human-approval-and-other-long-gaps).
+
+## Sampling
+
+Sampling is stable: whether a trace is sampled depends only on the judge and the trace ID, so reruns and other judges at the same rate agree. Each result records the rate in force, so rates computed from samples stay correct when you change it.
+
+## Session scoring
+
+Session-scoped agentic judges score windows of a session. `sessionTrigger.kind` sets when a window is scored:
+
+| Kind | Scores a window when |
+| --- | --- |
+| `inactivity` | The session has had no new trace for `inactivityMinutes` (1 to 10,080). |
+| `new_traces` | New traces arrive. |
+| `either` | Whichever happens first. |
+
+Each evaluation covers an explicit range of the session's traces. A conversation that continues gets new windows; earlier results are never rewritten. `get_session` returns the session's scores per window.
+
+## Backfills
+
+Run a judge version over past traces in a time range, with optional filters. Ask for the estimate first:
+
+```ts
+const estimate = await project.judges.backfillJudge({
+  judgeId,
+  versionId,
+  from: '2026-11-01T00:00:00Z',
+  to: '2026-11-19T00:00:00Z',
+  filter: { environments: ['production'] },
+  dryRun: true,
+});
+console.log(estimate.targetCount, estimate.estimatedCostUsd);
+```
+
+Run it again without `dryRun` to start. A backfill is a batch: follow it with `list_evaluations({ batchId })` and stop it with `cancel_evaluations({ batchId })`. Backfills never fire actions.
+
+## Limits
+
+Online evaluation and test scoring each have a per-project rate (a burst of 100 and 100 per minute by default). Evaluations over the rate are recorded as `skipped_rate_limited`, never dropped silently. At the project's spend cap, evaluations are skipped with `skipped_budget`. See [limits](/o11y/administration#limits).
+
+## Which runs fire actions
+
+| Trigger | Fires actions |
+| --- | --- |
+| Online, production version | Yes |
+| Backfill, `run_judge`, `evaluate_traces`, `evaluate_all_traces`, `asyncEvaluate` | No |
+| Test runs and rescoring | No |
+| External results | No |

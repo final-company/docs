@@ -1,0 +1,61 @@
+---
+title: "Deploy on AWS"
+description: "Deploy an Observability data plane in your AWS account and register it with Final."
+---
+
+A BYOC data plane runs in an AWS account you own. BYOC is enabled per organization. Ask Final to enable it, and Final provides the deployment on request: an AWS Terraform module and the data plane's container images.
+
+## What runs in your account
+
+| Component | Purpose |
+| --- | --- |
+| Container service | Runs the data plane from Final's container images. |
+| Load balancer | The data plane's HTTPS endpoint, with your TLS certificate. |
+| PostgreSQL | Ingest state, checkpoints, deletion records and scheduled work. |
+| S3 bucket | Raw batches, attachments and large attribute values. |
+| ClickHouse | Traces, spans, observations, scores and the SQL catalog. |
+
+You provide:
+
+- the VPC and subnets to deploy into;
+- a TLS certificate for the endpoint's domain;
+- a ClickHouse endpoint the data plane can reach, such as ClickHouse Cloud or your own cluster.
+
+## Deploy and register
+
+<Steps>
+  <Step title="Deploy">
+    Deploy the data plane into your account with the Terraform module Final provides, and review the plan before you apply it. Configure it with Final's control plane public keys, confirmed with Final out of band, so the data plane accepts only requests Final signs. Keep the data plane's HTTPS endpoint and its PEM public key for the next step.
+  </Step>
+  <Step title="Register the data plane">
+    An organization admin registers it, which pins its public key in Final:
+
+    ```ts
+    await project.admin.registerDataPlane({
+      endpoint: 'https://o11y-dataplane.example.com',
+      region: 'us-west-2',
+      publicKey: dataPlanePublicKeyPem,
+    });
+    ```
+
+    The endpoint must be HTTPS. A new registration starts as `pending`. An organization has one data plane: registering another replaces it.
+  </Step>
+  <Step title="Check it">
+    ```ts
+    const plane = await project.admin.getDataPlane();
+    console.log(plane.mode, plane.status, plane.lastSeenAt); // byoc active …
+    ```
+
+    Then run `npx final-o11y doctor`: it sends a test span through Final's endpoint and reads it back from your data plane.
+  </Step>
+</Steps>
+
+## Upgrades
+
+Final provides new data plane images and module versions with each release. To upgrade, deploy the new version, reviewing the plan before you apply it.
+
+## Rotate the key
+
+Give the data plane a new signing key, then register it again with the new public key. `register_data_plane` replaces the registration, including its key, so Final stops accepting the old one.
+
+Your deployment can pin more than one of Final's control plane keys, so a rotation of Final's key overlaps: add the new key, confirmed with Final out of band, before removing the old one.

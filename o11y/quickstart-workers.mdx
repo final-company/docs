@@ -1,0 +1,107 @@
+---
+title: "Quickstart: Workers and serverless"
+sidebarTitle: "Workers and serverless"
+description: "Trace Cloudflare Workers, AWS Lambda and other serverless functions, and flush spans before they freeze."
+---
+
+`@finalai/o11y/workers` traces Cloudflare Workers and other runtimes without Node's OpenTelemetry exporter. Spans are sent with `fetch` as OTLP/HTTP JSON, and nothing is read from the environment: you pass every setting.
+
+## Cloudflare Workers
+
+<Steps>
+  <Step title="Store the ingest key">
+    Create an ingest key in your project's **Observability** settings, then store it as a secret:
+
+    ```bash
+    npx wrangler secret put FINAL_API_KEY
+    ```
+  </Step>
+  <Step title="Enable nodejs_compat">
+    Spans nest across `await` only with a context manager, which needs `AsyncLocalStorage`:
+
+    ```toml wrangler.toml
+    compatibility_flags = ["nodejs_compat"]
+    ```
+  </Step>
+  <Step title="Wrap the handler">
+    ```ts src/index.ts
+    import { AsyncLocalStorage } from 'node:async_hooks';
+    import {
+      SpanKind,
+      asyncLocalStorageContextManager,
+      instrumentWorker,
+      observe,
+      setSession,
+    } from '@finalai/o11y/workers';
+
+    interface Env {
+      FINAL_API_KEY: string;
+    }
+
+    const answer = observe(
+      async (question: string) => `You asked: ${question}`,
+      { name: 'answer', kind: SpanKind.Agent },
+    );
+
+    export default instrumentWorker(
+      {
+        fetch: async (request: Request, env: Env) => {
+          const { question, conversationId } = await request.json<{
+            question: string;
+            conversationId: string;
+          }>();
+          setSession(conversationId);
+          return Response.json({ answer: await answer(question) });
+        },
+      },
+      (env: Env) => ({
+        apiKey: env.FINAL_API_KEY,
+        environment: 'production',
+        contextManager: asyncLocalStorageContextManager(new AsyncLocalStorage()),
+      }),
+    );
+    ```
+
+    Each request becomes a span that continues the caller's trace (from `traceparent`), with the method, path and response status. Spans flush with `ctx.waitUntil` after the response is returned, so tracing adds no latency to the response. The configuration function runs once per isolate, on the first request.
+  </Step>
+</Steps>
+
+### Options
+
+| Option | What it does |
+| --- | --- |
+| `apiKey` | Required. An ingest key or an API key with `o11y:ingest`. |
+| `environment` | Required. Sets `deployment.environment.name`. |
+| `baseUrl` | Defaults to `https://api.final.ai`. |
+| `projectId` | Needed only for `tag({ traceIds })` and `asyncEvaluate`. |
+| `serviceName`, `resourceAttributes` | Resource attributes on every span. |
+| `redact` | Rewrites or drops attributes before export. |
+| `contextManager` | Without one, spans in different async steps don't nest. |
+| `fetch` | Your own `fetch`, for example a service binding. |
+| `exporter` | Replaces the fetch exporter, for example in tests. |
+
+To trace something other than a `fetch` handler, call `initWorkers(options)` once and `await forceFlush()` (or pass it to `ctx.waitUntil`) before the invocation ends. `createFetchExporter({ apiKey })` gives you the exporter on its own.
+
+## Other serverless runtimes
+
+On AWS Lambda, Vercel Functions and similar Node runtimes, use `/node` and flush before each invocation returns, because the runtime can freeze the process right after:
+
+```ts
+import { forceFlush, init, observe } from '@finalai/o11y/node';
+
+init({ environment: 'production' });
+
+const run = observe(async (event: { question: string }) => ({ answer: `You asked: ${event.question}` }), {
+  name: 'handler',
+});
+
+export const handler = async (event: { question: string }) => {
+  try {
+    return await run(event);
+  } finally {
+    await forceFlush();
+  }
+};
+```
+
+For edge runtimes without Node APIs, use `/workers` with `initWorkers`.

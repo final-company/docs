@@ -1,0 +1,62 @@
+---
+title: "Trace health"
+description: "The checks that make traces complete enough to evaluate, their states, and how to fix failures."
+---
+
+Trace health checks that traces carry what judges, search and dashboards need. Each failing check comes with remediation text and a fix prompt you can give a coding agent.
+
+## Checks
+
+| Check | Passes when |
+| --- | --- |
+| `root_exists` | The trace has a root span. |
+| `one_root` | The trace has exactly one root span. |
+| `valid_timing` | Every span has ended, no earlier than it started. |
+| `parents_exist` | Every span's parent is in the trace. |
+| `parent_contains_child_timing` | Children start and end within their parent. |
+| `input_present` | The root has an input. A truncated or redacted input counts. |
+| `output_present` | The root has an output. A truncated or redacted output counts. |
+| `consistent_session_id` | Child spans carry no session other than the root's. |
+| `llm_model_present` | Every model call names its model. |
+| `valid_usage` | Every model call has input and output token counts of 0 or more, and a total no smaller than their sum. |
+| `valid_cost` | Every model call has a cost of 0 or more. A missing cost fails, unless Final can compute it from usage. |
+| `conversation_items_present` | A trace with model calls or observations has at least one conversation item. |
+| `conversation_roles_valid` | Every message's role is `system`, `developer`, `user`, `assistant` or `tool`. |
+
+The first eleven check tracing; the last two check the conversation view.
+
+Each check on a trace returns `pass`, `fail` or `not_evaluated` (when it doesn't apply, such as model checks on a trace without model calls), with the failing span IDs. Missing data is never counted as a pass.
+
+## States
+
+A trace's health state:
+
+| State | Meaning |
+| --- | --- |
+| `healthy` | No check fails. |
+| `needs_fixes` | A structural check fails: `root_exists`, `one_root`, `valid_timing`, `parents_exist`, `input_present` or `output_present`. Fix the instrumentation. |
+| `limited` | Only other checks fail, such as model, usage, cost or conversation checks. Judges can read the trace, with less to go on. |
+| `not_evaluated` | No check applied to the trace. |
+
+The summary over a window uses the same names:
+
+| State | Meaning |
+| --- | --- |
+| `healthy` | Every check passes on every trace it applies to. |
+| `needs_fixes` | Some check fails on at least one trace. |
+| `limited` | Nothing fails, but some check applied to none of the traces, such as model checks when no trace has a model call. |
+| `not_evaluated` | No traces were checked in the window. |
+
+## Read health
+
+| Operation | Returns |
+| --- | --- |
+| `get_trace_health_summary` | Per check: the state, failing and total traces, and remediation, over a window of `1h`, `12h`, `24h`, `7d` or `30d`, optionally for one environment. |
+| `get_trace_health` | One trace's check results, with failing spans, remediation and a fix prompt. |
+| `list_trace_health_failures` | Traces failing a given check. |
+
+Filter trace search by `healthStates` to find traces in a state. `final-o11y doctor` prints the 24-hour summary.
+
+## Fix with a coding agent
+
+Each failing check's fix prompt describes the problem and the change to make. Give it to the coding agent working in your repository, or connect the agent over [MCP](/o11y/mcp) and ask it to read `get_trace_health_summary` and fix every failing check.
