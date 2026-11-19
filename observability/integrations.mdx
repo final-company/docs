@@ -1,0 +1,156 @@
+---
+title: "Integrations"
+---
+
+`@finalai/observability/integrations` records model clients, agent frameworks and MCP servers. Call `init` (or `initWorkers`) first; integrations use its tracer.
+
+Every model call is recorded once. A wrapper inside a call that is already recorded (an AI SDK model call, an OpenInference LLM span, or another wrapper) records nothing, so stacking integrations doesn't double-count usage or cost.
+
+| Library | Integration |
+| --- | --- |
+| `openai` | `wrapOpenAI(client)` |
+| `@anthropic-ai/sdk` | `wrapAnthropic(client)` |
+| Vercel AI SDK 6 and 7 (`ai`) | `aiSdkTelemetry()` |
+| OpenAI Agents SDK (`@openai/agents`) | `openAIAgentsTracingProcessor()` |
+| Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`) | `traceClaudeAgentQuery(query)` |
+| LangChain.js and LangGraph.js | `instrumentLangChain(module)`, through OpenInference |
+| MCP servers (`@modelcontextprotocol/sdk` 1.x, `@modelcontextprotocol/server` 2.x) | `instrumentMcpServer(server)` |
+
+## OpenAI
+
+```ts
+import { wrapOpenAI } from '@finalai/observability/integrations';
+import OpenAI from 'openai';
+
+const openai = wrapOpenAI(new OpenAI());
+```
+
+`chat.completions.create`, `chat.completions.parse` and `responses.create` and `responses.parse` each become an `llm` span with the model, request parameters, the messages the model saw, tools offered, tool calls, output, usage (including cached and reasoning tokens) and the finish reason. Streams are recorded as they're consumed, and the span ends with the stream. The wrapper returns a proxy; the original client is unchanged.
+
+Pass `{ recordInput: false }` or `{ recordOutput: false }` to leave prompts or completions out.
+
+## Anthropic
+
+```ts
+import Anthropic from '@anthropic-ai/sdk';
+import { wrapAnthropic } from '@finalai/observability/integrations';
+
+const anthropic = wrapAnthropic(new Anthropic());
+
+const message = await anthropic.messages.create({
+  model: 'claude-opus-5-5',
+  max_tokens: 16000,
+  messages: [{ role: 'user', content: 'Summarize this ticket.' }],
+});
+```
+
+`messages.create` and `messages.stream` become `llm` spans with usage including cache reads and writes, tools offered, tool calls and output. It takes the same options as `wrapOpenAI`.
+
+## Vercel AI SDK
+
+Pass `aiSdkTelemetry()` as the call's telemetry settings:
+
+```ts
+import { aiSdkTelemetry } from '@finalai/observability/integrations';
+import { generateText } from 'ai';
+
+await generateText({ model, prompt, telemetry: aiSdkTelemetry() }); // AI SDK 7
+await generateText({ model, prompt, experimental_telemetry: aiSdkTelemetry() }); // AI SDK 6
+```
+
+Each generation is a span, each model call an `llm` span with usage, and each tool execution a `tool` span. Options: `functionId`, `recordInputs` and `recordOutputs` (both default `true`). In AI SDK 7, `finalTelemetryIntegration()` is the integration on its own, for your `telemetry.integrations`.
+
+## OpenAI Agents SDK
+
+```ts
+import { addTraceProcessor } from '@openai/agents';
+import { openAIAgentsTracingProcessor } from '@finalai/observability/integrations';
+
+addTraceProcessor(openAIAgentsTracingProcessor());
+```
+
+Agent runs, generations, function and MCP tool calls and handoffs become spans. An Agents SDK group ID becomes the session. Don't also wrap the OpenAI client the Agents SDK uses: each model call would be recorded twice.
+
+## Claude Agent SDK
+
+Wrap the `query()` you iterate:
+
+```ts
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import { traceClaudeAgentQuery } from '@finalai/observability/integrations';
+
+const prompt = 'Find the flaky test in this repository.';
+for await (const message of traceClaudeAgentQuery(query({ prompt }), { prompt })) {
+  console.log(message.type);
+}
+```
+
+The run is an `agent` span, each model turn an `llm` span with usage, and each tool use a `tool` span. A subagent's turns nest under the Task tool that started it. Options: `name`, `prompt` (recorded as the run's input) and `recordOutput`.
+
+## LangChain.js and LangGraph.js
+
+LangChain is traced through OpenInference. Install `@arizeai/openinference-instrumentation-langchain`, then pass the callback manager module:
+
+```ts
+import { instrumentLangChain } from '@finalai/observability/integrations';
+
+await instrumentLangChain(await import('@langchain/core/callbacks/manager'));
+```
+
+Chains, LLM calls, tools and retrievers become spans that Final reads as OpenInference.
+
+## MCP servers
+
+Instrument your server before registering tools; each tool call becomes a `tool` span:
+
+```ts
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { instrumentMcpServer } from '@finalai/observability/integrations';
+import * as z from 'zod';
+
+const server = instrumentMcpServer(new McpServer({ name: 'docs', version: '1.0.0' }), {
+  serverName: 'docs',
+});
+
+server.registerTool(
+  'search',
+  { inputSchema: z.object({ query: z.string() }) },
+  async ({ query }) => ({ content: [{ type: 'text', text: `Results for ${query}` }] }),
+);
+```
+
+It works with `registerTool` on `@modelcontextprotocol/sdk` 1.x and `@modelcontextprotocol/server` 2.x, with Zod 4 schemas.
+
+### What the calling agent reports
+
+Instrumented tools advertise three optional arguments that the calling agent fills in. They're recorded on the span and removed before your handler runs:
+
+| Argument | Recorded as |
+| --- | --- |
+| `intent` | `final.mcp.intent`: why the agent called the tool, in one sentence. |
+| `llm_model` | `final.mcp.llm_model`: the model the agent runs as. |
+| `conversation_id` | `final.session_id`: the conversation ID this server returned earlier. |
+
+The session is your app's own ID when you pass `sessionId`, else the echoed `conversation_id`, else a generated ID handed back to the agent, else the transport session. `final.mcp.session_source` records which (`app`, `echoed`, `generated` or `transport`).
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `serverName` | | Recorded as `final.mcp.server_name`. |
+| `injectAgentArguments` | `true` | Advertise the three arguments. |
+| `arguments` | | Rename an argument (`{ intent: 'reason' }`) or drop one (`{ llmModel: false }`). |
+| `sessionId` | | A function of `{ toolName, extra }` that returns your app's session ID for a call. |
+| `generateConversationIds` | `true` | Generate a conversation ID when there is none and return it to the agent. |
+| `capture` | Off | `{ arguments: true, result: true }` records tool arguments and results. |
+| `redact` | | `(value, part) => value` applied to captured arguments and results. |
+
+## Other OpenTelemetry instrumentations
+
+Register any OpenTelemetry or OpenInference instrumentation with the Final tracer provider:
+
+```ts
+import { init } from '@finalai/observability/node';
+
+init({ environment: 'production', instrumentations: [new SomeInstrumentation()] });
+```
+
+Instrumentations that use the global tracer provider need `installAsGlobalProvider: true`.

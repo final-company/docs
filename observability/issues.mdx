@@ -1,0 +1,89 @@
+---
+title: "Issues"
+---
+
+An issue is a recurring failure in your agent, backed by evidence. Detection opens issues, you triage them, a judge monitors each one, and a coding agent fixes it.
+
+## What an issue holds
+
+| Field | What it holds |
+| --- | --- |
+| Title | A short name for the failure. |
+| Observed | What the evidence shows, as fact. |
+| Suspected cause | Why it happens. Kept apart from what was observed, and it must cite evidence. |
+| Impact, Consider | Who is affected, and what to look at. |
+| Severity | `critical`, `high`, `medium` or `low`. |
+| Trend | `first_seen`, `ongoing` or `regressed`. |
+| Evidence | Cited traces and spans, each with an optional note and quote, and the incidents over time. |
+| Monitoring | The judge and label that track it. |
+| Fix tasks | Handoffs to coding agents. |
+| Activity | Status changes, comments, evidence, merges and handoffs. |
+
+Each issue has an `issue_key` that detection uses to update an existing issue rather than open a duplicate.
+
+## Lifecycle
+
+| Status | Meaning |
+| --- | --- |
+| `needs_review` | New or recurring; someone should look. |
+| `monitored` | A judge and label are linked, and the judge's production version runs online with sampling above 0. |
+| `dismissed` | Not a problem. |
+| `inactive` | Not seen for the stale window (1 to 365 days, 10 by default; you can turn the rule off). |
+| `regressed` | Seen again after being monitored or inactive. Goes back to `needs_review`. |
+| `resolved` | Set by Final when the monitored label stays at zero for the stale window. |
+| `merged` | Merged into another issue. Final. |
+
+You can set `needs_review`, `dismissed` and `inactive` with `update_issue`; the other states are transitions Final makes. Reopen a dismissed or inactive issue by setting it back to `needs_review`.
+
+## Detection
+
+Two kinds of detection open and update issues. Configure both with `update_issue_detection`, or in **Observability** > **Issues** > **Detection**.
+
+**Agentic detection** is a scheduled analysis by the detection agent. It reads recent traces, labels and health, and opens issues with cited evidence. Set its instructions, model, schedule (daily, weekly, an interval or cron, in a time zone) and optional Slack channels for reports. `run_issue_detection` runs it now and `stop_issue_detection` stops a run.
+
+**Deterministic detectors** run SQL over your traces and scores:
+
+| Detector | Finds |
+| --- | --- |
+| `error_spike` | A jump in error rate. |
+| `judge_failure_rate` | A jump in a judge's failure rate. |
+| `retry_loop` | Repeated identical calls within a trace. |
+| `cost_outlier` | Traces far above typical cost. |
+| `latency_outlier` | Traces far above typical latency. |
+
+Each detector can be turned on or off and given a `threshold`. Both kinds match new findings to existing issues by key and evidence, and update them instead of opening duplicates.
+
+## Triage
+
+`list_issues` sorts by severity, latest or evidence, and filters by status, severity, text and time. In the console, the inbox adds grouping, `j` and `k` to move between issues, and bulk dismiss or **Ask agent**.
+
+| Operation | What it does |
+| --- | --- |
+| `update_issue` | Change status, severity, title or description. |
+| `merge_issues` | Merge other issues into this one. |
+| `add_issue_evidence` | Cite more traces and spans. |
+| `comment_on_issue` | Add a comment. |
+| `create_issue` | Open an issue yourself. The suspected cause needs citations. |
+
+## Monitor with a judge
+
+Link a judge and one of its labels to an issue. Once that judge's production version runs online with sampling above 0, the issue is `monitored`, and its incidents come from the label's rate.
+
+```ts
+await project.issues.monitorIssueWithJudge({ issueId, judgeId, labelId });
+```
+
+No judge fits? Ask the observability agent to create one from the issue's evidence, then publish and promote it.
+
+## Hand off a fix
+
+`create_issue_fix_task` hands an issue to a coding agent, with its observed facts, suspected cause and evidence:
+
+| `target` | What happens |
+| --- | --- |
+| `final_task` | Creates a Final Task for `agentId` in `repository`. |
+| `codex`, `claude_code`, `cursor` | Returns a prompt to paste into that agent. |
+
+Add `instructions` for anything the agent should know. The handoff is recorded on the issue. After the fix ships, the monitoring judge shows whether the label rate drops, and a regression reopens the issue.
+
+To keep a fix fixed, turn the issue's failing traces into [test cases](/observability/tests) and run them in [CI](/observability/tests-in-ci).

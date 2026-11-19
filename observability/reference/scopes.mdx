@@ -1,0 +1,40 @@
+---
+title: "Scopes and keys"
+---
+
+## Scopes
+
+Every operation needs one scope. Grant API keys only the scopes they use.
+
+| Scope | Allows |
+| --- | --- |
+| `observability:ingest` | Sending telemetry: OTLP and `ingest_observations`. |
+| `observability:read` | Every read: traces, results, issues, SQL, dashboards, settings. |
+| `observability:write` | Creating, changing and deleting: judges, datasets, suites, issues, dashboards, settings and keys. |
+| `observability:execute` | Starting work that runs: evaluations, backfills, test runs, reprojection, detection, scheduled analyses, event replay and fix tasks. |
+
+Operations with the effect `destructive` (deleting, rotating, removing) need `observability:write`. The [tool reference](/observability/mcp-tools) lists the scope and effect of every operation.
+
+The scope is necessary, not sufficient: your project role also has to allow the operation. See [roles](/observability/administration#roles).
+
+## Kinds of credentials
+
+| Credential | Use it for | Scopes |
+| --- | --- | --- |
+| Ingest key | Apps that send telemetry. Bound to one project. | Ingest only. Every other operation returns `403`. |
+| API key | Scripts, CI and the SDK client. Create one in **Developer** > **API keys**; see [Get an API key](/api-keys). | The `observability:*` permissions you choose. |
+| Your Final account | The console, and MCP clients that sign in with Final. | Your project role. |
+
+Use an ingest key in every running app, so a leaked key can only send data. Use an API key with `read` and `execute` in CI for [tests](/observability/tests-in-ci), and add `ingest` only if the runner also sends traces with it.
+
+## Common combinations
+
+| Task | Scopes |
+| --- | --- |
+| Send traces | `ingest` |
+| `tag({ traceIds })` from the SDK | `ingest`, `write` |
+| `asyncEvaluate` from the SDK | `ingest`, `execute` |
+| `final-obs doctor` | `read` (plus an ingest key in `FINAL_INGEST_KEY`) |
+| `final-obs test run` | `read`, `execute` |
+| Turn on native producers | `write` |
+| Read the event feed | `read` |

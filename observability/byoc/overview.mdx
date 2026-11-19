@@ -1,0 +1,41 @@
+---
+title: "BYOC data plane"
+sidebarTitle: "Overview"
+---
+
+By default Final hosts all of Observability. With a BYOC (bring your own cloud) data plane, telemetry and evaluation content stay in your AWS account, while Final's hosted control plane keeps configuration, judges, agents and the console. Ingest, storage and queries run on infrastructure you own.
+
+## Architecture
+
+| | Data plane (your AWS account) | Control plane (Final) |
+| --- | --- | --- |
+| Runs | Ingest (OTLP and observations), durable acceptance, projection into analytics, the evidence API, the SQL gateway, deletion | Configuration and versions, evaluation scheduling and judges, actions, alignment, datasets, tests, issues, dashboards, agents, usage, events, the console and MCP tools |
+| Stores | Raw batches and attachments (S3), traces, spans, observations, scores and the SQL catalog (ClickHouse), ingest state and checkpoints (PostgreSQL) | Configuration, versions, job state, IDs, metrics and references to content in the data plane |
+
+Your apps still send to `https://api.final.ai/v1/observability/otlp` with the same keys. Final's edge checks the key and forwards telemetry to your data plane, which stores it before acknowledging. Nothing else about instrumentation changes.
+
+## The content boundary
+
+**In your data plane:** span payloads (inputs, outputs, model context, attributes), observations, attachments, dataset example payloads, judge reasons and citations.
+
+**In Final's control plane:** configuration (judges, rubrics, run settings, actions, datasets' schemas, suites, dashboards, saved queries), versions, job state, IDs, metrics such as counts, rates, costs and latencies, and references to content in the data plane. Issue text that the detection agent or a person writes, such as the observed facts and suspected cause, and judge rubrics live in the control plane.
+
+The control plane reads content only through your data plane's evidence API, when work needs it: a judge evaluating a trace, the observability agent reading a span, or the console showing one. Those calls are authenticated with mutual TLS and signed tokens. Judges and agents that use models send the evidence they read to the named model, as in managed mode.
+
+## How it connects
+
+<Steps>
+  <Step title="Deploy">
+    Apply Final's [AWS Terraform module](/observability/byoc/aws) in your account. It runs the data plane on ECS Fargate behind your load balancer and TLS certificate.
+  </Step>
+  <Step title="Register">
+    An organization admin registers the data plane's endpoint, region and public key with `register_data_plane`. From then on, the project's telemetry goes to it.
+  </Step>
+  <Step title="Operate">
+    `get_data_plane` shows its status (`pending`, `active`, `unreachable` or `revoked`) and when Final last reached it. See the [runbooks](/observability/byoc/runbooks).
+  </Step>
+</Steps>
+
+## What stays the same
+
+Every API operation, SDK method, CLI command and MCP tool works the same in both modes. Retention, deletion, redaction and mappers run in your data plane, and SQL queries run against your ClickHouse with per-project row policies.

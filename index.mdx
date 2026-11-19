@@ -23,6 +23,9 @@ Final is a cloud platform for building with AI agents. Use one product or combin
   <Card title="AI Workflows" icon="diagram-project" href="/workflows/overview">
     Describe a process to an agent, review it as a canvas, and run it durably with your integrations, models and agents.
   </Card>
+  <Card title="Observability" icon="chart-line" href="/observability/overview">
+    Trace, score and test AI agents and workflows that run anywhere, from OpenTelemetry or the TypeScript SDK.
+  </Card>
   <Card title="Final Device" icon="laptop" href="/device/overview">
     Connect your own computer or server so agents can work with its files, tools, and desktop.
   </Card>
@@ -53,6 +56,7 @@ How you authenticate depends on the product.
 | Product | How you connect |
 | --- | --- |
 | Agent SDK, Final VMs, Sandbox Router, Final Cloud Apps | An [API key](/api-keys) from the Final dashboard. The Sandbox Router can also run in your own process without one. |
+| Observability | An ingest key from your project's Observability settings to send traces; an [API key](/api-keys) for the API, SDK client and CLI. MCP clients sign in. |
 | MCP gateway | [Sign in from your AI client](/mcp-gateway/quickstart). No API key needed. |
 | Final Device | [Install it and approve a pairing code](/device/quickstart). No API key needed. |
 | Final CI Runners | [Enable your GitHub organization](/ci-runners/quickstart). Workflows don't need a key. |

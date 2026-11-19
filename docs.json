@@ -186,6 +186,90 @@
         ]
       },
       {
+        "tab": "Observability",
+        "icon": "chart-line",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "observability/overview",
+              "observability/quickstart",
+              "observability/quickstart-otlp",
+              "observability/quickstart-workers",
+              "observability/final-agents-and-workflows"
+            ]
+          },
+          {
+            "group": "Instrument",
+            "pages": [
+              "observability/integrations",
+              "observability/tracing-patterns",
+              "observability/context",
+              "observability/dual-export"
+            ]
+          },
+          {
+            "group": "Evaluate",
+            "pages": [
+              "observability/judges",
+              "observability/online-evaluation",
+              "observability/judge-actions",
+              "observability/alignment",
+              "observability/datasets-and-prompts"
+            ]
+          },
+          {
+            "group": "Test and fix",
+            "pages": [
+              "observability/tests",
+              "observability/tests-in-ci",
+              "observability/issues"
+            ]
+          },
+          {
+            "group": "Analyze",
+            "pages": [
+              "observability/agent",
+              "observability/dashboards-and-sql"
+            ]
+          },
+          {
+            "group": "MCP",
+            "pages": [
+              "observability/mcp",
+              "observability/mcp-tools"
+            ]
+          },
+          {
+            "group": "Administer",
+            "pages": [
+              "observability/administration"
+            ]
+          },
+          {
+            "group": "BYOC data plane",
+            "pages": [
+              "observability/byoc/overview",
+              "observability/byoc/aws",
+              "observability/byoc/runbooks"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "observability/reference/ingest",
+              "observability/reference/attributes",
+              "observability/reference/observations",
+              "observability/reference/trace-health",
+              "observability/reference/sql",
+              "observability/reference/events",
+              "observability/reference/scopes",
+              "observability/reference/errors"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Final Device",
         "icon": "laptop",
         "groups": [

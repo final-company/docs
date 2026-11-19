@@ -1,0 +1,60 @@
+---
+title: "Deploy on AWS"
+---
+
+Final's `observability-dataplane` Terraform module deploys the data plane into an AWS account you own. Ask Final to enable BYOC for your organization to get the module and its release images.
+
+## What the module creates
+
+| Resource | Purpose |
+| --- | --- |
+| ECS Fargate services | The data plane and its durable stream service, from Final's published images. |
+| Application Load Balancer | The data plane's HTTPS endpoint, with your TLS certificate. |
+| RDS PostgreSQL | Ingest state, checkpoints, tombstones, health rollups and scheduled work. The module applies the data plane's schema baseline. |
+| S3 bucket | Raw batches, attachments, large attribute values and evaluation bundles, with lifecycle rules. |
+| VPC endpoints | Private access to AWS services. |
+| IAM role | The data plane's access to the bucket and its own resources. |
+| ClickHouse (optional) | A single-node EC2 instance, if you don't bring your own. |
+
+You provide:
+
+- the VPC and subnets to deploy into;
+- a TLS certificate for the endpoint's domain;
+- a ClickHouse endpoint: ClickHouse Cloud in your account, or the module's single-node option.
+
+## Deploy and register
+
+<Steps>
+  <Step title="Plan and apply">
+    Add the module to your Terraform with the inputs above, then run `terraform plan`, review every change, and `terraform apply`. Keep the data plane's HTTPS endpoint and its PEM public key for the next step.
+  </Step>
+  <Step title="Register the data plane">
+    An organization admin registers it for a project:
+
+    ```ts
+    await project.admin.registerDataPlane({
+      endpoint: 'https://obs-dataplane.example.com',
+      region: 'us-west-2',
+      publicKey: dataPlanePublicKeyPem,
+    });
+    ```
+
+    The endpoint must be HTTPS. The control plane verifies the data plane with this key, and calls it over mutual TLS with signed tokens; unsigned calls are rejected.
+  </Step>
+  <Step title="Check it">
+    ```ts
+    const plane = await project.admin.getDataPlane();
+    console.log(plane.mode, plane.status, plane.lastSeenAt); // byoc active …
+    ```
+
+    Then run `npx final-obs doctor`: it sends a test span through Final's endpoint and reads it back from your data plane.
+  </Step>
+</Steps>
+
+## Upgrades
+
+Final publishes data plane images with each release. To upgrade, update the module version, then plan, review and apply.
+
+## Rotate the key
+
+Register the data plane again with its new public key. `register_data_plane` replaces the registration; the previous key stops working.

@@ -1,0 +1,78 @@
+---
+title: "The observability agent"
+sidebarTitle: "Observability agent"
+---
+
+Each project with Observability has an observability agent: a Final agent with every Observability tool and the project's files. Ask it why something failed, what changed, or to build what you need: judges, datasets, test cases, dashboards and issues.
+
+```text
+Why did refund requests start failing yesterday? Cite the traces.
+```
+
+The agent searches traces, reads spans, runs SQL and cites the spans it relied on. It starts from labels and the [SQL catalog](/observability/reference/sql), which index your traces by what judges found.
+
+## Chat
+
+Open **Observability** > **Agent** in your project. Chats are saved and can be shared, and you can copy a chat as a prompt for another agent.
+
+- **Modes.** Fast and Deep use two named model configurations. The mode is fixed for a chat.
+- **Mentions.** Mention traces, spans, judges, labels, views, charts, datasets and knowledge files to point the agent at them. Attach files as in any chat.
+- **Permissions.** The agent acts with your role. It reads freely; writes ask for your approval, or run without asking when you turn on **Auto-allow writes** for the chat.
+
+Things to ask it:
+
+- Suggest judges for this agent, and draft their rubrics.
+- Improve this judge's rubric from its review disagreements.
+- Turn last week's failures into test cases.
+- Find the root cause of this issue, and hand it to a coding agent.
+
+## Scheduled analysis
+
+Run the agent on a schedule with your instructions, and post the result to Slack.
+
+```ts
+import { AnalysisMode, ScheduleKind, ToolPermissionMode, Weekday } from '@finalai/observability/contract';
+
+await project.admin.createScheduledAnalysis({
+  name: 'Weekly failure summary',
+  instructions: 'Summarize the most frequent failures of the past 7 days with links to example traces.',
+  mode: AnalysisMode.Deep,
+  toolPermissionMode: ToolPermissionMode.ReadOnly,
+  schedule: { kind: ScheduleKind.Weekly, weekday: Weekday.Monday, timeOfDay: '09:00', timezone: 'America/New_York' },
+  slackChannels: ['#agent-quality'],
+});
+```
+
+| Field | Values |
+| --- | --- |
+| `mode` | `fast` or `deep` |
+| `toolPermissionMode` | `read_only`, `ask_for_writes` or `auto_allow_writes` |
+| `schedule.kind` | `daily` or `weekly` (with `timeOfDay`, and `weekday` for weekly), `interval` (`intervalMinutes`, 15 to 1,440) or `cron` |
+| `schedule.timezone` | An IANA time zone. |
+| `slackChannels` | Up to 10 channels for the report. |
+
+Templates cover a daily quality review, a weekly failure summary, investigating regressions, slow traces, a weekly cost review and suggesting new judges; pass `templateId` to start from one.
+
+Each run's status is `running`, `needs_input`, `needs_attention`, `completed` or `failed`, with a summary and a link to its conversation. `run_scheduled_analysis` runs one now, `update_scheduled_analysis({ paused: true })` pauses it, and `list_scheduled_analysis_runs` shows history. A schedule runs as its owner; project admins can edit it.
+
+## Knowledge
+
+Knowledge is a folder of files the agent reads and writes: `observability/` in the project's files. Three folders are reserved:
+
+| Folder | Holds |
+| --- | --- |
+| `memory/` | What the agent has learned about your project. `export_memory` exports it as JSON Lines. |
+| `skills/` | Instructions you write. Each file becomes a slash command in the agent's chat. |
+| `judges/` | Notes about your judges. |
+
+Read and edit knowledge with `list_knowledge_files`, `read_knowledge_files`, `search_knowledge_files`, `write_knowledge_file` and `delete_knowledge_file`, from the console or [MCP](/observability/mcp).
+
+## Slack
+
+Connect Slack once for your organization through **Connectors**. Then:
+
+- **Ask in Slack.** Mention the agent in a thread or DM it. Name a project with `--project <name>`; the thread keeps that project. A project admin chooses whether the agent answers only when mentioned.
+- **Approve in Slack.** Writes from Slack show a decision card to approve or deny; nothing is written silently.
+- **Reports and alerts.** Scheduled analyses, issue detection and [judge actions](/observability/judge-actions) post to the channels you choose, or the project's default channel.
+
+Set the default channel and the mention rule in **Observability** settings, or with `update_observability_settings({ slack: { defaultChannel, mentionRequired } })`.

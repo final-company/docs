@@ -1,0 +1,52 @@
+---
+title: "Runbooks"
+---
+
+Operating a BYOC data plane. Each section says what you'll see, why, and what to do.
+
+## How ingest stays durable
+
+The data plane acknowledges a request only after the raw batch is written to S3 and a pointer to it is appended to the project's durable stream. Projection into ClickHouse runs after that, from a checkpoint, and writes with idempotent keys. So:
+
+- an acknowledged batch is never lost, even if projection is down;
+- a replayed or duplicated batch converges to the same rows;
+- spans that arrive out of order or after their root are placed in their trace.
+
+## Recovery
+
+**The data plane is down or unreachable.** `get_data_plane` shows `unreachable`. Exporters get errors and retry with their own backoff, so keep their queues large enough to ride out an outage. Restore the ECS services (check task health, the load balancer target group and the RDS instance), then confirm `get_data_plane` returns `active`.
+
+**Ingest is accepted but traces don't appear.** Projection is behind or stopped. Check the data plane service's logs and its ClickHouse connection. When it recovers, projection resumes from its checkpoint and catches up; nothing needs to be resent.
+
+**ClickHouse lost data.** Raw batches in S3 are the source of truth within raw retention. Restore ClickHouse, then [reproject](#reprojection) the affected range.
+
+**Evaluations are failing with `evaluator_error` or `timeout`.** Judges read evidence from your data plane. Check that the control plane can reach it (`get_data_plane`), then rerun failed results with `evaluate_traces` or a [backfill](/observability/online-evaluation#backfills).
+
+## Reprojection
+
+Reprojection rebuilds traces from retained raw batches with the project's current [mappers](/observability/reference/attributes#mappers). Use it after changing mappers or after restoring ClickHouse:
+
+```ts
+await project.traces.reprojectTraces({ from: '2026-11-01T00:00:00Z', to: '2026-11-19T00:00:00Z' });
+```
+
+It's idempotent: running it twice gives the same result. It only covers batches still within raw retention (`rawDays`). Reprojecting doesn't re-run judges; backfill them if their inputs changed.
+
+## Deletion
+
+`delete_traces` hides traces from every read at once: the SQL catalog and the evidence API filter them out. Physical deletion from ClickHouse, S3 and the stream follows.
+
+1. Request it: `delete_traces({ traceIds })` or `delete_traces({ filter })`.
+2. Follow it: `list_deletion_requests` moves from `pending` to `hidden` to `completed`, and `observability.deletion.completed` is emitted.
+3. If a request ends `failed`, check the data plane's access to S3 and ClickHouse, then request the deletion again. The traces stay hidden in the meantime.
+
+Retention deletes expired data the same way, per project and per kind of data.
+
+## Rotate credentials
+
+- **Data plane key:** register again with the new public key; see [rotate the key](/observability/byoc/aws#rotate-the-key).
+- **Ingest keys:** `rotate_ingest_key`. Ingest keys are managed by Final, so rotating one needs no change in your account.
+
+## Revoke
+
+When a registration is revoked, `get_data_plane` shows `revoked` and the control plane stops calling the data plane. Data in your account stays there until you delete it.

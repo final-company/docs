@@ -1,0 +1,115 @@
+---
+title: "Attribute keys and mappers"
+sidebarTitle: "Attributes and mappers"
+---
+
+Final reads the `final.*` attributes below, plus OpenTelemetry GenAI, OpenInference and the other [conventions it normalizes](/observability/reference/ingest#normalization). Every other attribute is kept as sent. `FinalAttribute` in `@finalai/observability/contract` (also exported from `/node` and `/workers`) has every key.
+
+## Span kind, input and output
+
+| Key | Value |
+| --- | --- |
+| `final.span_kind` | `llm`, `tool`, `function`, `agent`, `generator` or `span`. |
+| `final.input` | The span's input. Strings as-is; structured values as JSON. |
+| `final.output` | The span's output. |
+
+## Trace context
+
+Set these on the root span. The SDK's `setSession`, `setCustomer`, `setCustomerUser`, `setAgentVersion` and `tag` do that for you.
+
+| Key | Value |
+| --- | --- |
+| `final.session_id` | The session the trace belongs to. Read from the root span only. |
+| `final.customer_id` | The customer or tenant. |
+| `final.customer_user_id` | The person within the customer. |
+| `final.agent_version` | The version of your agent. Traces compare by it. |
+| `final.tags` | A string array of tags. |
+| `deployment.environment.name` | The environment, as a resource attribute. Final has no environment key of its own. |
+
+## Model calls
+
+| Key | Value |
+| --- | --- |
+| `final.llm.provider` | Such as `openai` or `anthropic`. |
+| `final.llm.model` | The model ID. |
+| `final.llm.request_parameters` | JSON of the request parameters. |
+| `final.llm.tools_offered` | JSON of the tool definitions offered to the model. |
+| `final.llm.tool_calls` | JSON array of `{ id, name, arguments }`. |
+| `final.llm.context` | The exact messages the model saw. |
+| `final.llm.response_id` | The provider's response ID. |
+| `final.llm.finish_reason` | Why the model stopped. |
+| `final.llm.streaming` | Whether the call streamed. |
+
+## Usage and cost
+
+| Key | Value |
+| --- | --- |
+| `final.usage.input_tokens` | All input tokens, including cache reads and writes. |
+| `final.usage.output_tokens` | Output tokens. |
+| `final.usage.cache_read_tokens` | Input tokens read from a prompt cache. |
+| `final.usage.cache_creation_tokens` | Input tokens written to a prompt cache. |
+| `final.usage.reasoning_tokens` | Reasoning tokens. |
+| `final.usage.image_tokens` | Image tokens. |
+| `final.usage.total_tokens` | Total tokens. |
+| `final.usage.total_cost_usd` | Cost in USD. Omit when unknown; never send `0` for unknown. |
+| `final.usage.source` | Where usage came from. Final-metered calls say `agent_model_usage`. |
+| `final.usage.request_id` | The metered request's ID. Usage is counted once per request ID. |
+
+When cost is missing, Final computes it from the model's published prices where it knows them, and otherwise leaves it empty.
+
+## Tools and MCP
+
+| Key | Value |
+| --- | --- |
+| `final.tool.name` | The tool's name. |
+| `final.tool.call_id` | The tool call's ID, matching the model's tool call. |
+| `final.mcp.server_name` | The instrumented MCP server. |
+| `final.mcp.intent` | Why the calling agent used the tool. |
+| `final.mcp.llm_model` | The calling agent's model. |
+| `final.mcp.session_source` | Where the session came from: `app`, `echoed`, `generated` or `transport`. |
+
+## Links, tests and prompts
+
+| Key | Value |
+| --- | --- |
+| `final.link.trace_id`, `final.link.span_id` | On the root of a linked trace: the span that started it. |
+| `final.link.relation` | `fork`, `subagent` or `continuation`. |
+| `final.test.run_id`, `final.test.case_id`, `final.test.repeat` | Links a trace to a test case. Also sent as W3C baggage with the same names. |
+| `final.prompt.version_id` | The stored prompt version used. |
+| `final.conversation.observation` | A conversation item on the span, as JSON. See [observations](/observability/reference/observations). |
+
+## Mappers
+
+A mapper copies a source attribute to a target attribute when spans are processed, so you can map your own keys onto Final's without changing code.
+
+```ts
+await project.traces.createMapper({
+  sourceKey: 'app.conversation_id',
+  targetKey: 'final.session_id',
+  layer: 10,
+  override: false,
+  removeSource: false,
+});
+```
+
+| Setting | What it does |
+| --- | --- |
+| `sourceKey`, `targetKey` | Copy the value of `sourceKey` to `targetKey`. |
+| `layer` | 0 to 100. Lower layers apply first, so a later layer can map the output of an earlier one. |
+| `enabled` | Turn a mapper off without deleting it. |
+| `override` | Overwrite a target value the span already has. Off by default. |
+| `removeSource` | Drop the source attribute after mapping. |
+
+Mappers apply in layers on top of Final's built-in normalization: built-in conventions first, then your mappers, then enrichment such as span kind and cost. A project inherits mappers from its parent projects; `list_mappers` shows them in layer order, inherited ones included.
+
+Try a mapper before saving it: `preview_mapper` shows sample spans before and after.
+
+### Reproject
+
+Mappers apply to spans as they arrive. To apply new or changed mappers to traces you already have, reproject a time range:
+
+```ts
+await project.traces.reprojectTraces({ from: '2026-11-01T00:00:00Z', to: '2026-11-19T00:00:00Z' });
+```
+
+Reprojection rebuilds traces from the retained raw data, so it covers only the raw retention window. Running it twice gives the same result.

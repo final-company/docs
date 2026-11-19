@@ -1,0 +1,51 @@
+---
+title: "Trace health"
+---
+
+Trace health checks that traces carry what judges, search and dashboards need. Each failing check comes with remediation text and a fix prompt you can give a coding agent.
+
+## Checks
+
+| Check | Passes when |
+| --- | --- |
+| `root_exists` | The trace has a root span. |
+| `one_root` | The trace has exactly one root span. |
+| `valid_timing` | Every span ends after it starts. |
+| `parents_exist` | Every span's parent is in the trace. |
+| `parent_contains_child_timing` | Children start and end within their parent. |
+| `input_present` | The root has an input. |
+| `output_present` | The root has an output. |
+| `consistent_session_id` | Spans don't disagree about the session, and the root carries it. |
+| `llm_model_present` | Every model call names its model. |
+| `valid_usage` | Token counts on model calls are present and consistent. |
+| `valid_cost` | Cost on model calls is present and not negative, or explicitly unknown. |
+| `conversation_items_present` | The conversation view has items. |
+| `conversation_roles_valid` | Conversation items have valid roles. |
+
+The first eleven check tracing; the last two check the conversation view.
+
+Each check on a trace returns `pass`, `fail` or `not_evaluated` (when it doesn't apply, such as model checks on a trace without model calls), with the failing span IDs. Missing data is never counted as a pass.
+
+## States
+
+| State | Meaning |
+| --- | --- |
+| `healthy` | Every applicable check passes. |
+| `needs_fixes` | Some checks fail. Fix the instrumentation. |
+| `limited` | Health is only partly known, because some checks couldn't run. |
+| `not_evaluated` | Not checked yet. |
+| `unavailable` | Health data isn't available. |
+
+## Read health
+
+| Operation | Returns |
+| --- | --- |
+| `get_trace_health_summary` | Per check: the state, failing and total traces, and remediation, over a window of `1h`, `12h`, `24h`, `7d` or `30d`, optionally for one environment. |
+| `get_trace_health` | One trace's check results, with failing spans, remediation and a fix prompt. |
+| `list_trace_health_failures` | Traces failing a given check. |
+
+Filter trace search by `healthStates` to find traces in a state. `final-obs doctor` prints the 24-hour summary.
+
+## Fix with a coding agent
+
+Each failing check's fix prompt describes the problem and the change to make. Give it to the coding agent working in your repository, or connect the agent over [MCP](/observability/mcp) and ask it to read `get_trace_health_summary` and fix every failing check.

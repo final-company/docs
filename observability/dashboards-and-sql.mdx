@@ -1,0 +1,73 @@
+---
+title: "Dashboards and SQL"
+---
+
+Query traces, scores, issues, datasets and test results with SQL, and chart the results on dashboards. The same catalog serves the console, the API, MCP and the observability agent.
+
+## SQL
+
+```ts
+const result = await project.analytics.sqlQuery({
+  sql: `
+    SELECT toStartOfHour(start_time) AS hour, count() AS traces, sum(cost_usd) AS cost
+    FROM traces
+    WHERE start_time >= {start_time} AND start_time < {end_time}
+    GROUP BY hour ORDER BY hour`,
+  from: '2026-11-18T00:00:00Z',
+  to: '2026-11-19T00:00:00Z',
+  environment: 'production',
+});
+```
+
+Queries are ClickHouse SQL: one `SELECT` or `WITH` statement, read-only, over your project's catalog. `{start_time}` and `{end_time}` are filled in from `from` and `to`. Call `discover_schema` for the tables and columns; column names above are illustrative. See the [SQL reference](/observability/reference/sql) for the catalog and limits.
+
+Save queries with `save_query`, list them with `list_saved_queries`, and delete them with `delete_saved_query`.
+
+## Dashboards
+
+A dashboard has tabs of charts, a default time range (`1h`, `6h`, `24h`, `7d`, `30d`, `90d` or `all`) and an optional environment filter. Start from a template (project overview, cost and usage, or judges) or an empty dashboard:
+
+```ts
+const templates = await project.analytics.listDashboardTemplates();
+const dashboard = await project.analytics.createDashboardFromTemplate({
+  templateId: templates.items[0].templateId,
+  name: 'Support bot',
+});
+```
+
+### Charts
+
+| Kind | Use it for |
+| --- | --- |
+| `line`, `area` | Values over time. |
+| `bar` | Comparing groups. Horizontal or stacked. |
+| `pie` | Shares of a whole. |
+| `table` | Rows as returned. |
+| `stat` | One number, with an optional `headlineSql` for the headline. |
+
+```ts
+import { ChartKind } from '@finalai/observability/contract';
+
+await project.analytics.createDashboardChart({
+  dashboardId: dashboard.dashboardId,
+  revision: dashboard.revision,
+  title: 'Cost per day',
+  kind: ChartKind.Bar,
+  sql: 'SELECT toDate(start_time) AS day, sum(cost_usd) AS cost FROM traces WHERE start_time >= {start_time} GROUP BY day ORDER BY day',
+  display: { stacked: false, valueLabels: true, yTitle: 'USD per {bucket}' },
+});
+```
+
+Saving a chart runs its query once to validate it. Display options are `horizontal`, `stacked`, `valueLabels`, `cumulative`, `yTitle` (may contain `{bucket}`) and up to 8 series `colors`; `layout` places it on the grid.
+
+Every dashboard has a `revision`. Changes that pass a stale revision fail with `conflict`, so two editors (or an editor and an agent) never overwrite each other. Re-read the dashboard and try again.
+
+`get_label_distribution` and `get_label_relations` power the built-in label charts: how a judge's results split across labels, and which labels co-occur with other judges' labels.
+
+| Operation | What it does |
+| --- | --- |
+| `update_dashboard` | Change name, tabs, time range or environment; `isDefault` makes it your default dashboard. |
+| `duplicate_dashboard` | Copy a dashboard and its charts. |
+| `archive_dashboard`, `restore_dashboard` | Hide a dashboard and bring it back. |
+
+Agents build dashboards with the same tools: ask the observability agent for a chart and it writes the query, validates it and adds it.

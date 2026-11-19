@@ -1,0 +1,120 @@
+---
+title: "Administration"
+---
+
+## Roles
+
+Observability uses your project roles. Organization admins also manage what spans projects.
+
+| Role | Can |
+| --- | --- |
+| Viewer | Read everything: traces, judges, results, issues, dashboards, settings. |
+| Editor | Also write and execute: create and publish judges, run evaluations and tests, triage issues, build dashboards. |
+| Admin | Also manage ingest keys, retention, deletion, spend limits, Slack and native producers. |
+| Organization admin | Register a [BYOC data plane](/observability/byoc/overview) and set organization spend limits. |
+
+API keys are limited further by their [scopes](/observability/reference/scopes).
+
+## Ingest keys
+
+An ingest key belongs to one project and can only send telemetry: OTLP and observations. Use one in every app that sends traces, so a leaked key can't read anything.
+
+| Operation | What it does |
+| --- | --- |
+| `create_ingest_key` | Creates a key with a name and optional `expiresAt`. The secret is shown once. |
+| `list_ingest_keys` | Lists keys without their secrets. |
+| `rotate_ingest_key` | Replaces the secret. The old secret stops working at once; the new one is shown once. |
+| `delete_ingest_key` | Revokes the key. |
+
+## Settings
+
+`get_observability_settings` and `update_observability_settings` hold the project's:
+
+- **Environments**: the environment names the project uses (up to 50).
+- **Retention**: see [retention](#retention).
+- **Redaction rules**: see [redaction](#redaction).
+- **Slack**: the default channel, and whether the agent answers only when mentioned.
+- **Producers**: native export of [Final agent sessions, model calls and workflows](/observability/final-agents-and-workflows).
+
+## Redaction
+
+Redaction rules run at ingest, before anything is stored. Each rule names an attribute key, a pattern, or both, and a replacement:
+
+```ts
+await project.admin.updateObservabilitySettings({
+  redactionRules: [
+    { attributeKey: 'final.customer_user_id', replacement: '[redacted]' },
+    { pattern: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}', replacement: '[email]' },
+  ],
+});
+```
+
+A rule with only `attributeKey` replaces that attribute's value. A rule with only `pattern` (RE2 syntax) scans every value. Up to 100 rules; setting them replaces all existing rules. For redaction in your process, before data leaves it, use the SDK's [`redact`](/observability/context#redaction).
+
+## Usage and spend
+
+Three meters are recorded and charged:
+
+| Meter | Measures |
+| --- | --- |
+| `ingest_gb` | Raw telemetry received. |
+| `retained_gb_month` | Telemetry stored over time. |
+| `evaluation_spend` | Model spend of judges, detection and the observability agent, plus a platform fee per evaluation. Model cost is passed through once, never double-counted. |
+
+`get_usage` reports usage and charges over a time range by day or month. `list_usage_statements` lists monthly statements.
+
+`update_spend_limits` sets a monthly cap (`monthlyCapUsd`) and an evaluation budget (`evaluationBudgetUsd`); `null` removes a limit. `get_spend_limits` also shows the free allowance. At the cap, ingest returns `402` and evaluations are skipped with `skipped_budget`.
+
+### Usage alerts
+
+`set_usage_alerts` replaces the project's alerts: up to 10 thresholds per meter, each a percentage (1 to 100) of the limit, notifying chosen project roles in Final. Each crossing also emits `observability.usage.threshold_crossed` on the [event feed](/observability/reference/events), so a workflow or webhook can act on it.
+
+```ts
+import { ProjectRole, UsageMeter } from '@finalai/observability/contract';
+
+await project.admin.setUsageAlerts({
+  alerts: [
+    { meter: UsageMeter.EvaluationSpend, thresholdPercent: 80, notifyRoles: [ProjectRole.Admin] },
+    { meter: UsageMeter.EvaluationSpend, thresholdPercent: 100, notifyRoles: [ProjectRole.Admin, ProjectRole.Editor] },
+  ],
+});
+```
+
+## Limits
+
+| Limit | Default |
+| --- | --- |
+| OTLP request | 50 MB as sent, 20 MB decompressed, 8 MiB per span. See [ingest](/observability/reference/ingest#limits). |
+| Observations per request | 100 |
+| Online evaluations | Burst of 100, then 100 per minute per project. Over it: `skipped_rate_limited`. |
+| Test scoring | Burst of 100, then 100 per minute per project. |
+| SQL queries | Burst of 40, then 4 per second per project. See [SQL limits](/observability/reference/sql#limits). |
+| Cases per `add_test_cases` call | 1,000 |
+| Code judge bundle | 1 MiB |
+
+Rate limits can be raised per organization; contact Final.
+
+## Retention
+
+Set retention per project, in days (1 to 3,650), for four kinds of data:
+
+| Setting | Covers |
+| --- | --- |
+| `rawDays` | Raw ingested batches. Mappers can be [reapplied](/observability/reference/attributes#reproject) only within this window. |
+| `projectionDays` | Searchable traces, spans and observations. |
+| `attachmentDays` | Attachments and large attribute values. |
+| `derivedDays` | Evaluations, health results and other derived records. |
+
+## Deletion
+
+`delete_traces` deletes traces by ID or filter. They're hidden from every read at once, then purged from storage. `list_deletion_requests` shows each request as `pending`, `hidden` (no longer readable, purge in progress), `completed` or `failed`, and completion emits `observability.deletion.completed`.
+
+```ts
+await project.admin.deleteTraces({ filter: { customerIds: ['cus_42'] } });
+```
+
+Deleting a project deletes all of its Observability data the same way.
+
+## Audit
+
+Every write operation is recorded. `list_audit_events` returns, newest first, the operation (its tool name), the actor (a user, API key, agent or Final itself), the target and a digest of the input. Filter by operation, actor and time.

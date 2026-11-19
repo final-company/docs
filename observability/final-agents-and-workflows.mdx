@@ -1,0 +1,49 @@
+---
+title: "Final agents and workflows"
+---
+
+Agents built with the [Agent SDK](/agent-sdk) and [AI Workflows](/workflows/overview) report to Observability natively. Nothing to install: turn on the producers for a project, and its sessions, model calls and workflow runs arrive as standard OpenTelemetry traces through the same ingest path as any other app.
+
+## Turn on the producers
+
+Producers are off by default and opt-in per project. Turn them on in your project's **Observability** settings under **Producers**, or with the API:
+
+```ts
+import { createObservabilityClient } from '@finalai/observability/client';
+
+const client = createObservabilityClient({
+  baseUrl: 'https://api.final.ai',
+  apiKey: process.env.FINAL_API_KEY!, // needs observability:write
+});
+
+await client.project('prj_your_project').admin.updateObservabilitySettings({
+  producers: { agentSessions: true, modelCalls: true, workflows: true },
+});
+```
+
+| Producer | What it sends |
+| --- | --- |
+| `agentSessions` | Agent sessions: each turn is a trace with the session as `final.session_id`, and tool calls, decisions and approvals as spans. A delegated session is a linked trace. |
+| `modelCalls` | Every model call the project's agents make through Final, as an `llm` span with the exact request and response. |
+| `workflows` | Each workflow run is a trace: the run is the root, steps are children, and waits and approvals are explicit spans covering the gap. Agent sessions a step starts link to the step. |
+
+## One connected execution
+
+A workflow step that runs an agent links the agent session's traces to the step, and the session's model calls nest under its turns. A run reads end to end: workflow run, steps, agent sessions, model and tool calls.
+
+Model usage and cost come from the same record Final bills from. These spans carry `final.usage.source` = `agent_model_usage` and the request ID in `final.usage.request_id`, and usage totals, dashboards and charges count each request once.
+
+## Outcome signals
+
+Final also records outcomes it already knows as [external judge results](/observability/alignment#external-feedback), with source `final_outcome`:
+
+- a task deliverable accepted, or changes requested;
+- a decision resolved;
+- a reaction to a message;
+- why a turn stopped.
+
+These are evidence of how the work landed, kept separate from judged correctness. Use them in judges, tests, SQL and dashboards like any other result.
+
+## Your own code in the same trace
+
+Code you run from an agent or workflow, such as a tool's backend, can continue the trace with `continueTrace` when the request carries `traceparent`. See [distributed tracing](/observability/tracing-patterns#distributed-services).

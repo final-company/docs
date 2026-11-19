@@ -1,0 +1,73 @@
+---
+title: "Datasets and prompts"
+---
+
+## Datasets
+
+A dataset is a set of rows (examples) validated by a JSON Schema you choose. Every change creates a version, and earlier versions keep their rows, so a test run or export always names exactly what it used. Names are unique per project. Example payloads are stored in the [data plane](/observability/byoc/overview#the-content-boundary) with your traces.
+
+```ts
+const dataset = await project.data.createDataset({
+  name: 'refund-requests',
+  schema: {
+    type: 'object',
+    properties: {
+      question: { type: 'string' },
+      expected_action: { type: 'string', enum: ['refund', 'escalate', 'decline'] },
+    },
+    required: ['question'],
+  },
+});
+
+await project.data.addExamplesToDataset({
+  datasetId: dataset.datasetId,
+  examples: [{ data: { question: 'I was charged twice', expected_action: 'refund' } }],
+});
+```
+
+A schema may have at most one `trace` column, plus `session` fields. You can change the schema until test cases reference the dataset; after that it's frozen.
+
+### Ways to fill a dataset
+
+| Operation | What it does |
+| --- | --- |
+| `add_examples_to_dataset` | Adds up to 1,000 rows, each optionally linked to a trace or session. |
+| `add_traces_to_dataset` | Adds traces or sessions, by ID or filter, using a preset: `trace`, `session`, `llm_eval` (the model call's input and output) or `full_trace`. |
+| `import_dataset` | Imports JSON Lines or CSV content. |
+| `create_golden_dataset` | Turns judge reviews into rows with the reviewers' labels. See [alignment](/observability/alignment#golden-datasets). |
+| `create_labeled_dataset` | Copies a dataset with each example's current label from chosen judges added as columns. |
+| `add_to_dataset` action | Adds traces automatically when a judge matches. See [actions](/observability/judge-actions). |
+
+`update_example` replaces a row's data and `remove_examples_from_dataset` removes rows from the current version; both create a version. `list_examples({ version })` and `export_dataset({ format, version })` read any version.
+
+To turn recent failures into examples, ask the [observability agent](/observability/agent); it finds them with search and SQL and adds them with these tools.
+
+## Prompts
+
+Prompts are versioned templates: text, or chat messages, plus the model and its parameters. Tags such as `production`, `staging` or your own point at a version and move when you retag.
+
+```ts
+import { PromptKind } from '@finalai/observability/contract';
+
+await project.data.createPrompt({
+  name: 'support-reply',
+  kind: PromptKind.Chat,
+  messages: [{ role: 'system', content: 'You are a support agent for Acme. Be brief.' }],
+  model: 'claude-opus-5-5',
+  commitMessage: 'First version',
+});
+
+await project.data.tagPromptVersion({ name: 'support-reply', tag: 'production', version: 1 });
+```
+
+Fetch a prompt by tag or version number (the latest by default), render it with your values, and record the version on the trace:
+
+```ts
+import { setAttributes } from '@finalai/observability/node';
+
+const prompt = await project.data.getPrompt({ name: 'support-reply', tag: 'production' });
+setAttributes({ 'final.prompt.version_id': prompt.version.promptVersionId });
+// prompt.version.messages, .template, .variables, .model and .modelParams
+```
+
+Every version names its model; there is no default. `create_prompt_version` adds a version, `untag_prompt_version` removes a tag, and `delete_prompt` deletes a prompt with all its versions.

@@ -1,0 +1,77 @@
+---
+title: "Observability"
+icon: "chart-line"
+---
+
+import AgentSetup from '/snippets/agent-setup/observability.mdx';
+
+Final Observability records what your AI agents and workflows do, scores it, and turns failures into tests and fixes. It works with agents that run anywhere: send OpenTelemetry from any language, or use the TypeScript SDK. Final's own agents and workflows report through the same interfaces.
+
+```ts
+import { SpanKind, init, observe, setSession } from '@finalai/observability/node';
+import { wrapOpenAI } from '@finalai/observability/integrations';
+import OpenAI from 'openai';
+
+init({ environment: 'production' }); // reads FINAL_API_KEY
+
+const openai = wrapOpenAI(new OpenAI());
+
+export const answer = observe(
+  async (question: string, conversationId: string) => {
+    setSession(conversationId);
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5.1',
+      messages: [{ role: 'user', content: question }],
+    });
+    return response.choices[0]?.message.content;
+  },
+  { name: 'answer', kind: SpanKind.Agent },
+);
+```
+
+Every operation is available four ways, all generated from one contract: the HTTP API under `https://api.final.ai/v1/observability`, the `@finalai/observability` SDK, the `final-obs` CLI, and [Final MCP tools](/observability/mcp) that your coding agent or the observability agent can call.
+
+## Concepts
+
+| Term | What it means |
+| --- | --- |
+| **Trace** | One unit of work, such as an agent turn or a workflow run, as a tree of spans. Each span has a kind (`llm`, `tool`, `function`, `agent`, `generator` or `span`), input, output, usage and cost. |
+| **Session** | The traces of one conversation or thread, grouped by `final.session_id` on each root span. |
+| **Trace health** | Checks that each trace is complete enough to evaluate: one root, valid timing, inputs and outputs, models, usage and cost. See [trace health](/observability/reference/trace-health). |
+| **Judge** | An evaluator that scores spans, traces or sessions. Judges are agentic (a model with a rubric), deterministic (conditions), code (TypeScript), or external (results you submit). See [judges](/observability/judges). |
+| **Label** | One of a judge's possible outputs, such as `Hallucinated` or `Matched`. Labels have rates and time series, and they index your traces for search, SQL and the agent. |
+| **Evaluation** | One judge version's result on one target, with its value, reason, citations, cost and provenance. Online evaluation runs production judge versions on new traces. |
+| **Dataset** | Versioned rows with a JSON Schema, built from traces, files or judge reviews. See [datasets and prompts](/observability/datasets-and-prompts). |
+| **Test suite** | Versioned cases with checks against judge results. Runs score your agent, compare against a baseline, and gate CI. See [tests](/observability/tests). |
+| **Issue** | A recurring failure with cited evidence, severity, status and a monitoring judge. Detection opens issues; you triage them and hand them to a coding agent. See [issues](/observability/issues). |
+| **Observability agent** | A Final agent with every Observability tool, for investigation in chat, on a schedule, or in Slack. See [the observability agent](/observability/agent). |
+| **Data plane** | Where ingest, telemetry, attachments and evaluation outputs live. Final hosts it by default; you can run it in your own AWS account. See [BYOC data plane](/observability/byoc/overview). |
+
+## How it fits together
+
+<Steps>
+  <Step title="Send traces">
+    Instrument with the [TypeScript SDK](/observability/quickstart), any [OpenTelemetry SDK or Collector](/observability/quickstart-otlp), or [Workers](/observability/quickstart-workers). For [Final agents and workflows](/observability/final-agents-and-workflows), turn on the native producers.
+  </Step>
+  <Step title="Check trace health">
+    Fix what the health checks report, so judges see complete evidence.
+  </Step>
+  <Step title="Score">
+    Create judges, publish a version, and turn on [online evaluation](/observability/online-evaluation). [Actions](/observability/judge-actions) start workflows, notify people, post to Slack, or add traces to datasets when a judge matches.
+  </Step>
+  <Step title="Find and fix">
+    Detection opens [issues](/observability/issues). Monitor each with a judge, turn failures into [test cases](/observability/tests), and gate changes in [CI](/observability/tests-in-ci).
+  </Step>
+</Steps>
+
+## Let an agent set it up
+
+Give this prompt to your coding agent from the repository you want to instrument.
+
+<AgentSetup />
+
+## Next steps
+
+- [Quickstart: TypeScript SDK](/observability/quickstart)
+- [Quickstart: OpenTelemetry](/observability/quickstart-otlp)
+- [Connect a coding agent over MCP](/observability/mcp)
