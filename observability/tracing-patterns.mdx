@@ -1,5 +1,6 @@
 ---
 title: "Tracing patterns"
+description: "Shape traces for streaming, distributed services, queues, workflow engines, approvals and subagents."
 ---
 
 How to shape traces for the ways agents actually run. Every helper here is exported from both `@finalai/observability/node` and `@finalai/observability/workers`.
@@ -40,7 +41,7 @@ Send the trace context with outgoing requests, and continue it on the receiving 
 import { continueTrace, inject } from '@finalai/observability/node';
 
 // Caller
-await fetch('https://tools.internal/search', { method: 'POST', headers: inject({}), body });
+await fetch('https://tools.example.com/search', { method: 'POST', headers: inject(), body });
 
 // Receiver
 export const handle = (request: Request) => continueTrace(request.headers, () => search(request));
@@ -55,10 +56,10 @@ Store the carrier with the message, and continue the trace when a worker picks i
 ```ts
 import { continueTrace, inject, span } from '@finalai/observability/node';
 
-await queue.send({ payload, trace: inject({}) });
+await queue.send({ payload, trace: inject() });
 
 worker.on('message', (message) =>
-  continueTrace(message.trace, () => span('process message', () => process(message.payload))),
+  continueTrace(message.trace, () => span('process message', () => handleMessage(message.payload))),
 );
 ```
 
@@ -94,7 +95,7 @@ import { TraceLinkRelation, continueTrace, inject, span, startLinkedTrace } from
 // Before waiting: save the context with the pending approval, then let the trace end.
 await span('draft refund', async () => {
   const draft = await draftRefund();
-  await approvals.save({ draft, trace: inject({}) });
+  await approvals.save({ draft, trace: inject() });
 });
 
 // After approval, possibly in another process:

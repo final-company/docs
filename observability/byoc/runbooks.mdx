@@ -1,22 +1,23 @@
 ---
 title: "Runbooks"
+description: "Recover from outages, reproject traces, delete data and rotate credentials on a BYOC data plane."
 ---
 
 Operating a BYOC data plane. Each section says what you'll see, why, and what to do.
 
 ## How ingest stays durable
 
-The data plane acknowledges a request only after the raw batch is written to S3 and a pointer to it is appended to the project's durable stream. Projection into ClickHouse runs after that, from a checkpoint, and writes with idempotent keys. So:
+The data plane acknowledges a request only after the raw batch is written to S3 and queued for processing. Processing into ClickHouse runs after that, from a checkpoint, and writes with idempotent keys. So:
 
-- an acknowledged batch is never lost, even if projection is down;
+- an acknowledged batch is never lost, even if processing is down;
 - a replayed or duplicated batch converges to the same rows;
 - spans that arrive out of order or after their root are placed in their trace.
 
 ## Recovery
 
-**The data plane is down or unreachable.** `get_data_plane` shows `unreachable`. Exporters get errors and retry with their own backoff, so keep their queues large enough to ride out an outage. Restore the ECS services (check task health, the load balancer target group and the RDS instance), then confirm `get_data_plane` returns `active`.
+**The data plane is down or unreachable.** `get_data_plane` shows `unreachable`. Exporters get errors and retry with their own backoff, so keep their queues large enough to ride out an outage. Restore the data plane (check its containers' health, the load balancer's targets and PostgreSQL), then confirm `get_data_plane` returns `active`.
 
-**Ingest is accepted but traces don't appear.** Projection is behind or stopped. Check the data plane service's logs and its ClickHouse connection. When it recovers, projection resumes from its checkpoint and catches up; nothing needs to be resent.
+**Ingest is accepted but traces don't appear.** Processing is behind or stopped. Check the data plane's logs and its ClickHouse connection. When it recovers, processing resumes from its checkpoint and catches up; nothing needs to be resent.
 
 **ClickHouse lost data.** Raw batches in S3 are the source of truth within raw retention. Restore ClickHouse, then [reproject](#reprojection) the affected range.
 
@@ -34,7 +35,7 @@ It's idempotent: running it twice gives the same result. It only covers batches 
 
 ## Deletion
 
-`delete_traces` hides traces from every read at once: the SQL catalog and the evidence API filter them out. Physical deletion from ClickHouse, S3 and the stream follows.
+`delete_traces` hides traces from every read at once: the SQL catalog and the evidence API filter them out. Physical deletion from ClickHouse and S3 follows.
 
 1. Request it: `delete_traces({ traceIds })` or `delete_traces({ filter })`.
 2. Follow it: `list_deletion_requests` moves from `pending` to `hidden` to `completed`, and `observability.deletion.completed` is emitted.

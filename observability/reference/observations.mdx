@@ -1,5 +1,6 @@
 ---
 title: "Observations"
+description: "Send conversation items on spans or on their own, and control how conversations are shown."
 ---
 
 Observations are conversation items: messages, tool calls and results, reasoning and your own items. Attach them to spans for an exact conversation view, or send them on their own to import conversations that have no traces.
@@ -44,8 +45,8 @@ From the SDK, `setConversationObservation(observation)` attaches one to the acti
 | --- | --- | --- |
 | `kind` | Yes | `message`, `tool_call`, `tool_result`, `reasoning` or `custom`. |
 | `observedAt` | Yes | ISO 8601 with offset. Within 26 weeks before and 5 minutes after the request. |
-| `conversationId` | Without a trace | The conversation the item belongs to. |
-| `traceId`, `spanId` | | Attach the item to a span. |
+| `conversationId` | Without a `traceId` | The conversation the item belongs to. |
+| `traceId`, `spanId` | | Attach the item to a trace or span. A `spanId` needs a `traceId`. |
 | `role` | | Such as `user`, `assistant`, `system` or `tool`. |
 | `name` | | A tool name, or your custom item's name. |
 | `model` | | The model that produced the item. |
@@ -68,7 +69,16 @@ From the SDK, `setConversationObservation(observation)` attaches one to the acti
 
 ## Validation
 
-Requests are strict. An observation with an unknown field, or a field of the wrong type, is rejected on its own; the rest of the request is accepted. Each rejection reports its `index` in the request, a `code` and a `message`.
+Requests are strict. An observation with an unknown field, or a field of the wrong type, is rejected on its own; the rest of the request is accepted. An unknown field at the top level of the body, or more than 100 observations, rejects the whole request with `400`.
+
+Each rejection reports its `index` in the request, a `message` and one of these codes:
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_observation` | The observation doesn't match the schema. |
+| `observed_at_out_of_range` | `observedAt` is outside the accepted window. |
+| `conversation_required` | The observation has neither a `traceId` nor a `conversationId`. |
+| `trace_required` | The observation has a `spanId` without a `traceId`. |
 
 ## How they're shown
 

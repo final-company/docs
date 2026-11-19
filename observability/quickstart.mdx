@@ -1,13 +1,14 @@
 ---
 title: "Quickstart: TypeScript SDK"
 sidebarTitle: "TypeScript SDK"
+description: "Install the TypeScript SDK, send your first trace from a Node app, and check its trace health."
 ---
 
 Send your first trace from a Node app and check that it arrived healthy. You need Node 26 or later and a Final project.
 
 <Steps>
   <Step title="Create an ingest key">
-    In the [Final dashboard](https://console.final.ai), open your project's **Observability** settings and create an ingest key. The secret is shown once. An ingest key belongs to one project and can only send telemetry; see [scopes and keys](/observability/reference/scopes).
+    In the [Final dashboard](https://console.final.ai), go to **Observability** > **Settings**, open the **Ingest keys** tab and click **Create key**. The secret is shown once. An ingest key belongs to one project and can only send telemetry; see [scopes and keys](/observability/reference/scopes).
 
     ```bash
     export FINAL_API_KEY='paste-your-ingest-key'
@@ -57,10 +58,10 @@ Send your first trace from a Node app and check that it arrived healthy. You nee
     npx tsx agent.ts
     ```
 
-    `final-obs doctor` reads the trace back, which an ingest key can't do. Run it with an [API key](/api-keys) that has `observability:read` as `FINAL_API_KEY`, and pass the ingest key as `FINAL_INGEST_KEY` so the test span is sent with it:
+    `final-obs doctor` reads the trace back, which an ingest key can't do. Create an [API key](/api-keys) with `observability:read`, pass it as `FINAL_API_KEY`, and pass the ingest key as `FINAL_INGEST_KEY` so the test span is sent with it:
 
     ```bash
-    FINAL_INGEST_KEY="$FINAL_API_KEY" FINAL_API_KEY="$FINAL_READ_KEY" npx final-obs doctor
+    FINAL_INGEST_KEY="$FINAL_API_KEY" FINAL_API_KEY='paste-your-api-key' npx final-obs doctor
     ```
 
     `doctor` checks your credentials, sends a test span, waits for it to arrive and prints the project's trace health:

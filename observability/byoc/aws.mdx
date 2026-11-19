@@ -1,32 +1,31 @@
 ---
 title: "Deploy on AWS"
+description: "Deploy an Observability data plane in your AWS account and register it with Final."
 ---
 
-Final's `observability-dataplane` Terraform module deploys the data plane into an AWS account you own. Ask Final to enable BYOC for your organization to get the module and its release images.
+A BYOC data plane runs in an AWS account you own. BYOC is enabled per organization: ask Final to enable it, and Final provides the deployment and the data plane's release images.
 
-## What the module creates
+## What runs in your account
 
-| Resource | Purpose |
+| Component | Purpose |
 | --- | --- |
-| ECS Fargate services | The data plane and its durable stream service, from Final's published images. |
-| Application Load Balancer | The data plane's HTTPS endpoint, with your TLS certificate. |
-| RDS PostgreSQL | Ingest state, checkpoints, tombstones, health rollups and scheduled work. The module applies the data plane's schema baseline. |
-| S3 bucket | Raw batches, attachments, large attribute values and evaluation bundles, with lifecycle rules. |
-| VPC endpoints | Private access to AWS services. |
-| IAM role | The data plane's access to the bucket and its own resources. |
-| ClickHouse (optional) | A single-node EC2 instance, if you don't bring your own. |
+| Container service | Runs the data plane from Final's published images. |
+| Load balancer | The data plane's HTTPS endpoint, with your TLS certificate. |
+| PostgreSQL | Ingest state, checkpoints, deletion records and scheduled work. |
+| S3 bucket | Raw batches, attachments and large attribute values. |
+| ClickHouse | Traces, spans, observations, scores and the SQL catalog. |
 
 You provide:
 
 - the VPC and subnets to deploy into;
 - a TLS certificate for the endpoint's domain;
-- a ClickHouse endpoint: ClickHouse Cloud in your account, or the module's single-node option.
+- a ClickHouse endpoint the data plane can reach, such as ClickHouse Cloud or your own cluster.
 
 ## Deploy and register
 
 <Steps>
-  <Step title="Plan and apply">
-    Add the module to your Terraform with the inputs above, then run `terraform plan`, review every change, and `terraform apply`. Keep the data plane's HTTPS endpoint and its PEM public key for the next step.
+  <Step title="Deploy">
+    Deploy the data plane into your account with the deployment Final provides, and review every change before you apply it. Keep the data plane's HTTPS endpoint and its PEM public key for the next step.
   </Step>
   <Step title="Register the data plane">
     An organization admin registers it for a project:
@@ -39,7 +38,7 @@ You provide:
     });
     ```
 
-    The endpoint must be HTTPS. The control plane verifies the data plane with this key, and calls it over mutual TLS with signed tokens; unsigned calls are rejected.
+    The endpoint must be HTTPS. A new registration starts as `pending`.
   </Step>
   <Step title="Check it">
     ```ts
@@ -53,8 +52,8 @@ You provide:
 
 ## Upgrades
 
-Final publishes data plane images with each release. To upgrade, update the module version, then plan, review and apply.
+Final publishes data plane images with each release. To upgrade, deploy the new version, reviewing the changes before you apply them.
 
 ## Rotate the key
 
-Register the data plane again with its new public key. `register_data_plane` replaces the registration; the previous key stops working.
+Register the data plane again with its new public key. `register_data_plane` replaces the registration, including its key.

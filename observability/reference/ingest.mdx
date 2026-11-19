@@ -1,6 +1,7 @@
 ---
 title: "Ingest contract"
 sidebarTitle: "Ingest"
+description: "OTLP and observation endpoints, headers, limits, status codes, partial success and root finalization."
 ---
 
 ## Endpoints
@@ -18,7 +19,7 @@ Both are on `https://api.final.ai`. OpenTelemetry exporters take `https://api.fi
 | --- | --- |
 | `Authorization` | `Bearer <key>`: an ingest key, or an API key with `observability:ingest`. |
 | `Content-Type` | `application/x-protobuf` or `application/json`. |
-| `Content-Encoding` | `gzip`, optional. |
+| `Content-Encoding` | `gzip`, optional. Other encodings return `415`. |
 
 The project comes from the key, never from the payload. Spans can't write to another project, whatever their attributes say.
 
@@ -26,38 +27,39 @@ The project comes from the key, never from the payload. Spans can't write to ano
 
 | Limit | Value |
 | --- | --- |
-| Request body as sent | 50 MB |
-| Decompressed request | 20 MB |
-| One span | 8 MiB |
+| Gzip-compressed request body | 50 MB |
+| Uncompressed request body, or a gzip body once decompressed | 20 MB |
+| Attributes on one span, including its events and links | 8 MiB |
 | Observations per request | 100 |
+| Parts per observation | 100 |
 | Observation time | `observedAt` within 26 weeks before and 5 minutes after the request |
 
-A request over a size limit returns `413`. Attribute values above 64 KiB are stored separately and read in pages with `read_span_attribute`; `get_span` returns a preview.
+A request over a size limit returns `413` and nothing in it is stored. A request with more than 100 observations returns `400`. Attribute values above 64 KiB are stored separately and read in pages with `read_span_attribute`; `get_span` returns a preview.
 
 ## Status codes
 
 | Status | Meaning | What to do |
 | --- | --- | --- |
-| `200`, `202` | Accepted and stored durably. | Nothing. Check the body for [partial success](#partial-success). |
+| `200` | Accepted and stored durably. | Nothing. Check the body for [partial success](#partial-success). |
 | `400` | The body couldn't be decoded. | Fix the payload. Don't retry it unchanged. |
 | `401` | Missing or invalid key. | Check the key. |
 | `402` | The project reached its spend cap. | Raise the cap; see [usage and spend](/observability/administration#usage-and-spend). |
 | `403` | The key lacks `observability:ingest`. | Use an ingest key. |
 | `413` | Over a size limit. | Send smaller batches. |
-| `429` | Rate limited. | Retry with backoff. |
+| `415` | An unsupported `Content-Encoding`. | Send `gzip` or uncompressed. |
 | `5xx` | Not stored. | Retry with backoff. |
 
-A `2xx` is returned only after the raw batch is written to durable storage. Anything Final acknowledged is kept, even if processing it later is delayed; nothing needs to be resent. Rejected ingest is reported as `observability.ingest.rejected` on the [event feed](/observability/reference/events).
+A `200` is returned only after the raw batch is written to durable storage. Anything Final acknowledged is kept, even if processing it later is delayed; nothing needs to be resent.
 
 ## Partial success
 
 When some spans in an OTLP batch are rejected and the rest are stored, the response follows the OTLP specification: `200` with `partialSuccess.rejectedSpans` and an `errorMessage`. Don't retry the batch; fix what the message describes.
 
-The observations endpoint returns `accepted` (a count) and `rejected`, with each rejected observation's `index`, `code` and `message`. Unknown fields reject that observation, not the request.
+The observations endpoint returns `accepted` (a count) and `rejected`, with each rejected observation's `index`, `code` and `message`. An unknown field inside an observation rejects that observation only; an unknown field at the top level of the body rejects the request with `400`. See [validation](/observability/reference/observations#validation).
 
 ## Root finalization
 
-A trace is final when its root span has ended and a short grace period for late child spans has passed. Final then evaluates it once with every matching online judge. Spans that arrive after finalization are still stored and shown, but don't start another evaluation.
+A trace is final when its root span has ended and a grace period for late child spans (about 30 seconds) has passed. Final then evaluates it once with every matching online judge. Spans that arrive after finalization are still stored and shown, but don't start another evaluation.
 
 - **The session comes from the root.** `final.session_id` is read from the root span only; a session ID on a child doesn't group the trace.
 - **Keep roots short-lived.** A root that never ends is never evaluated. End traces at long waits and [link](/observability/tracing-patterns#human-approval-and-other-long-gaps) the next one.
@@ -71,11 +73,11 @@ Imported data never gets fabricated values. When usage, cost, reasoning or model
 
 Final reads these conventions, in addition to [`final.*` attributes](/observability/reference/attributes):
 
-- OpenTelemetry GenAI semantic conventions;
+- OpenTelemetry GenAI semantic conventions, including indexed prompt and completion attributes;
 - OpenInference;
 - Vercel AI SDK 6 and 7;
-- LangSmith and Logfire attributes;
-- Braintrust cost attributes;
-- common provider attributes.
+- attributes from other common tracing libraries.
+
+`final.*` attributes take precedence over every convention. When a model call reports usage but no cost, Final computes the cost from the model's prices where it knows them.
 
 Custom attributes are kept as sent. Use [mappers](/observability/reference/attributes#mappers) to map your own keys onto Final's.

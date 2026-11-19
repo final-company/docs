@@ -1,5 +1,6 @@
 ---
 title: "Error codes"
+description: "API error codes, SDK client error codes and final-obs exit codes."
 ---
 
 Failed API requests return a JSON body with a code and a message:
@@ -8,12 +9,13 @@ Failed API requests return a JSON body with a code and a message:
 { "error": { "code": "forbidden", "message": "missing observability:write permission" } }
 ```
 
-`details` is added where it helps, such as validation issues. The SDK client throws `ObservabilityApiError` (check with `isObservabilityApiError`) with `status`, `code`, `message`, `details`, `operation` and `requestId`. Include the request ID when you contact Final.
+API responses also carry `details`: extra information such as validation issues, or `null`. The SDK client throws `ObservabilityApiError` (check with `isObservabilityApiError`) with `status`, `code`, `message`, `details`, `operation` and `requestId`. Include the request ID when you contact Final.
 
 ## Server codes
 
 | Code | Status | Meaning |
 | --- | --- | --- |
+| `invalid_request` | 400 | The input failed validation, or the SQL isn't a single read-only statement over the [catalog](/observability/reference/sql#queries). |
 | `unauthorized` | 401 | Missing, invalid or expired credentials. |
 | `forbidden` | 403 | The key lacks the operation's scope, or your role doesn't allow it. Ingest keys get this for everything but ingest. |
 | `not_found` | 404 | No such object in this project. |
@@ -21,9 +23,10 @@ Failed API requests return a JSON body with a code and a message:
 | `spend_cap_reached` | 402 | The project reached its monthly cap. Ingest is refused and evaluations are skipped. |
 | `payload_too_large` | 413 | Over an [ingest limit](/observability/reference/ingest#limits). |
 | `rate_limited` | 429 | Too many requests. Retry with backoff. |
-| `query_rate_limited` | | Too many SQL queries. See [SQL limits](/observability/reference/sql#limits). |
-| `query_memory_limit` | | The SQL query used too much memory. |
-| `query_timeout` | | The SQL query ran too long. |
+| `query_rate_limited` | 429 | Too many SQL queries. See [SQL limits](/observability/reference/sql#limits). |
+| `query_memory_limit` | 422 | The SQL query used too much memory. |
+| `query_timeout` | 504 | The SQL query ran too long. |
+| `unavailable` | 503 | A dependency is temporarily unavailable. Retry with backoff. |
 
 Invalid input is rejected before anything runs: requests are strict, so unknown fields and wrong types are errors rather than being ignored. Other codes may appear; treat unknown codes by their HTTP status.
 

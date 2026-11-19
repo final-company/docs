@@ -1,12 +1,13 @@
 ---
 title: "Final agents and workflows"
+description: "Turn on native tracing for agent sessions, model calls and workflow runs built on Final."
 ---
 
 Agents built with the [Agent SDK](/agent-sdk) and [AI Workflows](/workflows/overview) report to Observability natively. Nothing to install: turn on the producers for a project, and its sessions, model calls and workflow runs arrive as standard OpenTelemetry traces through the same ingest path as any other app.
 
 ## Turn on the producers
 
-Producers are off by default and opt-in per project. Turn them on in your project's **Observability** settings under **Producers**, or with the API:
+Producers are off by default and opt-in per project. Turn them on in **Observability** > **Settings** > **Producers**, under **Export from Final**, or with the API:
 
 ```ts
 import { createObservabilityClient } from '@finalai/observability/client';
@@ -31,7 +32,7 @@ await client.project('prj_your_project').admin.updateObservabilitySettings({
 
 A workflow step that runs an agent links the agent session's traces to the step, and the session's model calls nest under its turns. A run reads end to end: workflow run, steps, agent sessions, model and tool calls.
 
-Model usage and cost come from the same record Final bills from. These spans carry `final.usage.source` = `agent_model_usage` and the request ID in `final.usage.request_id`, and usage totals, dashboards and charges count each request once.
+Model usage and cost come from the same record Final bills from. These spans carry `final.usage.source` = `final` (`FINAL_METERED_USAGE_SOURCE`) and the request ID in `final.usage.request_id`, and usage totals, dashboards and charges count each request once.
 
 ## Outcome signals
 

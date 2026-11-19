@@ -1,11 +1,12 @@
 ---
 title: "MCP tool reference"
 sidebarTitle: "Tool reference"
+description: "Every Observability MCP tool with its group, required scope and effect."
 ---
 
 {/* Generated from the operation inventory in @finalai/observability 0.1.0. Regenerate rather than edit by hand. */}
 
-Every Observability operation is one Final MCP tool. Its catalog path is `final.observability.<group>.<tool>`, for example `final.observability.traces.search_traces`. Every tool takes `projectId`. The same operation is an HTTP route under `/v1/observability`, a method on `client.project(id).<group>` in the SDK, and a `final-obs <group> <tool>` command.
+Every Observability operation is one Final MCP tool, 180 in all. Its catalog path is `final.observability.<group>.<tool>`, for example `final.observability.traces.search_traces`. Every tool takes `projectId`. The same operation is an HTTP route under `/v1/observability`, a method on `client.project(id).<group>` in the SDK, and a `final-obs <group> <tool>` command.
 
 **Scope** is the API key permission the call needs. **Effect** is what it does: `read` changes nothing, `write` creates or changes something, `execute` starts work that runs (and may spend money), and `destructive` deletes or replaces something that can't be recovered. See [scopes and keys](/observability/reference/scopes).
 
@@ -48,7 +49,7 @@ Every Observability operation is one Final MCP tool. Its catalog path is `final.
 
 ## Judges, evaluations & feedback
 
-`final.observability.judges`: Judges and versions, run settings, actions, labels, evaluations and external results. 28 tools.
+`final.observability.judges`: Judges and versions, run settings, actions, labels, evaluations and external results. 29 tools.
 
 | Tool | What it does | Scope | Effect |
 | --- | --- | --- | --- |
@@ -63,6 +64,7 @@ Every Observability operation is one Final MCP tool. Its catalog path is `final.
 | `promote_judge_version` | Make a published version the production version that runs online. | `observability:write` | write |
 | `set_judge_run_settings` | Set the draft's online evaluation: environments, conditions, sampling, session triggers and budget. | `observability:write` | write |
 | `upload_code_judge` | Upload a code judge's TypeScript bundle (up to 1 MiB) and its environment variables into the draft. | `observability:write` | write |
+| `get_code_judge_source` | Get the source files of a code judge's uploaded bundle (the draft's, or a given version's). | `observability:read` | read |
 | `list_judge_action_groups` | List the action groups of a judge's draft or a given version. | `observability:read` | read |
 | `set_judge_action_groups` | Replace the draft's action groups. Only online production results fire actions. | `observability:write` | write |
 | `list_action_deliveries` | List action deliveries with status, attempts and errors. | `observability:read` | read |
@@ -98,7 +100,7 @@ Every Observability operation is one Final MCP tool. Its catalog path is `final.
 
 ## Datasets & prompts
 
-`final.observability.data`: Datasets, examples, imports and exports, and versioned prompts. 21 tools.
+`final.observability.data`: Datasets, examples, imports and exports, and versioned prompts. 22 tools.
 
 | Tool | What it does | Scope | Effect |
 | --- | --- | --- | --- |
@@ -117,6 +119,7 @@ Every Observability operation is one Final MCP tool. Its catalog path is `final.
 | `export_dataset` | Export a dataset version as JSON Lines or CSV. | `observability:read` | read |
 | `create_labeled_dataset` | Copy a dataset with each example's current label from the chosen judges added as columns. | `observability:write` | write |
 | `list_prompts` | List prompts with their tags. | `observability:read` | read |
+| `list_prompt_versions` | List a prompt's versions, newest first. | `observability:read` | read |
 | `get_prompt` | Get a prompt at a tag or version number (default: latest). | `observability:read` | read |
 | `create_prompt` | Create a prompt with its first version. | `observability:write` | write |
 | `create_prompt_version` | Add a version to a prompt. | `observability:write` | write |

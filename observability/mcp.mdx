@@ -1,6 +1,7 @@
 ---
 title: "Use Observability over MCP"
 sidebarTitle: "MCP"
+description: "Connect Claude Code, Codex, Cursor or any MCP client and use every Observability operation as a tool."
 ---
 
 Every Observability operation is a Final MCP tool. Connect Claude Code, Codex, Cursor or any MCP client to Final, and your coding agent can search traces, read spans, write judges, run tests and fix issues in the same session where it edits your code.
@@ -53,7 +54,7 @@ Using Final, find yesterday's production traces in project prj_your_project wher
 
 ## How agents find the tools
 
-Your client doesn't load 178 tools. It sees Final's discovery tools and searches for what it needs: `search_tools` finds a tool, `describe_tools` returns its exact input schema, and `call_tool` runs it. Observability tools have catalog paths like `final.observability.traces.search_traces`. Agents running on Final find them the same way, through tool search.
+Your client doesn't load 180 tools. It sees Final's discovery tools and searches for what it needs: `search_tools` finds a tool, `describe_tools` returns its exact input schema, and `call_tool` runs it. Observability tools have catalog paths like `final.observability.traces.search_traces`. Agents running on Final find them the same way, through tool search.
 
 Every tool takes `projectId`. Agents running in a Final session are confined to their own project and its sub-projects.
 

@@ -1,5 +1,6 @@
 ---
 title: "Trace health"
+description: "The checks that make traces complete enough to evaluate, their states, and how to fix failures."
 ---
 
 Trace health checks that traces carry what judges, search and dashboards need. Each failing check comes with remediation text and a fix prompt you can give a coding agent.
@@ -10,17 +11,17 @@ Trace health checks that traces carry what judges, search and dashboards need. E
 | --- | --- |
 | `root_exists` | The trace has a root span. |
 | `one_root` | The trace has exactly one root span. |
-| `valid_timing` | Every span ends after it starts. |
+| `valid_timing` | Every span has ended, no earlier than it started. |
 | `parents_exist` | Every span's parent is in the trace. |
 | `parent_contains_child_timing` | Children start and end within their parent. |
-| `input_present` | The root has an input. |
-| `output_present` | The root has an output. |
-| `consistent_session_id` | Spans don't disagree about the session, and the root carries it. |
+| `input_present` | The root has an input. A truncated or redacted input counts. |
+| `output_present` | The root has an output. A truncated or redacted output counts. |
+| `consistent_session_id` | Child spans carry no session other than the root's. |
 | `llm_model_present` | Every model call names its model. |
-| `valid_usage` | Token counts on model calls are present and consistent. |
-| `valid_cost` | Cost on model calls is present and not negative, or explicitly unknown. |
-| `conversation_items_present` | The conversation view has items. |
-| `conversation_roles_valid` | Conversation items have valid roles. |
+| `valid_usage` | Every model call has input and output token counts of 0 or more, and a total no smaller than their sum. |
+| `valid_cost` | Every model call has a cost of 0 or more. A missing cost fails, unless Final can compute it from usage. |
+| `conversation_items_present` | A trace with model calls or observations has at least one conversation item. |
+| `conversation_roles_valid` | Every message's role is `system`, `developer`, `user`, `assistant` or `tool`. |
 
 The first eleven check tracing; the last two check the conversation view.
 
@@ -28,13 +29,23 @@ Each check on a trace returns `pass`, `fail` or `not_evaluated` (when it doesn't
 
 ## States
 
+A trace's health state:
+
 | State | Meaning |
 | --- | --- |
-| `healthy` | Every applicable check passes. |
-| `needs_fixes` | Some checks fail. Fix the instrumentation. |
-| `limited` | Health is only partly known, because some checks couldn't run. |
-| `not_evaluated` | Not checked yet. |
-| `unavailable` | Health data isn't available. |
+| `healthy` | No check fails. |
+| `needs_fixes` | A structural check fails: `root_exists`, `one_root`, `valid_timing`, `parents_exist`, `input_present` or `output_present`. Fix the instrumentation. |
+| `limited` | Only other checks fail, such as model, usage, cost or conversation checks. Judges can read the trace, with less to go on. |
+| `not_evaluated` | No check applied to the trace. |
+
+The summary over a window uses the same names:
+
+| State | Meaning |
+| --- | --- |
+| `healthy` | Every check passes on every trace it applies to. |
+| `needs_fixes` | Some check fails on at least one trace. |
+| `limited` | Nothing fails, but some check applied to none of the traces, such as model checks when no trace has a model call. |
+| `not_evaluated` | No traces were checked in the window. |
 
 ## Read health
 

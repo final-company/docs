@@ -1,5 +1,6 @@
 ---
 title: "Dashboards and SQL"
+description: "Query traces, scores, issues and test results with SQL, and chart them on dashboards."
 ---
 
 Query traces, scores, issues, datasets and test results with SQL, and chart the results on dashboards. The same catalog serves the console, the API, MCP and the observability agent.
@@ -19,7 +20,7 @@ const result = await project.analytics.sqlQuery({
 });
 ```
 
-Queries are ClickHouse SQL: one `SELECT` or `WITH` statement, read-only, over your project's catalog. `{start_time}` and `{end_time}` are filled in from `from` and `to`. Call `discover_schema` for the tables and columns; column names above are illustrative. See the [SQL reference](/observability/reference/sql) for the catalog and limits.
+Queries are ClickHouse SQL: one `SELECT` or `WITH` statement, read-only, over your project's catalog. `{start_time}` and `{end_time}` are filled in from `from` and `to`. Call `discover_schema` for every table and column with its description. See the [SQL reference](/observability/reference/sql) for the catalog and limits.
 
 Save queries with `save_query`, list them with `list_saved_queries`, and delete them with `delete_saved_query`.
 

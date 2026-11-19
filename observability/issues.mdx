@@ -1,5 +1,6 @@
 ---
 title: "Issues"
+description: "Detect recurring failures, triage them, monitor each with a judge, and hand fixes to a coding agent."
 ---
 
 An issue is a recurring failure in your agent, backed by evidence. Detection opens issues, you triage them, a judge monitors each one, and a coding agent fixes it.
@@ -37,7 +38,7 @@ You can set `needs_review`, `dismissed` and `inactive` with `update_issue`; the 
 
 ## Detection
 
-Two kinds of detection open and update issues. Configure both with `update_issue_detection`, or in **Observability** > **Issues** > **Detection**.
+Two kinds of detection open and update issues. Configure both with `update_issue_detection`, or with **Detection settings** on the **Issues** page.
 
 **Agentic detection** is a scheduled analysis by the detection agent. It reads recent traces, labels and health, and opens issues with cited evidence. Set its instructions, model, schedule (daily, weekly, an interval or cron, in a time zone) and optional Slack channels for reports. `run_issue_detection` runs it now and `stop_issue_detection` stops a run.
 

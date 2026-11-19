@@ -1,6 +1,7 @@
 ---
 title: "Judge actions"
 sidebarTitle: "Actions"
+description: "Start workflows, notify people, post to Slack or add traces to datasets when an online judge matches."
 ---
 
 When an online result matches, a judge can start a workflow, notify people, post to Slack, add the trace to a dataset, or run another judge. Actions are events: every match publishes `observability.judge.matched` to the project's [event feed](/observability/reference/events), and action groups decide what else happens. There is no email action; to send email, start a [workflow](/workflows/overview) that sends it.

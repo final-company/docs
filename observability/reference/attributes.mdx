@@ -1,6 +1,7 @@
 ---
 title: "Attribute keys and mappers"
 sidebarTitle: "Attributes and mappers"
+description: "The final.* attribute keys Final reads, and mappers that copy your own keys onto them."
 ---
 
 Final reads the `final.*` attributes below, plus OpenTelemetry GenAI, OpenInference and the other [conventions it normalizes](/observability/reference/ingest#normalization). Every other attribute is kept as sent. `FinalAttribute` in `@finalai/observability/contract` (also exported from `/node` and `/workers`) has every key.
@@ -52,7 +53,7 @@ Set these on the root span. The SDK's `setSession`, `setCustomer`, `setCustomerU
 | `final.usage.image_tokens` | Image tokens. |
 | `final.usage.total_tokens` | Total tokens. |
 | `final.usage.total_cost_usd` | Cost in USD. Omit when unknown; never send `0` for unknown. |
-| `final.usage.source` | Where usage came from. Final-metered calls say `agent_model_usage`. |
+| `final.usage.source` | Where usage came from. Model calls Final meters itself say `final` (`FINAL_METERED_USAGE_SOURCE` in the contract). |
 | `final.usage.request_id` | The metered request's ID. Usage is counted once per request ID. |
 
 When cost is missing, Final computes it from the model's published prices where it knows them, and otherwise leaves it empty.
@@ -76,6 +77,7 @@ When cost is missing, Final computes it from the model's published prices where 
 | `final.link.relation` | `fork`, `subagent` or `continuation`. |
 | `final.test.run_id`, `final.test.case_id`, `final.test.repeat` | Links a trace to a test case. Also sent as W3C baggage with the same names. |
 | `final.prompt.version_id` | The stored prompt version used. |
+| `final.workflow.run_id`, `final.workflow.step_id`, `final.workflow.agent_session_id`, `final.agent.session_id` | Set by Final's [native producers](/observability/final-agents-and-workflows): the workflow run, step and agent session a root span belongs to. |
 | `final.conversation.observation` | A conversation item on the span, as JSON. See [observations](/observability/reference/observations). |
 
 ## Mappers

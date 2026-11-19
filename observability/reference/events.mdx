@@ -1,9 +1,10 @@
 ---
 title: "Lifecycle events and webhooks"
 sidebarTitle: "Events and webhooks"
+description: "Observability lifecycle event kinds, the event feed, signed webhooks and workflow triggers."
 ---
 
-Observability publishes lifecycle events to a per-project feed. Read the feed, deliver it to webhooks, or start workflows from it. `LifecycleEventKind` in `@finalai/observability/contract` has every kind.
+Observability publishes lifecycle events to a per-project feed. Read the feed, or have it delivered to webhooks. `LifecycleEventKind` in `@finalai/observability/contract` names each kind.
 
 ## Kinds
 
@@ -19,10 +20,7 @@ Observability publishes lifecycle events to a per-project feed. Read the feed, d
 | `observability.test_run.completed` | A test run finished. |
 | `observability.dataset.version_created` | A dataset changed. |
 | `observability.usage.threshold_crossed` | A usage alert threshold was crossed. |
-| `observability.ingest.rejected` | Telemetry was rejected. |
 | `observability.deletion.completed` | A deletion request finished purging. |
-
-Each event has `eventId`, `kind`, `occurredAt` and `data`.
 
 ## Read the feed
 
@@ -31,7 +29,7 @@ curl -sS "https://api.final.ai/v1/observability/projects/$FINAL_PROJECT_ID/event
   -H "Authorization: Bearer $FINAL_API_KEY"
 ```
 
-`list_events` returns events in order, filtered by `kinds` and time, with `nextCursor` for the next page. It needs `observability:read`.
+`list_events` returns events in order, filtered by `kinds` and time (`from`, `to`), with `nextCursor` for the next page. Each event has `eventId`, `kind`, `occurredAt` and `data`. It needs `observability:read`.
 
 ## Webhooks
 
@@ -48,7 +46,28 @@ const subscription = await project.admin.createEventSubscription({
 // subscription.signingSecret is shown only here: store it now.
 ```
 
-Deliveries are signed per [Standard Webhooks](https://www.standardwebhooks.com/), like the [agent event feed](/operate/events#receive-webhooks): verify with `verifyWebhook` from `@finalai/agents/webhooks` or any Standard Webhooks library before trusting a delivery, and pass the body exactly as received.
+Each delivery is a `POST` of a batch of up to 100 events:
+
+```json
+{
+  "subscription": "…",
+  "events": [
+    {
+      "id": "…",
+      "kind": "observability.issue.created",
+      "createdAt": "2026-11-19T10:00:00Z",
+      "organizationId": "…",
+      "projectId": "…",
+      "data": {}
+    }
+  ],
+  "cursor": "…"
+}
+```
+
+Deliveries are signed per [Standard Webhooks](https://www.standardwebhooks.com/), with `webhook-id`, `webhook-timestamp` and `webhook-signature` headers and the subscription's `whsec_` secret. Verify the signature with any Standard Webhooks library before trusting a delivery, and pass the body exactly as received. `webhook-id` identifies the batch, so use each event's `id` to deduplicate.
+
+A failed delivery is retried with backoff, from 10 seconds up to an hour between attempts. The subscription shows `failing` meanwhile, and one that keeps failing for 3 days is paused.
 
 | Operation | What it does |
 | --- | --- |
@@ -59,6 +78,6 @@ Deliveries are signed per [Standard Webhooks](https://www.standardwebhooks.com/)
 
 ## Workflows
 
-To run a workflow when a judge matches, use a [`start_workflow` action](/observability/judge-actions#targets). Lifecycle events also reach your project's workflows as events, so a workflow with `onEvent('observability.issue.created')` starts on every new issue. See [workflow triggers](/workflows/triggers).
+To run a workflow when a judge matches, use a [`start_workflow` action](/observability/judge-actions#targets). For other kinds, subscribe a workflow's [webhook URL](/workflows/triggers#webhooks): each delivery starts a run with the delivery body as its input, so the workflow's input schema must accept it.
 
 There is no email channel. To email someone about an event, start a workflow that sends the email.

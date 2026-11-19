@@ -1,5 +1,6 @@
 ---
 title: "Judges"
+description: "Score spans, traces and sessions with agentic, deterministic, code and external judges, and version them."
 ---
 
 A judge scores a span, a trace or a session and returns one of its labels, a score, or pass/fail, with a reason. Judges run [online](/observability/online-evaluation) on new traces, on demand, over past traces, and in [tests](/observability/tests).
@@ -68,7 +69,7 @@ await project.judges.createJudge({
 });
 ```
 
-Deterministic judges run in Final's evaluation service without a model, so they cost no model spend.
+Deterministic judges run without a model, so they cost no model spend.
 
 ### Code
 
@@ -160,7 +161,7 @@ None of these fire actions. From code that's already traced, `asyncEvaluate(judg
 | --- | --- |
 | `pending`, `running` | Not finished. |
 | `value` | The judge produced a value. |
-| `insufficient_evidence` | The evidence couldn't support a judgment, for example a missing output. Never counted as a pass or a fail. |
+| `insufficient_evidence` | The evidence couldn't support a verdict, for example a missing output. Never counted as a pass or a fail. |
 | `evaluator_error` | The judge failed, such as a code judge that threw. |
 | `timeout` | The judge ran past its deadline. |
 | `skipped_rate_limited` | Over the project's evaluation rate. Recorded, never silently dropped. |

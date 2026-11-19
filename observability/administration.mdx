@@ -1,5 +1,6 @@
 ---
 title: "Administration"
+description: "Roles, ingest keys, settings, redaction, usage and spend, limits, retention, deletion and audit."
 ---
 
 ## Roles
@@ -84,7 +85,7 @@ await project.admin.setUsageAlerts({
 
 | Limit | Default |
 | --- | --- |
-| OTLP request | 50 MB as sent, 20 MB decompressed, 8 MiB per span. See [ingest](/observability/reference/ingest#limits). |
+| OTLP request | 50 MB gzip-compressed, 20 MB uncompressed, 8 MiB of attributes per span. See [ingest](/observability/reference/ingest#limits). |
 | Observations per request | 100 |
 | Online evaluations | Burst of 100, then 100 per minute per project. Over it: `skipped_rate_limited`. |
 | Test scoring | Burst of 100, then 100 per minute per project. |
