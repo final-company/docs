@@ -40,6 +40,7 @@ A duration is a string of one or more number-and-unit parts, such as `'90s'`, `'
 | `step_outcome_unknown` | A step with `maxAttempts: 1` may or may not have run; it isn't run again. |
 | `decision_timeout` | Nobody answered a call's approval or sign-in in time. |
 | `too_many_decisions` | A tool call kept asking for approvals or sign-ins. |
+| `model_required` | A model or agent step named no `model`. |
 | `invalid_output` | A model's or agent's answer didn't match `output`. |
 | `agent_timeout` | An agent step didn't finish within its `timeout`. |
 | `conversation_required` | A call needed a person's answer, and the run acts for nobody. |
