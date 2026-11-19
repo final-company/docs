@@ -1,0 +1,152 @@
+---
+title: "Images"
+description: "Describe a sandbox's base, packages, files, and start command once, and run it on any provider that can build it."
+icon: "layer-group"
+---
+
+There's no image format every provider accepts, but there is a description of an image every provider can realize. The image builder produces that description: a base, a list of steps, environment variables, a working directory, and an optional start command. Each provider turns it into whatever it has, whether that's its own image builder, a snapshot, or steps run at create.
+
+```ts
+import { image } from '@finalai/sandbox-router';
+
+const app = image
+  .node('24')
+  .apt(['git', 'ripgrep'])
+  .npm(['pnpm'], { global: true })
+  .copy('./app', '/app')
+  .env({ NODE_ENV: 'development' })
+  .workdir('/app')
+  .run('pnpm install --frozen-lockfile')
+  .start('pnpm dev', { ready: { port: 3000 } });
+
+const sandbox = await router.sandboxes.create({ image: app, ports: [3000], cpu: 2, memoryMib: 4096 });
+```
+
+`create` resolves once the steps have run and the start command's ready check passes. Commands you run later start in the image's `workdir` with its `env`. With an in-process router, the `workdir` default applies to handles from the router instance that created the sandbox; pass `cwd` explicitly when you reattach from another process.
+
+## Choose a base
+
+| Base | Builder | Runs on |
+| --- | --- | --- |
+| Default | `image.default()` | Every provider. A Linux shell with coreutils, git, curl, Python 3, and Node.js. |
+| Ubuntu | `image.ubuntu(version?)`, default `'24.04'` | Providers with an Ubuntu image, or that can run a container image. |
+| Node.js | `image.node(version?)`, default `'24'` | Providers with a Node.js image, or that can run a container image. |
+| Python | `image.python(version?)`, default `'3.13'` | Providers with a Python image, or that can run a container image. |
+| Container image | `image.from(reference, options?)` | Only providers with the verified `image` capability. |
+
+The base decides which providers can run an image, so choose the most portable one that works. The default image runs everywhere. Presets map to each provider's closest equivalent: its own Node.js or Python image where it has one, or the matching official container image. An arbitrary container image needs the `image` capability, which rules out providers that only run their own images, such as Boat and Vercel Sandbox.
+
+If a base rules out every provider, `router.offers.match` says so with the `image` check, and its `nearest` fix suggests switching to the default base.
+
+For a container image in a private registry, name the stored secret that holds the password. Final reads it from your project's [secrets](/operate/authentication#use-secrets-in-your-code), so this only works with the hosted router:
+
+```ts
+const base = image.from('ghcr.io/acme/build-base:1', {
+  registryCredential: { username: 'acme-bot', passwordSecret: 'GHCR_TOKEN' },
+});
+```
+
+## Add steps
+
+Steps run in order, in the image's `workdir` with its `env`:
+
+| Method | What it does |
+| --- | --- |
+| `.apt(packages)` | Installs Debian packages with `apt-get`, as root. |
+| `.pip(packages)` | Installs Python packages with `pip`. |
+| `.npm(packages, { global? })` | Installs npm packages, locally by default or globally (as root) with `global: true`. |
+| `.run(command)` | Runs a shell command. |
+| `.copy(source, destination)` | Copies a local file or directory into the image. `destination` must be an absolute path. |
+| `.mkdir(path)` | Creates a directory and its parents. |
+| `.env(vars)` | Adds environment variables, for the steps and every command in the sandbox. |
+| `.workdir(path)` | Sets the working directory for later steps and commands, and creates it. |
+| `.user(name)` | Runs steps as this user. |
+
+Each method returns a new builder, so you can share a base and extend it in different ways:
+
+```ts
+const base = image.python('3.13').apt(['build-essential']).pip(['uv']);
+const api = base.copy('./api', '/srv/api').workdir('/srv/api').run('uv sync');
+const worker = base.copy('./worker', '/srv/worker').workdir('/srv/worker').run('uv sync');
+```
+
+### Copy local files
+
+`copy` reads from your machine's disk when the image is first used, so it needs Node.js. Symbolic links are skipped, and one copy step can carry up to 64 MiB. The hosted router uploads the content once and stores it by its hash; an in-process router writes it straight into the sandbox or the provider's builder.
+
+Because the content's hash is part of the image's identity, changing a copied file produces a new image, and copying the same content again reuses the existing one.
+
+## Start command and ready check
+
+`.start(command, { ready })` sets a command every sandbox from the image runs at create, and a check that must pass before `create` resolves:
+
+| `ready` | Passes when |
+| --- | --- |
+| `{ port: 3000 }` | Something accepts TCP connections on that port inside the sandbox. |
+| `{ file: '/tmp/ready' }` | The file exists. |
+| `{ url: 'http://localhost:3000/health' }` | A request to the URL succeeds. |
+| `{ command: 'pg_isready' }` | The command exits with code 0. |
+
+The router polls the check for up to two minutes. If it doesn't pass, the router deletes the sandbox and the create fails with `timeout`, without trying another provider. Where the provider can store a start command with the image, the provider starts it; elsewhere the router starts it in the background, with output in `/tmp/sandbox-start.log`. The router enforces the ready check itself either way.
+
+## How each provider builds it
+
+For each provider, the router picks one of three strategies:
+
+| Strategy | What happens | First create | Later creates |
+| --- | --- | --- | --- |
+| `build` | The provider's own image builder builds the image. | Waits for the build. | Fast. |
+| `bake` | For providers without a builder but with snapshots: the router creates a sandbox from the base, runs the steps once, snapshots it, and creates later sandboxes from the snapshot. | Waits for the bake. | Fast. |
+| `runtime` | For providers with neither: the router runs the steps on every create. | Runs the steps. | Runs the steps again. |
+
+Built and baked images are cached per provider and image, so you pay the build time once. `runtime` is always correct but slower, which shows up in the [catalog](/sandbox-router/catalog-and-pricing) as offers whose `image.strategy` is `runtime`. Each offer's `image.state` is `building`, `ready`, or `failed`, and after create, `sandbox.info.image.strategy` tells you which strategy the sandbox used.
+
+If a build fails on one provider, the router [falls back](/sandbox-router/routing#fallbacks) to the next offer. The hosted router then excludes that provider for this image, with the `image` check, until the image changes.
+
+## Prepare an image ahead of time
+
+To keep the first create fast, build or bake an image before you need it:
+
+```ts
+const prepared = await router.images.prepare({ image: app, providers: ['e2b', 'daytona'] });
+
+for (const build of prepared.builds) {
+  console.log(build.provider, build.strategy, build.state, build.errorCode);
+}
+```
+
+Leave out `providers` to prepare it on every provider that can run it.
+
+With the hosted router, `prepare` registers the image and returns an ID starting with `simg_`. Builds continue in the background, so a build's `state` can be `building`. Pass the ID as `image` to create from it without sending the description again:
+
+```ts
+const sandbox = await router.sandboxes.create({ image: prepared.id });
+```
+
+An in-process router builds before `prepare` returns. Its `id` is the image's content key, and creates need the image itself rather than the ID.
+
+### Cache images in-process
+
+An in-process router remembers what it built in memory by default, so a new process builds again. To reuse builds across runs, keep the cache in a JSON file:
+
+```ts
+import { createSandboxRouter, fileImageCache } from '@finalai/sandbox-router';
+
+const router = createSandboxRouter({
+  providers: [e2b({ apiKey: process.env.E2B_API_KEY! })],
+  imageCache: fileImageCache('.sandbox-images.json'),
+});
+```
+
+You can also pass your own cache: any object with async `get(key)` and `set(key, artifact)` methods.
+
+## Save and load an image description
+
+`toJSON()` returns the plain, versioned description, and `image.fromJSON()` reads one back:
+
+```ts
+const spec = app.toJSON();
+const again = image.fromJSON(JSON.parse(JSON.stringify(spec)));
+```
+
+You can pass either a builder or its JSON as `image` on `create`, `match`, and `prepare`.

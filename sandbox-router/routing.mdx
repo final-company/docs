@@ -1,0 +1,190 @@
+---
+title: "Routing"
+description: "Choose which provider runs a sandbox: pin one, sort by price or latency, cap the price, require capabilities, and control fallbacks."
+icon: "route"
+---
+
+When you create a sandbox, the router builds an offer for every provider and region, drops the ones that can't serve the request, ranks the rest, and tries them in order. The `routing` block on `sandboxes.create` controls each of those steps.
+
+```ts
+import { Capability, RoutingSort, ByokPreference } from '@finalai/sandbox-router';
+
+const sandbox = await router.sandboxes.create({
+  cpu: 4,
+  memoryMib: 8192,
+  routing: {
+    sort: RoutingSort.Latency,
+    maxPricePerHour: '0.40',
+    require: [Capability.Snapshot, Capability.Pause],
+    ignore: ['boat'],
+    byok: ByokPreference.First,
+  },
+});
+
+console.log(sandbox.info.provider, sandbox.info.attempts);
+```
+
+## Routing options
+
+<ParamField path="provider" type="string">
+  Use only this provider, with no fallback to others. Shorthand for `only: [provider]` with `allowFallbacks: false`. If the provider fails, the create fails.
+</ParamField>
+
+<ParamField path="order" type="string[]">
+  Try these providers first, in this order. Providers not listed follow, ranked by `sort`, unless `allowFallbacks` is `false`.
+</ParamField>
+
+<ParamField path="only" type="string[]">
+  Consider only these providers.
+</ParamField>
+
+<ParamField path="ignore" type="string[]">
+  Never use these providers.
+</ParamField>
+
+<ParamField path="allowFallbacks" type="boolean" default="true">
+  After a [retryable failure](#fallbacks), try the next offer. With `false`, the router tries only the providers in `order`, or only the top-ranked offer when there's no `order`.
+</ParamField>
+
+<ParamField path="sort" type="RoutingSort" default="RoutingSort.Price">
+  How to rank eligible offers. See [sort](#sort).
+</ParamField>
+
+<ParamField path="maxPricePerHour" type="string">
+  The most one running hour may cost you, in US dollars as a decimal string such as `'0.25'`. Offers above it are excluded. The price compared is the one for the billing mode the router would try first.
+</ParamField>
+
+<ParamField path="require" type="Capability[]">
+  Capabilities the provider must have verified, such as `Capability.Snapshot` or `Capability.Pty`. See [capabilities](#capabilities).
+</ParamField>
+
+<ParamField path="byok" type="ByokPreference">
+  Whether to use your stored provider key, Final's provider account, or both, and in which order. Hosted router only. See [choose a billing mode per request](/sandbox-router/byok-and-billing#choose-a-billing-mode-per-request).
+</ParamField>
+
+<ParamField path="regions" type="string[]">
+  Allowed regions. The `region` field on the create request itself (outside `routing`) allows exactly one. Region names come from `router.providers.list()`.
+</ParamField>
+
+Provider names are the ones in `router.providers.list()`: `e2b`, `daytona`, `modal`, `vercel`, `boat`, and `final`.
+
+## Sort
+
+| `sort` | Ranks offers by |
+| --- | --- |
+| `RoutingSort.Price` (default) | Hourly price for the billing mode tried first, then measured create latency. |
+| `RoutingSort.Latency` | Measured median create latency, then price. Offers with no measurements rank last. |
+| `RoutingSort.Balanced` | Price, measured create latency, and success rate together, with price weighted most. The router picks among the offers scoring within 10% of the best, favoring the best, so load spreads across near-equal providers. |
+
+Explicit `order` always comes before the sort. Measurements come from the [catalog](/sandbox-router/catalog-and-pricing#measured-performance). An in-process router has them only with `catalog: 'public'`; without them, `Latency` and `Balanced` rank on price.
+
+## Capabilities
+
+Every provider runs commands and reads and writes files. Anything beyond that is a capability, and an offer lists only the capabilities its provider has verified.
+
+| Capability | What it means |
+| --- | --- |
+| `pause`, `resume` | [Pause and resume](/sandbox-router/sandboxes#pause-and-resume). |
+| `stop` | [Stop and start](/sandbox-router/sandboxes#stop-and-start). |
+| `snapshot`, `fork` | [Snapshots and forks](/sandbox-router/sandboxes#snapshots-and-forks). |
+| `pty` | [Interactive terminals](/sandbox-router/sandboxes#open-a-terminal). |
+| `gpu` | GPUs, requested with `gpu: { kind, count }`. |
+| `image` | Arbitrary container images as an [image base](/sandbox-router/images#choose-a-base). |
+| `networkPolicy` | [Outbound network rules](/sandbox-router/sandboxes#network-policy). |
+| `publicPorts` | [URLs for ports](/sandbox-router/sandboxes#ports). |
+| `labels` | Labels the provider can list sandboxes by. |
+| `directConnect` | [A credential for the provider's own API](/sandbox-router/sandboxes#leave-the-router). |
+| `resize` | [Changing CPU and memory](/sandbox-router/sandboxes#resize) of a running sandbox. |
+| `idleTimeout`, `maxLifetime` | Native idle and lifetime timeouts. |
+
+You don't need to list capabilities your request already implies. The router adds them itself:
+
+| Your request has | Needs |
+| --- | --- |
+| `gpu` | `gpu` |
+| An image with a container image base (`image.from(...)`) | `image` |
+| `network` other than `EgressMode.AllowAll` | `networkPolicy` |
+| `atEnd: AtEnd.Pause` | `pause` |
+| `timeouts.idleS` or `timeouts.maxS`, in-process only | `idleTimeout` or `maxLifetime` |
+
+The hosted router enforces timeouts itself, so any provider can take a request with timeouts there.
+
+Calling an operation the sandbox's provider doesn't support, such as `sandbox.fork()` on a provider without `fork`, fails with `unsupported_by_provider`. Use `require` when you know at create time that you'll need it.
+
+## Fallbacks
+
+The router tries offers in ranked order and moves to the next one only when the failure is retryable:
+
+- **Retryable**: the provider is out of capacity, rate-limited, returned a server error, or timed out; or the image couldn't be built on that provider. The router moves on, unless `allowFallbacks` is `false` or the provider was pinned.
+- **Not retryable**: the provider rejected the credentials or the request. The create fails with that error, without trying others.
+- **Start command not ready**: if an [image's start command](/sandbox-router/images#start-command-and-ready-check) doesn't pass its ready check, the router deletes the sandbox and the create fails with `timeout`.
+
+Before moving on after a timeout, the router confirms the timed-out attempt left no sandbox behind, deleting any it finds. If it can't confirm that, it stops and the create fails with `create_outcome_unknown`, so you never end up paying for two sandboxes. `error.attempts` lists what happened at each provider.
+
+An offer can be tried with both billing modes: with `byok: ByokPreference.First`, a retryable failure with your key is followed by Final's account on the same provider. Set `byok: ByokPreference.Only` to never use Final's account.
+
+When every attempt fails with a retryable error, the create fails with `provider_unavailable`. `sandbox.info.attempts` on a successful create lists the failed attempts before the one that landed.
+
+<Note>
+Placement is final. Once a sandbox is created, it stays on its provider for its whole life, through pauses, stops, and resizes. Snapshots and forks stay on the same provider too.
+</Note>
+
+## Dry run a request
+
+`router.offers.match` takes the same options as `sandboxes.create` and tells you what a create would do, without creating anything:
+
+```ts
+import { Capability, RoutingSort } from '@finalai/sandbox-router';
+
+const match = await router.offers.match({
+  cpu: 8,
+  memoryMib: 16384,
+  routing: { sort: RoutingSort.Price, maxPricePerHour: '0.10', require: [Capability.Fork] },
+});
+
+for (const offer of match.eligible) {
+  console.log('eligible', offer.provider, offer.region, offer.price);
+}
+for (const offer of match.excluded) {
+  console.log('excluded', offer.provider, offer.check, offer.failures.map((f) => f.detail));
+}
+if (match.nearest != null) {
+  console.log('to get a route:', match.nearest.description, match.nearest.field, '→', match.nearest.to);
+}
+```
+
+- `eligible` lists offers in the order the router would try them.
+- `excluded` lists every other offer with `check`, the first check it failed, and `failures`, every failed check with its `detail` and a suggested `fix` when there is one.
+- `nearest` is the single smallest change to your request that would make at least one offer eligible, or `null` when something is already eligible. It names the `field` to change (such as `routing.maxPricePerHour`, `cpu`, or `image.base`), the value to change it `to`, a `description`, and the offers it `gains`.
+
+`nearest` prefers the least disruptive change: raising the price cap first, then allowing another region, accepting weaker isolation, changing the billing mode, dropping a required capability, changing the image base, and finally asking for less CPU or memory or changing provider lists.
+
+### Exclusion checks
+
+| `check` | The offer failed because |
+| --- | --- |
+| `provider` | It isn't in `provider` or `only`, or it is in `ignore`. |
+| `region` | Its region isn't in `region` or `routing.regions`. |
+| `capability` | It hasn't verified a capability you required or your request implies. |
+| `isolation` | Its isolation is weaker than `isolation` on the request. |
+| `resources` | The provider can't grant the CPU, memory, or disk you asked for. |
+| `price` | Its price is above `maxPricePerHour`. |
+| `image` | It can't run your image's base, or building the image there failed. |
+| `credential` | No account is available in the billing mode `byok` allows, such as `ByokPreference.Only` with no stored key. |
+| `snapshot` | You're creating from a snapshot that lives on another provider. |
+
+### When nothing matches
+
+If no offer is eligible, `sandboxes.create` fails with `no_matching_offer` (HTTP `409` on the hosted API) and creates nothing. `error.details` carries the same `excluded` and `nearest` as a dry run:
+
+```ts
+import { isSandboxRouterError, SandboxRouterErrorCode } from '@finalai/sandbox-router';
+
+try {
+  await router.sandboxes.create({ cpu: 64 });
+} catch (error) {
+  if (isSandboxRouterError(error) && error.code === SandboxRouterErrorCode.NoMatchingOffer) {
+    console.error(error.details); // { excluded: [...], nearest: { field: 'cpu', to: 16, ... } }
+  }
+}
+```

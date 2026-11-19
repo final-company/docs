@@ -1,0 +1,169 @@
+---
+title: "Sandbox Router quickstart"
+sidebarTitle: "Quickstart"
+description: "Create a sandbox through the router, run a command, write and read a file, and delete it."
+icon: "rocket"
+---
+
+In this guide you create a sandbox on the cheapest provider that fits, run a command in it, write a file and read it back, and delete the sandbox. You can use the hosted router with a Final API key, or run the router in your own process with your own provider keys.
+
+## Prerequisites
+
+- Node.js 26 or later.
+- For the hosted router: a [Final API key](/api-keys), exported as `FINAL_API_KEY`.
+- For the in-process router: an account and API key with at least one provider. This guide uses E2B, with the key in `E2B_API_KEY`.
+
+<Steps>
+  <Step title="Install the SDK">
+    <Tabs>
+      <Tab title="Hosted">
+        ```bash
+        npm install @finalai/sandbox-router
+        ```
+      </Tab>
+      <Tab title="In-process">
+        Install the router and a package for each provider you want to use:
+
+        ```bash
+        npm install @finalai/sandbox-router @finalai/sandbox-router-e2b
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Create a router">
+    <Tabs>
+      <Tab title="Hosted">
+        ```ts router.ts
+        import { createSandboxRouter } from '@finalai/sandbox-router';
+
+        export const router = createSandboxRouter({ apiKey: process.env.FINAL_API_KEY! });
+        ```
+
+        The hosted router chooses among every provider in the catalog. Until you [store your own provider keys](/sandbox-router/byok-and-billing), sandboxes run on Final's provider accounts and are billed through Final.
+      </Tab>
+      <Tab title="In-process">
+        ```ts router.ts
+        import { createSandboxRouter } from '@finalai/sandbox-router';
+        import { e2b } from '@finalai/sandbox-router-e2b';
+
+        export const router = createSandboxRouter({
+          providers: [e2b({ apiKey: process.env.E2B_API_KEY! })],
+        });
+        ```
+
+        The in-process router only chooses among the providers you pass, and calls them directly with your keys. To add more, install their packages and add them to the list:
+
+        ```ts
+        import { daytona } from '@finalai/sandbox-router-daytona';
+        import { modal } from '@finalai/sandbox-router-modal';
+
+        const router = createSandboxRouter({
+          providers: [
+            e2b({ apiKey: process.env.E2B_API_KEY! }),
+            daytona({ apiKey: process.env.DAYTONA_API_KEY! }),
+            modal({
+              tokenId: process.env.MODAL_TOKEN_ID!,
+              tokenSecret: process.env.MODAL_TOKEN_SECRET!,
+            }),
+          ],
+        });
+        ```
+      </Tab>
+    </Tabs>
+
+    The SDK never reads environment variables itself; pass keys in explicitly.
+  </Step>
+
+  <Step title="Create a sandbox and run a command">
+    Everything from here on is the same in both modes.
+
+    ```ts quickstart.ts
+    import { RoutingSort, SandboxSize } from '@finalai/sandbox-router';
+    import { router } from './router.js';
+
+    const sandbox = await router.sandboxes.create({
+      size: SandboxSize.Small, // 2 vCPUs, 4 GiB
+      routing: { sort: RoutingSort.Price },
+      labels: { purpose: 'quickstart' },
+    });
+
+    console.log(sandbox.id, 'on', sandbox.info.provider, sandbox.info.price.hourly, 'USD/h');
+
+    const result = await sandbox.run('echo "Hello from $(uname -sm)"');
+    console.log(result.exitCode, result.stdout);
+    ```
+
+    ```text
+    sbr_... on e2b 0.17 USD/h
+    0 Hello from Linux x86_64
+    ```
+
+    `create` resolves once the sandbox can run commands. `run` waits for the command to finish and returns its exit code and output. It doesn't throw when the command fails, so check `exitCode`.
+  </Step>
+
+  <Step title="Write and read a file">
+    ```ts
+    await sandbox.files.write('/tmp/greeting.txt', 'hello from the router\n');
+
+    const text = await sandbox.files.readText('/tmp/greeting.txt');
+    console.log(text); // "hello from the router\n"
+    ```
+
+    `files.write` takes a string or bytes and creates missing parent directories. Use `files.readText` for UTF-8 text and `files.read` for raw bytes.
+  </Step>
+
+  <Step title="Delete the sandbox">
+    ```ts
+    await sandbox.delete();
+    ```
+
+    Deleting removes the sandbox and its files on the provider. To keep it for later instead, [pause it](/sandbox-router/sandboxes#pause-and-resume). To make sure a forgotten sandbox doesn't keep running, set [timeouts](/sandbox-router/sandboxes#timeouts) when you create it.
+  </Step>
+</Steps>
+
+## Handle errors
+
+Every failed call throws an error that `isSandboxRouterError` recognizes. It has a `code`, the `provider` whose call failed (if one did), and for creates, every `attempt` the router made:
+
+```ts
+import { isSandboxRouterError, SandboxRouterErrorCode } from '@finalai/sandbox-router';
+
+try {
+  const sandbox = await router.sandboxes.create({ cpu: 64, memoryMib: 131072 });
+  await sandbox.delete();
+} catch (error) {
+  if (!isSandboxRouterError(error)) throw error;
+
+  if (error.code === SandboxRouterErrorCode.NoMatchingOffer) {
+    console.error('No provider can run this request:', error.details);
+  }
+  for (const attempt of error.attempts) {
+    console.error(attempt.provider, attempt.region, attempt.outcome, attempt.errorCode);
+  }
+  console.error(error.code, error.message, error.nativeError);
+}
+```
+
+`nativeError` holds the provider's own error text, verbatim, when there is one. To find out what a request would do before creating anything, use [`router.offers.match`](/sandbox-router/routing#dry-run-a-request). See [error codes](/sandbox-router/api#error-codes) for the full list.
+
+<Check>
+You created a sandbox through the router, ran a command, moved a file in and out, and deleted it. The sandbox ran on whichever provider was cheapest for the request, and your code didn't need to know which one.
+</Check>
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Control routing" icon="route" href="/sandbox-router/routing">
+    Pin a provider, require capabilities, cap the price, or sort by latency.
+  </Card>
+  <Card title="Bring your own image" icon="layer-group" href="/sandbox-router/images">
+    Describe the tools and files once, and run them on any provider.
+  </Card>
+  <Card title="Work with sandboxes" icon="box" href="/sandbox-router/sandboxes">
+    Stream output, open a terminal, expose a port, pause, and snapshot.
+  </Card>
+  <Card title="Use your own keys" icon="key" href="/sandbox-router/byok-and-billing">
+    Store provider keys as project secrets for the hosted router.
+  </Card>
+</Columns>

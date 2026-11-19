@@ -1,0 +1,399 @@
+---
+title: "Work with sandboxes"
+sidebarTitle: "Sandboxes"
+description: "Create sandboxes, run and stream commands, open terminals, move files, expose ports, pause, snapshot, fork, and leave the router."
+icon: "box"
+---
+
+A sandbox handle works the same way on every provider. Operations that need a [capability](/sandbox-router/routing#capabilities) the sandbox's provider lacks fail with `unsupported_by_provider`; the tables below note which ones need one.
+
+## Create options
+
+<ParamField path="size" type="SandboxSize">
+  Shorthand for CPU and memory: `small` (2 vCPUs, 4 GiB), `medium` (4, 8 GiB), `large` (8, 16 GiB), or `xlarge` (16, 32 GiB). `cpu` and `memoryMib` override it.
+</ParamField>
+
+<ParamField path="cpu" type="number" default="2">
+  vCPUs. Providers that only grant whole CPUs or fixed sizes round up; the [quote](/sandbox-router/catalog-and-pricing#the-offer-object) says so.
+</ParamField>
+
+<ParamField path="memoryMib" type="number" default="4096">
+  Memory in MiB.
+</ParamField>
+
+<ParamField path="diskGib" type="number">
+  Disk in GiB. Without it, you get the provider's default disk.
+</ParamField>
+
+<ParamField path="gpu" type="{ kind: string; count: number }">
+  GPUs. Requires the `gpu` capability.
+</ParamField>
+
+<ParamField path="image" type="ImageBuilderIface | ImageSpecIface | string">
+  An [image](/sandbox-router/images), its JSON, or a registered image ID (`simg_...`, hosted only). Without it, you get the provider's default image.
+</ParamField>
+
+<ParamField path="snapshot" type="string">
+  Create from a [snapshot](#snapshots-and-forks). This pins the snapshot's provider.
+</ParamField>
+
+<ParamField path="env" type="Record<string, string>">
+  Environment variables for every command.
+</ParamField>
+
+<ParamField path="secretRefs" type="Record<string, string>">
+  Environment variables whose values come from your project's secrets, by secret name. Hosted only. See [BYOK and billing](/sandbox-router/byok-and-billing#pass-secrets-to-a-sandbox).
+</ParamField>
+
+<ParamField path="ports" type="number[]">
+  Ports the sandbox serves. Some providers only route ports declared at create, so list every port you'll ask a URL for.
+</ParamField>
+
+<ParamField path="network" type="NetworkIface">
+  Outbound network rules. See [network policy](#network-policy).
+</ParamField>
+
+<ParamField path="timeouts" type="{ idleS?: number; maxS?: number }">
+  When to apply `atEnd`. See [timeouts](#timeouts).
+</ParamField>
+
+<ParamField path="atEnd" type="AtEnd" default="AtEnd.Delete">
+  What happens when a timeout fires: `AtEnd.Delete` or `AtEnd.Pause`. `Pause` requires the `pause` capability.
+</ParamField>
+
+<ParamField path="isolation" type="Isolation">
+  The least isolation you accept: `shared`, `filtered`, or `dedicated`. See [isolation](/sandbox-router/catalog-and-pricing#the-offer-object).
+</ParamField>
+
+<ParamField path="labels" type="Record<string, string>">
+  Key-value labels to find sandboxes by. Keys are lowercase letters, digits, `_`, `.`, and `-`, up to 63 characters, starting with a letter or digit. Values are up to 256 characters.
+</ParamField>
+
+<ParamField path="region" type="string">
+  The one region to create in. To allow several, use `routing.regions`.
+</ParamField>
+
+<ParamField path="routing" type="RoutingIface">
+  How to choose the provider. See [routing](/sandbox-router/routing).
+</ParamField>
+
+<ParamField path="providerOptions" type="Record<string, unknown>">
+  Settings for one provider, keyed by provider name, such as `{ modal: { ... } }`. Each provider package documents and validates its own options, and they apply only if the sandbox lands on that provider.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string">
+  Retrying a create with the same key returns the same sandbox instead of creating another. Hosted only.
+</ParamField>
+
+<ParamField path="signal" type="AbortSignal">
+  Cancels the create. In-process only.
+</ParamField>
+
+### The sandbox info
+
+`sandbox.info` describes the sandbox as of the last response; `await sandbox.refresh()` fetches it again.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The router's ID for the sandbox, starting with `sbr_`. |
+| `provider`, `providerSandboxId`, `region` | Where it runs, and the provider's own ID for it. |
+| `state` | `creating`, `running`, `paused`, `stopped`, `deleted`, `failed`, or `unknown`. |
+| `nativeState`, `nativeError` | The provider's own state and error text, verbatim. `state` is `unknown` when the provider reports a state with no equivalent. |
+| `granted` | The `cpu`, `memoryMib`, and `diskGib` the provider granted. |
+| `price` | `hourly`, what one running hour costs you, and the `priceVersion` pinned at create. |
+| `billing` | `mode` (`byok` or `managed`) and, for `byok`, the `credential` secret name. |
+| `capabilities` | What this sandbox's provider supports. |
+| `image` | The image `strategy` used, or `null`. |
+| `labels` | Its labels. |
+| `applied` | Request fields the provider honored as given. |
+| `attempts` | On create, every provider the router tried, in order. |
+| `createdAt` | When it was created. |
+
+## Find sandboxes
+
+```ts
+import { SandboxState } from '@finalai/sandbox-router';
+
+const sandbox = await router.sandboxes.get('sbr_...');
+
+const running = await router.sandboxes.list({
+  provider: 'e2b',
+  state: SandboxState.Running,
+  labels: { purpose: 'ci' },
+});
+```
+
+`list` returns sandboxes with every label you pass. An in-process router lists the sandboxes it created on its configured providers, across processes.
+
+If you stored `sandbox.info` yourself, `router.sandboxes.handle(info)` gives you a handle without a request.
+
+## Lifecycle
+
+| Method | Needs | What it does |
+| --- | --- | --- |
+| `pause({ keep })` | `pause` | Pauses, keeping memory or only files. |
+| `resume()` | `resume` | Resumes a paused sandbox. |
+| `stop()` | `stop` | Stops, keeping files. |
+| `start()` | `stop` | Starts a stopped sandbox. |
+| `setTimeout(timeouts)` | | Changes the [timeouts](#timeouts). |
+| `resize({ cpu, memoryMib })` | `resize` | Changes CPU and memory, and returns what was granted. |
+| `delete()` | | Deletes the sandbox and its files. |
+
+### Pause and resume
+
+```ts
+import { PauseKeep } from '@finalai/sandbox-router';
+
+const { kept } = await sandbox.pause({ keep: PauseKeep.Memory });
+// later
+const { coldRestart } = await sandbox.resume();
+```
+
+`keep` is what you'd like kept, and defaults to `PauseKeep.Memory`:
+
+- `PauseKeep.Memory`: memory and running processes, as well as files. The sandbox resumes exactly where it was.
+- `PauseKeep.Files`: files only. Processes start again on resume.
+
+Not every provider can keep memory. `kept` tells you what the provider actually kept, and `coldRestart` is `true` when the sandbox booted again from its files instead of continuing from memory. After a cold restart, start any services you need again.
+
+### Stop and start
+
+`stop()` shuts the sandbox down and keeps its files; `start()` boots it again. Running processes don't survive. Use it when you don't need memory kept and the provider charges less for a stopped sandbox than a paused one; the quote's `hourlyPaused` shows the rate.
+
+### Timeouts
+
+```ts
+import { AtEnd } from '@finalai/sandbox-router';
+
+const sandbox = await router.sandboxes.create({
+  timeouts: { idleS: 600, maxS: 4 * 3600 },
+  atEnd: AtEnd.Pause,
+});
+
+await sandbox.setTimeout({ maxS: 8 * 3600 });
+```
+
+- `idleS`: seconds without a running command or connection before `atEnd` applies.
+- `maxS`: seconds after create before `atEnd` applies, however busy the sandbox is.
+
+The hosted router enforces both on every provider. An in-process router relies on the provider's own timeouts, so a request with `idleS` or `maxS` only routes to providers with the `idleTimeout` or `maxLifetime` capability, and `setTimeout` fails on providers without them.
+
+### Resize
+
+```ts
+const granted = await sandbox.resize({ cpu: 8, memoryMib: 16384 });
+```
+
+`resize` needs the `resize` capability and returns the resources granted, which can be rounded up.
+
+## Run commands
+
+### Run to completion
+
+```ts
+const result = await sandbox.run('npm test', {
+  cwd: '/app',
+  env: { CI: '1' },
+  timeoutMs: 10 * 60_000,
+  onStdout: (text) => process.stdout.write(text),
+  onStderr: (text) => process.stderr.write(text),
+});
+
+console.log(result.exitCode, result.reason);
+```
+
+A string runs under `sh -c`. An array is one argument per element, quoted for you: `sandbox.run(['grep', '-r', pattern, '.'])`.
+
+`run` resolves with `exitCode`, `signal`, `reason`, and the full `stdout` and `stderr`. It doesn't throw for a failing command, so check `exitCode`. `reason` says how the process ended:
+
+| `reason` | Meaning |
+| --- | --- |
+| `exited` | The process exited on its own; `exitCode` is its code. |
+| `killed` | It was killed by a signal. |
+| `timeout` | It ran past `timeoutMs`. |
+| `output_cap` | It wrote more output than the provider allows (`limits.maxOutputBytes`). Output is never silently truncated. |
+| `provider_lost` | The sandbox stopped or the provider lost the process. |
+
+Exit codes are the provider's, as reported. The router never guesses a timeout from a signal.
+
+### Stream a process
+
+`exec` starts a process and resolves once it's running, with its output as streams:
+
+```ts
+const server = await sandbox.exec(['node', 'server.js'], { cwd: '/app', env: { PORT: '3000' } });
+
+void (async () => {
+  for await (const chunk of server.stdout) process.stdout.write(chunk);
+})();
+
+// ...later
+await server.kill(); // or server.kill(ProcessSignal.Kill)
+const exit = await server.wait(); // { exitCode, signal, reason }
+```
+
+| Member | What it does |
+| --- | --- |
+| `processId` | The process's ID, to [reattach](#reattach-to-a-process) with. |
+| `stdout`, `stderr` | `ReadableStream<Uint8Array>` of the process's output. |
+| `write(data)` | Writes a string or bytes to stdin. Start the process with `stdin: true`. |
+| `closeStdin()` | Closes stdin. |
+| `wait()` | Resolves with `{ exitCode, signal, reason }` when the process ends. |
+| `kill(signal?)` | Sends `ProcessSignal.Term`, `Kill`, `Int`, or `Hup`. Killing a process that already ended succeeds. |
+| `lastSeq()` | The sequence number of the last frame received. |
+| `detach()` | Stops receiving output. The process keeps running. |
+
+`exec` options are `cwd`, `env`, `timeoutMs`, and `stdin`. Stdin is closed at start unless you pass `stdin: true`:
+
+```ts
+const cat = await sandbox.exec('cat > /tmp/input.txt', { stdin: true });
+await cat.write('line one\n');
+await cat.closeStdin();
+await cat.wait();
+```
+
+### Reattach to a process
+
+Output arrives as numbered frames. If your connection drops, `wait()` rejects with `network_error` and the process keeps running in the sandbox. Reattach with the process ID and the last sequence number you saw, and the output continues from there:
+
+```ts
+import { isSandboxRouterError, SandboxRouterErrorCode } from '@finalai/sandbox-router';
+
+const build = await sandbox.exec('npm run build');
+let exit;
+try {
+  exit = await build.wait();
+} catch (error) {
+  if (!isSandboxRouterError(error) || error.code !== SandboxRouterErrorCode.NetworkError) throw error;
+  const again = await sandbox.attach(build.processId, { afterSeq: build.lastSeq() });
+  exit = await again.wait();
+}
+```
+
+Without `afterSeq`, `attach` replays all output the provider still has. You can also `detach()` on purpose and reattach later, from another process if you keep the sandbox and process IDs. Reattaching needs a provider that can replay output; others fail with `unsupported_by_provider`.
+
+## Open a terminal
+
+`pty.open` starts an interactive terminal (requires `pty`):
+
+```ts
+const terminal = await sandbox.pty.open({ cols: 120, rows: 32 });
+
+void terminal.output.pipeTo(
+  new WritableStream({ write: (chunk) => void process.stdout.write(chunk) }),
+);
+
+await terminal.write('ls -la\n');
+await terminal.resize({ cols: 160, rows: 40 });
+await terminal.close();
+```
+
+Options are `cols`, `rows`, and optionally `cwd`, `env`, and `command` (the user's login shell by default). The terminal has `output` and `input` streams, `write`, `resize`, `wait`, and `close`, which ends the terminal's process.
+
+## Files
+
+```ts
+await sandbox.files.write('/app/config.json', JSON.stringify({ debug: true }), { mode: 0o644 });
+
+const config = await sandbox.files.readText('/app/config.json');
+const head = await sandbox.files.read('/app/data.bin', { offset: 0, length: 4096 });
+
+for (const entry of await sandbox.files.list('/app')) {
+  console.log(entry.kind, entry.path, entry.size);
+}
+
+await sandbox.files.mkdir('/app/out');
+await sandbox.files.remove('/app/out', { recursive: true });
+const missing = await sandbox.files.stat('/app/nope'); // null
+```
+
+| Method | What it does |
+| --- | --- |
+| `read(path, { offset?, length? })` | Reads bytes as a `Uint8Array`, optionally a range. |
+| `readText(path, { offset?, length? })` | Reads UTF-8 text. |
+| `write(path, data, { mode? })` | Writes a string or bytes, creating parent directories. |
+| `list(path)` | Lists a directory. |
+| `mkdir(path, { recursive? })` | Creates a directory, with its parents by default. |
+| `remove(path, { recursive? })` | Removes a file, or a directory with `recursive: true`. Removing a missing path succeeds. |
+| `stat(path)` | Returns an entry, or `null` for a missing path. |
+
+Each entry has `name`, `path`, `kind` (`file`, `directory`, `symlink`, or `other`), `size`, `modifiedAt`, and `mode`.
+
+## Ports
+
+Get a URL for a port the sandbox serves (requires `publicPorts`). Declare the port in `ports` at create, since some providers only route declared ports:
+
+```ts
+import { PortAuth } from '@finalai/sandbox-router';
+
+const { url, auth, token, expiresAt } = await sandbox.ports.url(3000);
+
+const response = await fetch(url, {
+  headers: auth === PortAuth.Bearer && token != null ? { authorization: `Bearer ${token}` } : {},
+});
+```
+
+How a caller gets access depends on the provider:
+
+| `auth` | Access |
+| --- | --- |
+| `public` | Anyone with the URL. |
+| `bearer` | Send `token` in an `Authorization: Bearer` header. |
+| `cookie` | Open the URL in a browser and sign in; the provider sets a session cookie. |
+| `url` | The URL itself carries the access token. Treat it as a secret. |
+
+`expiresAt` is when the URL or token stops working, if it does.
+
+## Snapshots and forks
+
+```ts
+const { snapshotId } = await sandbox.snapshot({ name: 'deps-installed' });
+
+const copy = await router.sandboxes.create({ snapshot: snapshotId });
+
+const children = await sandbox.fork(3, { labels: { experiment: 'parallel' } });
+```
+
+- `snapshot` (requires `snapshot`) saves the sandbox so you can create new ones from it. What it keeps (files, or memory as well) depends on the provider.
+- `fork` (requires `fork`) creates running copies of the sandbox and returns a handle for each.
+
+Snapshots and forks stay on the sandbox's provider. Creating from a snapshot always lands on that provider, and offers from other providers are excluded with the `snapshot` check.
+
+## Network policy
+
+Limit outbound traffic at create or later (requires `networkPolicy`):
+
+```ts
+import { EgressMode } from '@finalai/sandbox-router';
+
+const sandbox = await router.sandboxes.create({
+  network: { egress: { allowDomains: ['registry.npmjs.org', 'github.com'] } },
+});
+
+await sandbox.network.set({ egress: EgressMode.DenyAll });
+```
+
+`egress` is `EgressMode.AllowAll` (the default), `EgressMode.DenyAll`, or an allow list with `allowDomains` and `allowCidrs`.
+
+## Leave the router
+
+Every sandbox can be managed without the router:
+
+```ts
+const { provider, providerSandboxId, region } = await sandbox.native();
+```
+
+`native()` always works. Use the provider's own SDK, CLI, or dashboard with `providerSandboxId`. If the sandbox runs on Final's account for that provider (`billing.mode` is `managed`), keep managing it through the router.
+
+Where the provider offers one (`directConnect`), `connect()` returns a credential for the provider's own API, for the shortest path to the sandbox or for moving off the router:
+
+```ts
+const credential = await sandbox.connect();
+console.log(credential.kind, credential.url, credential.expiresAt);
+```
+
+The credential has the `provider` and `providerSandboxId`, a `kind` in the provider's terms (such as `access_token` or `api_key`), a `token`, an optional `url`, an `expiresAt` if it expires, and provider-specific `details`. Treat `token` as a secret.
+
+## Usage
+
+With the hosted router, `sandbox.usage()` returns what the sandbox has used and cost so far. See [usage costs](/sandbox-router/catalog-and-pricing#usage-costs).
