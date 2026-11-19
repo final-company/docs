@@ -1,0 +1,108 @@
+---
+title: "Context"
+description: "Set sessions, customers, environments, agent versions, tags and redaction so traces are searchable and comparable."
+---
+
+Context makes traces searchable and comparable: which conversation, which customer, which environment and which version of your agent. Set it where your code knows it; the SDK puts it where Final reads it.
+
+## Trace-level context
+
+These describe the whole trace. They're written on the root span (Final reads sessions from the root only), copied onto every later span of the trace in this process, and sent downstream as baggage by `inject`.
+
+| Call | Attribute | Use it for |
+| --- | --- | --- |
+| `setSession(id)` | `final.session_id` | Grouping traces into a conversation or thread. |
+| `setCustomer(id)` | `final.customer_id` | The account or tenant you serve. |
+| `setCustomerUser(id)` | `final.customer_user_id` | The person within that customer. |
+| `setAgentVersion(version)` | `final.agent_version` | A release, commit SHA or prompt revision. Traces compare by agent version. |
+| `tag(tags)` | `final.tags` | Free-form labels such as `beta` or `vip`. |
+
+```ts
+import { observe, setAgentVersion, setCustomer, setCustomerUser, setSession, tag } from '@finalai/o11y/node';
+
+export const handle = observe(async (request: SupportRequest) => {
+  setSession(request.threadId);
+  setCustomer(request.accountId);
+  setCustomerUser(request.userId);
+  setAgentVersion(process.env.GIT_SHA ?? 'dev');
+  await tag(['support', request.plan]);
+  return reply(request);
+});
+```
+
+Call them inside an active span. With no active span they do nothing.
+
+## Environment
+
+The environment is the standard `deployment.environment.name` resource attribute, set once by `init({ environment })`. Use stable names such as `production`, `staging` and `development`. Online judges run only in the environments you choose, and [test runs](/o11y/tests) use `test` so production monitors ignore them.
+
+With raw OTLP, set it as a resource attribute: `OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production`.
+
+## Tags
+
+`tag(['beta'])` tags the current trace as it's recorded, so an ingest key is enough. To tag traces that are already stored, pass their IDs; this calls `tag_traces` and needs `init({ projectId })` with an API key that has `o11y:write`:
+
+```ts
+await tag('needs-review', { traceIds: ['4bf92f3577b34da6a3ce929d0e0e4736'] });
+```
+
+## Span-level context
+
+These describe the current span only.
+
+| Call | What it records |
+| --- | --- |
+| `setInput(value)` | `final.input`. Strings as-is, anything else as JSON. |
+| `setOutput(value)` | `final.output`. |
+| `setAttributes(record)` | Any attributes. Primitives and flat arrays pass through; other values become JSON. |
+| `recordLLMMetadata(metadata)` | Marks the span as a model call: `provider`, `model`, `usage`, `toolsOffered`, `toolCalls`, `requestParameters`, `context` (the exact messages the model saw), `responseId`, `finishReason`, `streaming`. |
+| `setConversationObservation(observation)` | A conversation item on the span. See [observations](/o11y/reference/observations). |
+
+Use `recordLLMMetadata` for a model client without an integration:
+
+```ts
+import { SpanKind, recordLLMMetadata, span } from '@finalai/o11y/node';
+
+const reply = await span(
+  'summarize',
+  async () => {
+    const result = await myModel.generate(messages);
+    recordLLMMetadata({
+      provider: 'acme',
+      model: result.model,
+      context: messages,
+      usage: { inputTokens: result.usage.input, outputTokens: result.usage.output },
+    });
+    return result.text;
+  },
+  { kind: SpanKind.Llm },
+);
+```
+
+Usage fields are `inputTokens` (all input tokens, including cache reads and writes), `outputTokens`, `cacheReadTokens`, `cacheCreationTokens`, `reasoningTokens`, `imageTokens`, `totalTokens` and `totalCostUsd`. Leave out what you don't know. Unknown cost is left empty, never recorded as 0.
+
+## Your own propagating attributes
+
+`setPropagatingAttribute(key, value)` sets an attribute on the current span and every later span of the trace, and sends it downstream like the trace-level context. Only `final.*` keys are read back from incoming baggage.
+
+## Prompts
+
+When you render a [stored prompt](/o11y/datasets-and-prompts#prompts), record its version so traces compare by prompt:
+
+```ts
+setAttributes({ 'final.prompt.version_id': prompt.version.promptVersionId });
+```
+
+## Redaction
+
+`init({ redact })` sees every attribute before it leaves the process. Return a replacement, or `undefined` to drop it:
+
+```ts
+init({
+  environment: 'production',
+  redact: ({ key, value }) =>
+    key === 'final.customer_user_id' ? undefined : typeof value === 'string' ? value.replace(/\b\d{16}\b/g, '[card]') : value,
+});
+```
+
+Project redaction rules in **Observability** settings also apply at ingest, before anything is stored. See [administration](/o11y/administration#redaction).

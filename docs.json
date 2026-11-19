@@ -192,79 +192,79 @@
           {
             "group": "Get started",
             "pages": [
-              "observability/overview",
-              "observability/quickstart",
-              "observability/quickstart-otlp",
-              "observability/quickstart-workers",
-              "observability/final-agents-and-workflows"
+              "o11y/overview",
+              "o11y/quickstart",
+              "o11y/quickstart-otlp",
+              "o11y/quickstart-workers",
+              "o11y/final-agents-and-workflows"
             ]
           },
           {
             "group": "Instrument",
             "pages": [
-              "observability/integrations",
-              "observability/tracing-patterns",
-              "observability/context",
-              "observability/dual-export"
+              "o11y/integrations",
+              "o11y/tracing-patterns",
+              "o11y/context",
+              "o11y/dual-export"
             ]
           },
           {
             "group": "Evaluate",
             "pages": [
-              "observability/judges",
-              "observability/online-evaluation",
-              "observability/judge-actions",
-              "observability/alignment",
-              "observability/datasets-and-prompts"
+              "o11y/judges",
+              "o11y/online-evaluation",
+              "o11y/judge-actions",
+              "o11y/alignment",
+              "o11y/datasets-and-prompts"
             ]
           },
           {
             "group": "Test and fix",
             "pages": [
-              "observability/tests",
-              "observability/tests-in-ci",
-              "observability/issues"
+              "o11y/tests",
+              "o11y/tests-in-ci",
+              "o11y/issues"
             ]
           },
           {
             "group": "Analyze",
             "pages": [
-              "observability/agent",
-              "observability/dashboards-and-sql"
+              "o11y/agent",
+              "o11y/dashboards-and-sql"
             ]
           },
           {
             "group": "MCP",
             "pages": [
-              "observability/mcp",
-              "observability/mcp-tools"
+              "o11y/mcp",
+              "o11y/mcp-tools"
             ]
           },
           {
             "group": "Administer",
             "pages": [
-              "observability/administration"
+              "o11y/administration"
             ]
           },
           {
             "group": "BYOC data plane",
             "pages": [
-              "observability/byoc/overview",
-              "observability/byoc/aws",
-              "observability/byoc/runbooks"
+              "o11y/byoc/overview",
+              "o11y/byoc/aws",
+              "o11y/byoc/runbooks"
             ]
           },
           {
             "group": "Reference",
             "pages": [
-              "observability/reference/ingest",
-              "observability/reference/attributes",
-              "observability/reference/observations",
-              "observability/reference/trace-health",
-              "observability/reference/sql",
-              "observability/reference/events",
-              "observability/reference/scopes",
-              "observability/reference/errors"
+              "o11y/reference/ingest",
+              "o11y/reference/attributes",
+              "o11y/reference/observations",
+              "o11y/reference/trace-health",
+              "o11y/reference/sql",
+              "o11y/reference/events",
+              "o11y/reference/scopes",
+              "o11y/reference/errors"
             ]
           }
         ]

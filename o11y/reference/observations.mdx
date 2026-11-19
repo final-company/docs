@@ -1,0 +1,89 @@
+---
+title: "Observations"
+description: "Send conversation items on spans or on their own, and control how conversations are shown."
+---
+
+Observations are conversation items: messages, tool calls and results, reasoning and your own items. Attach them to spans for an exact conversation view, or send them on their own to import conversations that have no traces.
+
+## Send observations
+
+```bash
+curl -sS https://api.final.ai/v1/o11y/projects/$FINAL_PROJECT_ID/observations \
+  -H "Authorization: Bearer $FINAL_INGEST_KEY" \
+  -H 'content-type: application/json' \
+  -d '{
+  "observations": [
+    {
+      "kind": "message",
+      "observedAt": "2026-11-19T10:00:00Z",
+      "conversationId": "conv_1",
+      "role": "user",
+      "parts": [{ "kind": "text", "text": "I was charged twice." }]
+    },
+    {
+      "kind": "message",
+      "observedAt": "2026-11-19T10:00:04Z",
+      "conversationId": "conv_1",
+      "role": "assistant",
+      "model": "claude-opus-5-5",
+      "parts": [{ "kind": "text", "text": "I see two charges for order 1042. I have refunded one." }],
+      "usage": { "inputTokens": 812, "outputTokens": 24, "totalCostUsd": 0.0037 }
+    }
+  ]
+}'
+```
+
+```json
+{ "accepted": 2, "rejected": [] }
+```
+
+From the SDK, `setConversationObservation(observation)` attaches one to the active span, and `client.project(id).traces.ingestObservations({ observations })` sends a batch.
+
+## Items
+
+| Field | Required | What it holds |
+| --- | --- | --- |
+| `kind` | Yes | `message`, `tool_call`, `tool_result`, `reasoning` or `custom`. |
+| `observedAt` | Yes | ISO 8601 with offset. Within 26 weeks before and 5 minutes after the request. |
+| `conversationId` | Without a `traceId` | The conversation the item belongs to. |
+| `traceId`, `spanId` | | Attach the item to a trace or span. A `spanId` needs a `traceId`. |
+| `role` | | Such as `user`, `assistant`, `system` or `tool`. |
+| `name` | | A tool name, or your custom item's name. |
+| `model` | | The model that produced the item. |
+| `parts` | Yes | Up to 100 parts. |
+| `usage` | | Token counts and cost. |
+
+## Parts
+
+| Field | What it holds |
+| --- | --- |
+| `kind` | `text`, `image`, `audio`, `file`, `json` or `custom`. |
+| `text` | Text content. |
+| `mimeType` | The media type, for media and files. |
+| `url` | A URL or `data:` URI, for media and files. |
+| `json` | Any JSON, for `json` and `custom` parts. |
+
+## Usage
+
+`inputTokens` (all input, including cache reads and writes), `outputTokens`, `cacheReadTokens`, `cacheCreationTokens`, `reasoningTokens`, `imageTokens`, `totalTokens` and `totalCostUsd`. Token counts are non-negative integers. Leave out what you don't know; missing cost stays missing, never `0`.
+
+## Validation
+
+Requests are strict. An observation with an unknown field, or a field of the wrong type, is rejected on its own; the rest of the request is accepted. An unknown field at the top level of the body, or more than 100 observations, rejects the whole request with `400`.
+
+Each rejection reports its `index` in the request, a `message` and one of these codes:
+
+| Code | Meaning |
+| --- | --- |
+| `invalid_observation` | The observation doesn't match the schema. |
+| `observed_at_out_of_range` | `observedAt` is outside the accepted window. |
+| `conversation_required` | The observation has neither a `traceId` nor a `conversationId`. |
+| `trace_required` | The observation has a `spanId` without a `traceId`. |
+
+## How they're shown
+
+The conversation view (`get_conversation`) combines observations with items extracted from spans by your [display rules](#display-rules), in time order.
+
+### Display rules
+
+Display rules turn spans into conversation items when you don't send observations. Each rule matches by `spanName` or `spanKind`, sets the `role`, reads input and output from attribute paths (`inputPath`, `outputPath`), or hides matching spans (`hidden`). `set_conversation_display_rules` replaces the project's rules.

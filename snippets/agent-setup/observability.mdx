@@ -1,8 +1,0 @@
-<Prompt description="**Send traces to Final Observability.** Paste this into Claude Code, Codex, or Cursor from the repository you want to instrument.">
-Instrument this project for Final Observability, following Final's Observability docs.
-Look at the project first. For a TypeScript app on Node 26 or later, install @finalai/observability and call init from @finalai/observability/node before any agent code runs; use the integrations that match the libraries I already use (wrapOpenAI, wrapAnthropic, aiSdkTelemetry, openAIAgentsTracingProcessor, traceClaudeAgentQuery, instrumentLangChain or instrumentMcpServer). For Cloudflare Workers, use instrumentWorker from @finalai/observability/workers. For any other language, configure its OpenTelemetry OTLP/HTTP exporter with the endpoint https://api.final.ai/v1/observability/otlp.
-Set the session, customer and agent version on each trace where the code knows them, and set the environment explicitly.
-If FINAL_API_KEY isn't set, send me to my project's Observability settings in the Final dashboard to create an ingest key, and have me export it in my shell. Never write the key to a file tracked by Git.
-Run the app once, then run npx final-obs doctor with FINAL_INGEST_KEY set to the ingest key and FINAL_API_KEY set to an API key with observability:read, and fix every trace health warning it prints.
-Finish by listing the files you changed and where I can see the trace.
-</Prompt>
