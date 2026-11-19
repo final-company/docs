@@ -7,17 +7,15 @@ icon: "route"
 When you create a sandbox, the router builds an offer for every provider and region, drops the ones that can't serve the request, ranks the rest, and tries them in order. The `routing` block on `sandboxes.create` controls each of those steps.
 
 ```ts
-import { Capability, RoutingSort, ByokPreference } from '@finalai/sandbox-router';
-
 const sandbox = await router.sandboxes.create({
   cpu: 4,
   memoryMib: 8192,
   routing: {
-    sort: RoutingSort.Latency,
+    sort: 'latency',
     maxPricePerHour: '0.40',
-    require: [Capability.Snapshot, Capability.Pause],
+    require: ['snapshot', 'pause'],
     ignore: ['boat'],
-    byok: ByokPreference.First,
+    byok: 'first',
   },
 });
 
@@ -46,7 +44,7 @@ console.log(sandbox.info.provider, sandbox.info.attempts);
   After a [retryable failure](#fallbacks), try the next offer. With `false`, the router tries only the providers in `order`, or only the top-ranked offer when there's no `order`.
 </ParamField>
 
-<ParamField path="sort" type="RoutingSort" default="RoutingSort.Price">
+<ParamField path="sort" type="'price' | 'latency' | 'balanced'" default="'price'">
   How to rank eligible offers. See [sort](#sort).
 </ParamField>
 
@@ -55,10 +53,10 @@ console.log(sandbox.info.provider, sandbox.info.attempts);
 </ParamField>
 
 <ParamField path="require" type="Capability[]">
-  Capabilities the provider must have verified, such as `Capability.Snapshot` or `Capability.Pty`. See [capabilities](#capabilities).
+  Capabilities the provider must have verified, such as `'snapshot'` or `'pty'`. See [capabilities](#capabilities).
 </ParamField>
 
-<ParamField path="byok" type="ByokPreference">
+<ParamField path="byok" type="'first' | 'fallback' | 'only' | 'off'">
   Whether to use your stored provider key, Final's provider account, or both, and in which order. Hosted router only. See [choose a billing mode per request](/sandbox-router/byok-and-billing#choose-a-billing-mode-per-request).
 </ParamField>
 
@@ -72,11 +70,11 @@ Provider names are the ones in `router.providers.list()`: `e2b`, `daytona`, `mod
 
 | `sort` | Ranks offers by |
 | --- | --- |
-| `RoutingSort.Price` (default) | Hourly price for the billing mode tried first, then measured create latency. |
-| `RoutingSort.Latency` | Measured median create latency, then price. Offers with no measurements rank last. |
-| `RoutingSort.Balanced` | Price, measured create latency, and success rate together, with price weighted most. The router picks among the offers scoring within 10% of the best, favoring the best, so load spreads across near-equal providers. |
+| `'price'` (default) | Hourly price for the billing mode tried first, then measured create latency. |
+| `'latency'` | Measured median create latency, then price. Offers with no measurements rank last. |
+| `'balanced'` | Price, measured create latency, and success rate together, with price weighted most. The router picks among the offers scoring within 10% of the best, favoring the best, so load spreads across near-equal providers. |
 
-Explicit `order` always comes before the sort. Measurements come from the [catalog](/sandbox-router/catalog-and-pricing#measured-performance). An in-process router has them only with `catalog: 'public'`; without them, `Latency` and `Balanced` rank on price.
+Explicit `order` always comes before the sort. Measurements come from the [catalog](/sandbox-router/catalog-and-pricing#measured-performance). An in-process router has them only with `catalog: 'public'`; without them, `'latency'` and `'balanced'` rank on price.
 
 ## Capabilities
 
@@ -103,8 +101,8 @@ You don't need to list capabilities your request already implies. The router add
 | --- | --- |
 | `gpu` | `gpu` |
 | An image with a container image base (`image.from(...)`) | `image` |
-| `network` other than `EgressMode.AllowAll` | `networkPolicy` |
-| `atEnd: AtEnd.Pause` | `pause` |
+| `network` with `egress` other than `'allow-all'` | `networkPolicy` |
+| `atEnd: 'pause'` | `pause` |
 | `timeouts.idleS` or `timeouts.maxS`, in-process only | `idleTimeout` or `maxLifetime` |
 
 The hosted router enforces timeouts itself, so any provider can take a request with timeouts there.
@@ -121,7 +119,7 @@ The router tries offers in ranked order and moves to the next one only when the 
 
 Before moving on after a timeout, the router confirms the timed-out attempt left no sandbox behind, deleting any it finds. If it can't confirm that, it stops and the create fails with `create_outcome_unknown`, so you never end up paying for two sandboxes. `error.attempts` lists what happened at each provider.
 
-An offer can be tried with both billing modes: with `byok: ByokPreference.First`, a retryable failure with your key is followed by Final's account on the same provider. Set `byok: ByokPreference.Only` to never use Final's account.
+An offer can be tried with both billing modes: with `byok: 'first'`, a retryable failure with your key is followed by Final's account on the same provider. Set `byok: 'only'` to never use Final's account.
 
 When every attempt fails with a retryable error, the create fails with `provider_unavailable`. `sandbox.info.attempts` on a successful create lists the failed attempts before the one that landed.
 
@@ -134,12 +132,10 @@ Placement is final. Once a sandbox is created, it stays on its provider for its 
 `router.offers.match` takes the same options as `sandboxes.create` and tells you what a create would do, without creating anything:
 
 ```ts
-import { Capability, RoutingSort } from '@finalai/sandbox-router';
-
 const match = await router.offers.match({
   cpu: 8,
   memoryMib: 16384,
-  routing: { sort: RoutingSort.Price, maxPricePerHour: '0.10', require: [Capability.Fork] },
+  routing: { sort: 'price', maxPricePerHour: '0.10', require: ['fork'] },
 });
 
 for (const offer of match.eligible) {
@@ -170,7 +166,7 @@ if (match.nearest != null) {
 | `resources` | The provider can't grant the CPU, memory, or disk you asked for. |
 | `price` | Its price is above `maxPricePerHour`. |
 | `image` | It can't run your image's base, or building the image there failed. |
-| `credential` | No account is available in the billing mode `byok` allows, such as `ByokPreference.Only` with no stored key. |
+| `credential` | No account is available in the billing mode `byok` allows, such as `byok: 'only'` with no stored key. |
 | `snapshot` | You're creating from a snapshot that lives on another provider. |
 
 ### When nothing matches

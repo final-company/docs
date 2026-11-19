@@ -9,7 +9,7 @@ A sandbox handle works the same way on every provider. Operations that need a [c
 
 ## Create options
 
-<ParamField path="size" type="SandboxSize">
+<ParamField path="size" type="'small' | 'medium' | 'large' | 'xlarge'">
   Shorthand for CPU and memory: `small` (2 vCPUs, 4 GiB), `medium` (4, 8 GiB), `large` (8, 16 GiB), or `xlarge` (16, 32 GiB). `cpu` and `memoryMib` override it.
 </ParamField>
 
@@ -57,11 +57,11 @@ A sandbox handle works the same way on every provider. Operations that need a [c
   When to apply `atEnd`. See [timeouts](#timeouts).
 </ParamField>
 
-<ParamField path="atEnd" type="AtEnd" default="AtEnd.Delete">
-  What happens when a timeout fires: `AtEnd.Delete` or `AtEnd.Pause`. `Pause` requires the `pause` capability.
+<ParamField path="atEnd" type="'delete' | 'pause'" default="'delete'">
+  What happens when a timeout fires: delete the sandbox or pause it. `'pause'` requires the `pause` capability.
 </ParamField>
 
-<ParamField path="isolation" type="Isolation">
+<ParamField path="isolation" type="'shared' | 'filtered' | 'dedicated'">
   The least isolation you accept: `shared`, `filtered`, or `dedicated`. See [isolation](/sandbox-router/catalog-and-pricing#the-offer-object).
 </ParamField>
 
@@ -86,7 +86,7 @@ A sandbox handle works the same way on every provider. Operations that need a [c
 </ParamField>
 
 <ParamField path="signal" type="AbortSignal">
-  Cancels the create. In-process only.
+  Cancels the create. With the hosted router, aborting cancels the request, and the sandbox can still be created; send an `idempotencyKey` so a retry returns that sandbox instead of creating another.
 </ParamField>
 
 ### The sandbox info
@@ -142,17 +142,15 @@ If you stored `sandbox.info` yourself, `router.sandboxes.handle(info)` gives you
 ### Pause and resume
 
 ```ts
-import { PauseKeep } from '@finalai/sandbox-router';
-
-const { kept } = await sandbox.pause({ keep: PauseKeep.Memory });
+const { kept } = await sandbox.pause({ keep: 'memory' });
 // later
 const { coldRestart } = await sandbox.resume();
 ```
 
-`keep` is what you'd like kept, and defaults to `PauseKeep.Memory`:
+`keep` is what you'd like kept, and defaults to `'memory'`:
 
-- `PauseKeep.Memory`: memory and running processes, as well as files. The sandbox resumes exactly where it was.
-- `PauseKeep.Files`: files only. Processes start again on resume.
+- `'memory'`: memory and running processes, as well as files. The sandbox resumes exactly where it was.
+- `'files'`: files only. Processes start again on resume.
 
 Not every provider can keep memory. `kept` tells you what the provider actually kept, and `coldRestart` is `true` when the sandbox booted again from its files instead of continuing from memory. After a cold restart, start any services you need again.
 
@@ -163,11 +161,9 @@ Not every provider can keep memory. `kept` tells you what the provider actually 
 ### Timeouts
 
 ```ts
-import { AtEnd } from '@finalai/sandbox-router';
-
 const sandbox = await router.sandboxes.create({
   timeouts: { idleS: 600, maxS: 4 * 3600 },
-  atEnd: AtEnd.Pause,
+  atEnd: 'pause',
 });
 
 await sandbox.setTimeout({ maxS: 8 * 3600 });
@@ -197,12 +193,13 @@ const result = await sandbox.run('npm test', {
   timeoutMs: 10 * 60_000,
   onStdout: (text) => process.stdout.write(text),
   onStderr: (text) => process.stderr.write(text),
+  signal: AbortSignal.timeout(15 * 60_000),
 });
 
 console.log(result.exitCode, result.reason);
 ```
 
-A string runs under `sh -c`. An array is one argument per element, quoted for you: `sandbox.run(['grep', '-r', pattern, '.'])`.
+`signal` aborts the command: an in-process router kills the process, and the hosted router cancels the request. A string runs under `sh -c`. An array is one argument per element, quoted for you: `sandbox.run(['grep', '-r', pattern, '.'])`.
 
 `run` resolves with `exitCode`, `signal`, `reason`, and the full `stdout` and `stderr`. It doesn't throw for a failing command, so check `exitCode`. `reason` says how the process ended:
 
@@ -241,6 +238,7 @@ const exit = await server.wait(); // { exitCode, signal, reason }
 | `wait()` | Resolves with `{ exitCode, signal, reason }` when the process ends. |
 | `kill(signal?)` | Sends `ProcessSignal.Term`, `Kill`, `Int`, or `Hup`. Killing a process that already ended succeeds. |
 | `lastSeq()` | The sequence number of the last frame received. |
+| `gaps()` | Output the provider lost and couldn't replay after a reattach, as frame ranges. |
 | `detach()` | Stops receiving output. The process keeps running. |
 
 `exec` options are `cwd`, `env`, `timeoutMs`, and `stdin`. Stdin is closed at start unless you pass `stdin: true`:
@@ -267,10 +265,13 @@ try {
   if (!isSandboxRouterError(error) || error.code !== SandboxRouterErrorCode.NetworkError) throw error;
   const again = await sandbox.attach(build.processId, { afterSeq: build.lastSeq() });
   exit = await again.wait();
+  for (const { from, to } of again.gaps()) {
+    console.warn(`lost output frames ${from} to ${to ?? 'unknown'}`);
+  }
 }
 ```
 
-Without `afterSeq`, `attach` replays all output the provider still has. You can also `detach()` on purpose and reattach later, from another process if you keep the sandbox and process IDs. Reattaching needs a provider that can replay output; others fail with `unsupported_by_provider`.
+If the provider can't replay some of the output, the stream skips it and `gaps()` lists the missing frame ranges, `from` through `to` (`to` is `null` when the provider can't tell how much was lost). Output is never dropped without a gap to show for it. Without `afterSeq`, `attach` replays all output the provider still has. You can also `detach()` on purpose and reattach later, from another process if you keep the sandbox and process IDs. Reattaching needs a provider that can replay output; others fail with `unsupported_by_provider`.
 
 ## Open a terminal
 
@@ -288,7 +289,7 @@ await terminal.resize({ cols: 160, rows: 40 });
 await terminal.close();
 ```
 
-Options are `cols`, `rows`, and optionally `cwd`, `env`, and `command` (the user's login shell by default). The terminal has `output` and `input` streams, `write`, `resize`, `wait`, and `close`, which ends the terminal's process.
+Options (`PtyOptionsIface`) are `cols`, `rows`, and optionally `cwd`, `env`, and `command` (the user's login shell by default). The terminal has `output` and `input` streams, `write`, `resize`, `wait`, and `close`, which ends the terminal's process.
 
 ## Files
 
@@ -364,16 +365,14 @@ Snapshots and forks stay on the sandbox's provider. Creating from a snapshot alw
 Limit outbound traffic at create or later (requires `networkPolicy`):
 
 ```ts
-import { EgressMode } from '@finalai/sandbox-router';
-
 const sandbox = await router.sandboxes.create({
   network: { egress: { allowDomains: ['registry.npmjs.org', 'github.com'] } },
 });
 
-await sandbox.network.set({ egress: EgressMode.DenyAll });
+await sandbox.network.set({ egress: 'deny-all' });
 ```
 
-`egress` is `EgressMode.AllowAll` (the default), `EgressMode.DenyAll`, or an allow list with `allowDomains` and `allowCidrs`.
+`egress` is `'allow-all'` (the default), `'deny-all'`, or an allow list with `allowDomains` and `allowCidrs`.
 
 ## Leave the router
 

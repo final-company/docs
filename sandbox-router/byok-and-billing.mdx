@@ -25,12 +25,10 @@ An in-process router always uses your own keys, which you pass to each provider 
     Tell the router which secret holds the key for which provider:
 
     ```ts
-    import { CredentialMode } from '@finalai/sandbox-router';
-
     await router.providers.setCredential({
       provider: 'e2b',
       secret: 'E2B_API_KEY',
-      mode: CredentialMode.Prioritized,
+      mode: 'prioritized',
     });
     ```
 
@@ -47,8 +45,8 @@ An in-process router always uses your own keys, which you pass to each provider 
 
 `mode` sets the default order for that provider:
 
-- `CredentialMode.Prioritized`: use your key first, and Final's account if a create with your key fails with a [retryable error](/sandbox-router/routing#fallbacks).
-- `CredentialMode.Fallback`: use Final's account first, and your key only after it fails.
+- `'prioritized'` (the default): use your key first, and Final's account if a create with your key fails with a [retryable error](/sandbox-router/routing#fallbacks).
+- `'fallback'`: use Final's account first, and your key only after it fails.
 
 To stop using your key, remove it. The secret itself stays in your project:
 
@@ -62,18 +60,16 @@ await router.providers.removeCredential({ provider: 'e2b' });
 
 | `byok` | Tries |
 | --- | --- |
-| `ByokPreference.First` | Your key, then Final's account. |
-| `ByokPreference.Fallback` | Final's account, then your key. |
-| `ByokPreference.Only` | Only your key. Providers where you haven't stored one are excluded. |
-| `ByokPreference.Off` | Only Final's account. |
+| `'first'` | Your key, then Final's account. |
+| `'fallback'` | Final's account, then your key. |
+| `'only'` | Only your key. Providers where you haven't stored one are excluded. |
+| `'off'` | Only Final's account. |
 
 Without `byok`, each provider follows its stored `mode`, and providers without a stored key use Final's account.
 
 ```ts
-import { ByokPreference, RoutingSort } from '@finalai/sandbox-router';
-
 const sandbox = await router.sandboxes.create({
-  routing: { sort: RoutingSort.Price, byok: ByokPreference.Only },
+  routing: { sort: 'price', byok: 'only' },
 });
 ```
 

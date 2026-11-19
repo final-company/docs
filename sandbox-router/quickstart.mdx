@@ -79,12 +79,11 @@ In this guide you create a sandbox on the cheapest provider that fits, run a com
     Everything from here on is the same in both modes.
 
     ```ts quickstart.ts
-    import { RoutingSort, SandboxSize } from '@finalai/sandbox-router';
     import { router } from './router.js';
 
     const sandbox = await router.sandboxes.create({
-      size: SandboxSize.Small, // 2 vCPUs, 4 GiB
-      routing: { sort: RoutingSort.Price },
+      size: 'small', // 2 vCPUs, 4 GiB
+      routing: { sort: 'price' },
       labels: { purpose: 'quickstart' },
     });
 

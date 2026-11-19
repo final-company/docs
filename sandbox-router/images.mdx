@@ -123,7 +123,14 @@ With the hosted router, `prepare` registers the image and returns an ID starting
 const sandbox = await router.sandboxes.create({ image: prepared.id });
 ```
 
-An in-process router builds before `prepare` returns. Its `id` is the image's content key, and creates need the image itself rather than the ID.
+Check on the builds later with `router.images.get`:
+
+```ts
+const record = await router.images.get(prepared.id);
+const pending = record.builds.filter((build) => build.state === 'building');
+```
+
+An in-process router builds before `prepare` returns, and has no `images.get`: it fails with `invalid_request`. Its `id` is the image's content key, and creates need the image itself rather than the ID.
 
 ### Cache images in-process
 

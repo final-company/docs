@@ -36,7 +36,7 @@ These answer without an API key, so you can browse prices and providers before y
 
 | Method | Path | Returns |
 | --- | --- | --- |
-| `GET` | `/sandbox-offers` | Ranked [offers](/sandbox-router/catalog-and-pricing#the-offer-object): `{ "offers": [...] }`. Query: `cpu`, `memory_mib`, `disk_gib`, `gpu` (`kind:count`), `region`, `require` (comma-separated capabilities), `isolation`, `sort`, `max_price_per_hour`, `byok`. |
+| `GET` | `/sandbox-offers` | Ranked [offers](/sandbox-router/catalog-and-pricing#the-offer-object): `{ "offers": [...] }`. Query: `cpu`, `memory_mib`, `disk_gib`, `size`, `gpu` (`kind:count`), `region`, `require` (comma-separated capabilities), `isolation`, `sort`, `max_price_per_hour`, `byok`. |
 | `GET` | `/sandbox-providers` | `{ "providers": [...] }`: each provider's `name`, `regions`, `capabilities`, `isolation`, `billing_model`, `price_version`, `status`, and, with an API key, your stored `credential`. |
 | `GET` | `/sandbox-price-versions` | `{ "versions": [...] }`, the [price versions](/sandbox-router/catalog-and-pricing#price-versions). Query: `provider`, `at`. |
 
@@ -52,7 +52,7 @@ Every other route needs an API key.
 | --- | --- | --- |
 | `POST` | `/sandbox-offers/match` | [Dry run](/sandbox-router/routing#dry-run-a-request) a create body. Returns `eligible`, `excluded`, and `nearest`. |
 | `POST` | `/sandbox-images` | Register an image. Body: `{ "spec": {...} }`. Returns the image record with its `simg_` ID. |
-| `GET` | `/sandbox-images/{id}` | An image record, with each provider's build `strategy`, `state`, and `error_code`. |
+| `GET` | `/sandbox-images/{id}` | An image record, with each provider's build `strategy`, `state`, and `error_code`. `router.images.get(id)` in the SDK. |
 | `POST` | `/sandbox-images/{id}/prepare` | Start building or baking the image. Body: `{ "providers": [...] }` (optional). Returns the image record. |
 | `POST` | `/sandbox-artifacts` | Upload the content of an image's `copy` step. Body: `digest` and `files`, each with a relative `path`, `mode`, and base64 `data`. |
 | `PUT` | `/sandbox-providers/{provider}/credential` | [Store a provider key](/sandbox-router/byok-and-billing#store-a-provider-key). Body: `{ "secret": "E2B_API_KEY", "mode": "prioritized" }`. |

@@ -7,14 +7,14 @@ icon: "route"
 Sandbox Router gives you one client for code sandboxes from many providers. You describe the sandbox you need (size, image, capabilities, price ceiling) and the router picks a provider that can run it, falls back to another if the first can't, and returns a handle that works the same way whichever provider it landed on: commands, streaming processes, terminals, files, ports, pause, snapshots, and forks.
 
 ```ts
-import { createSandboxRouter, RoutingSort } from '@finalai/sandbox-router';
+import { createSandboxRouter } from '@finalai/sandbox-router';
 
 const router = createSandboxRouter({ apiKey: process.env.FINAL_API_KEY! });
 
 const sandbox = await router.sandboxes.create({
   cpu: 2,
   memoryMib: 4096,
-  routing: { sort: RoutingSort.Price, maxPricePerHour: '0.25' },
+  routing: { sort: 'price', maxPricePerHour: '0.25' },
 });
 
 console.log(sandbox.info.provider); // For example, "e2b"

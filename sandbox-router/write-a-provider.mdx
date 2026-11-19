@@ -145,8 +145,10 @@ if (!report.passed) process.exit(1);
 | `provider` | The provider to check. |
 | `spec` | Overrides for the spec test sandboxes are created with. |
 | `providerOptions` | Your provider's options for those creates. |
-| `include` | Also run the cases for declared `image` (a container image base) and `networkPolicy` capabilities, which create extra sandboxes. |
+| `include` | Also run the cases for declared `image` (a container image base) and `networkPolicy` capabilities, which create extra sandboxes. These are the only two it accepts. |
 | `timeoutMs` | Time limit per case. Default 180 seconds. |
 | `onCase` | Called with each case's result as it finishes. |
+
+The kit doesn't verify GPUs, so a declared `gpu` capability never appears in `verified`.
 
 The report has `passed` (every required case passed), `verified` (declared capabilities whose cases passed), and each case's `name`, `capability`, `status` (`passed`, `failed`, or `skipped`), `message`, and `durationMs`. Capabilities count only once verified: run conformance in your CI against a real account, and fix failures in the provider rather than removing the capability.
