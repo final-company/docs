@@ -4,7 +4,7 @@ sidebarTitle: "Channels"
 description: "Build a channel that brings an outside surface into Final's chats: its provider app, routes, people, places, and events."
 ---
 
-A channel translates an outside surface, like a webhook, a chat app, or email, into people, places, and inputs in Final's chats, and carries the agent's replies back out. A channel is its own document, separate from any agent: one self-contained module, published by name and installed in a project. Its handlers always run on Final's serverless runtime.
+A channel translates an outside surface where people talk to an agent, like a chat app, email, a phone line, or an issue's comment thread, into people, places, and inputs in Final's chats, and carries the agent's replies back out. A channel is its own document, separate from any agent: one self-contained module, published by name and installed in a project. Its handlers always run on Final's serverless runtime.
 
 A channel declares the provider application it needs, such as an OAuth client and a signing secret, under `require.app`. A **channel app** in your project holds those credentials and meets the requirement. The channel's code never sees the secret values: it asks Final to verify a signature, exchange an OAuth code, or send an authorized request.
 
@@ -193,9 +193,27 @@ When a channel refuses an unlinked person or an unconnected place, it can send t
 
 Shared provider places connect to group chats. Direct messages may connect to the linked person's own chat. `places.defaults` declares whether the channel accepts captioned input from unlinked people (`audience: 'anyone'`) and may create a group chat automatically. Such input never receives a member's authority or personal credentials.
 
+A place whose places nest, like threads inside a channel, can give each thread its own conversation: set `childPlaces: 'own'` in `places.defaults`. Each thread then talks in a conversation of its own, with the install's agent and the place's audience, and reports its parent place in `conversation.place` so apps can group threads under it. With `'parent'`, the default, every thread talks in the place's conversation.
+
+Who is in a channel's conversation follows the provider place. Adding or removing people or agents through the conversation's participants is refused.
+
 The `origin` reply policy sends replies to the place that started a turn. An explicit `all` policy shares future chat messages with that place. Channels decide which provider APIs can represent edits, removals, reactions, and streamed replies. Don't promise a change the provider can't make.
 
 **Follow** observes a resource without making it the chat's place. Implement both `resources.resolve({ url, principal }, ctx)` and `resources.authorize({ place, principal }, ctx)`: the first parses a resource URL into a canonical place, and the second checks the person's current provider access. Final repeats that check for later observation. Use `places.follow(place, { by, conversation })` and `places.unfollow(...)` with a currently linked person.
+
+## Channels and Tasks
+
+A channel is a front door to one agent: the install's agent, which coordinates the work people ask for there. For Final's own installs that's the project's Project Agent, and direct messages land in each person's Home.
+
+When someone asks for real work in a channel, the agent [proposes a Task](/tasks/agent-tools) from that conversation, with the thread as its sources. The conversation then watches the Task:
+
+- The proposal card, and later the review card, are [decisions](/client/decisions) with the conversation's ID, so a channel that renders its `decision.created` events shows them in the thread. Only the linked person the Task acts for can answer them.
+- When the Task starts, needs its person, or ends, the agent hears it and posts a short message of its own, with a link.
+- Asked for status, the agent reads the Task; asked to pass on an instruction, it posts to the Task's thread.
+
+Nothing else crosses over. Final doesn't mirror Tasks into a provider, create Task threads in it, or sync Task state with it, and nothing in Final is specific to one provider. With `childPlaces: 'own'`, each provider thread is its own conversation, so each thread's Task is watched by the conversation that asked for it.
+
+To start work when something happens in another system, rather than when someone talks to an agent, use a [workflow](/workflows/triggers) with a webhook or integration event trigger and a [task step](/workflows/steps#hand-work-to-a-task), not a channel.
 
 ## Routes, listeners, and events
 

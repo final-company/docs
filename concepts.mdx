@@ -62,11 +62,16 @@ Most sessions start because your app sends a message. Work can also arrive witho
 - **Inputs** hand a conversation's agent something to act on that isn't a member's message, like a finished build. See [send an input](/client/conversations#send-an-input-from-another-system).
 - A [subagent](/client/sessions#start-a-subagent) is a session that works for another session. Each of its answers reaches the parent session as input.
 - [Schedules](/build/schedules) are timers in a conversation. Each firing prompts one agent participant, with what that participant was provided.
-- [Channels](/build/channels) turn an outside surface, like a webhook or a chat app, into people, places, and inputs in Final's chats.
+- [Channels](/build/channels) turn an outside surface where people talk, like a chat app or an issue thread, into people, places, and inputs in Final's chats.
+- [Workflows](/workflows/overview) start work on a schedule, from a webhook, or when an integration reports an event.
 
 [Hooks](/build/hooks) run your code when something happens in a session, without changing what the agent does. The [event feed](/operate/events) tells your systems what changed across a project.
 
+## Tasks: work a project hands off
+
+A [Task](/tasks/overview) is work someone asked a project for, with a brief, a thread of updates, and typed results. One agent works it, or a lead agent plans it into steps for other agents. People accept the proposal, and the result when it needs review. A **runner** claims each ready Task and starts a session bound to it; the session works it with Final's [task tools](/tasks/agent-tools).
+
 ## Sessions or conversations
 
-- **Sessions** are the direct line: you send a message and stream the agent's work. Use them for tasks, or when your app stores its own chat history.
+- **Sessions** are the direct line: you send a message and stream the agent's work. Use them for one-off jobs, or when your app stores its own chat history.
 - **[Conversations](/client/conversations)** are chats Final stores, with people and agents as participants, message history, and read state. Each agent participant has its own `provide`, and Final delivers each message to the right agent's session.

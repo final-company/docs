@@ -113,6 +113,14 @@
             ]
           },
           {
+            "group": "Tasks",
+            "pages": [
+              "tasks/overview",
+              "tasks/runners",
+              "tasks/agent-tools"
+            ]
+          },
+          {
             "group": "Operate",
             "pages": [
               "operate/authentication",

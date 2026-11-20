@@ -126,6 +126,7 @@ Every sandbox and integration must belong to the project the call is made in.
 | `project.conversations.direct(...)`, `handle.addParticipant(...)` | The agent's. |
 | `handle.participants.provide(participantId, patch)` | The result must still meet the agent's requirements. |
 | `project.channels.install({ agent, agents: { provide } })`, `client.channelBindings.update(...)` | The agent that answers in the chats the install creates. |
+| `project.tasks.create(...)`, `.propose(...)`, `.batch(...)` | The Task's agent, against the part of `provide` the Task sets. A runner provides the rest when it [starts the session](/tasks/runners#provide-what-the-task-leaves-out), and the session's `provide` must agree with every field the Task sets. |
 
 In a conversation, each top-level key (`harness`, `compute`, `integrations`) comes whole from the nearest scope that sets it: the participant, then the conversation, then the channel install that created it. Compute never mixes sandboxes from two scopes. A conversation's [schedules](/build/schedules) run with what their agent participant is provided there.
 

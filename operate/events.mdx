@@ -3,7 +3,7 @@ title: "Events and webhooks"
 description: "Read what changed in a project from its event feed, or have Final push it to your endpoint."
 ---
 
-Final keeps an **event feed** of what changes in a project: conversations created and archived, people and agents joining, turns ending, decisions raised and resolved, agents published, and projects created or moved. Read it to keep your own systems in step, like a dashboard of open decisions or an audit trail of finished turns, instead of polling each conversation.
+Final keeps an **event feed** of what changes in a project: conversations created and archived, people and agents joining, turns ending, decisions raised and resolved, Tasks moving through their states, agents published, and projects created or moved. Read it to keep your own systems in step, like a dashboard of open decisions or an audit trail of finished turns, instead of polling each conversation.
 
 Events carry IDs and state, not content, except a turn's structured result for the caller that asked for it. Read the details you need through the API.
 
@@ -77,7 +77,14 @@ Failed deliveries are retried. A subscription that keeps failing is disabled; `e
 | `decision.raised`, `decision.resolved` | A decision is waiting for an answer, or was answered, cancelled, or expired. The caller that raised a [decision](/client/decisions) sees its `requestKey` and `ownedByYou`. |
 | `agent.published`, `agent.archived` | A name was pointed at a new agent hash, or archived. |
 | `project.created`, `.archived`, `.unarchived`, `.moved` | A project changed in the tree. |
-| `link.created`, `link.deleted` | A conversation was linked to another, or unlinked. |
+| `task.proposed`, `.accepted`, `.ready`, `.claimed`, `.released` | A [Task](/tasks/overview) was proposed, accepted, became ready to claim, was claimed, or had its claim released. |
+| `task.held`, `task.unheld` | A Task started or stopped waiting on a question or an approval. |
+| `task.completed`, `.failed`, `.canceled`, `.reopened` | A Task finished, or was reopened. |
+| `task.result_posted`, `task.result_decided` | A Task's result was posted, or accepted or sent back. |
+| `task_update.posted` | An update was posted to a Task's thread. |
+| `task.subscription_changed` | Someone followed, muted, or unfollowed a Task. |
 | `identity_link.created` | Someone linked a channel account. Only they see it. |
 
-An event of a kind your SDK version doesn't know arrives with `kind` set to `unrecognized` and the original in `rawKind`.
+Task events carry a summary of the Task: its ID, project, root, state, title, acting user, runner, labels, and agent, plus the update ID and claim epoch when they apply. Project viewers see them. A `decision.raised` for a Task carries its `taskId`.
+
+An event of a kind your SDK version doesn't know arrives with `kind` set to `unrecognized` and the original in `rawKind`. The conversation links API is gone, and with it the `link.created` and `link.deleted` events; the SDK reads any it meets as unrecognized.

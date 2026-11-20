@@ -35,6 +35,23 @@ curl -X POST "$WORKFLOW_WEBHOOK_URL" \
   -d '{"orderId": "ord_123"}'
 ```
 
+### Signed webhooks
+
+A workflow can also have a webhook signing secret. Final then accepts only deliveries that carry an `x-hub-signature-256` header: `sha256=` followed by the hexadecimal HMAC-SHA256 of the exact request body under that secret, the way GitHub and many other senders sign. A delivery without a valid signature is refused with `401`, and starts no run.
+
+```bash
+BODY='{"orderId": "ord_123"}'
+SIGNATURE="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | sed 's/^.* //')"
+curl -X POST "$WORKFLOW_WEBHOOK_URL" \
+  -H 'content-type: application/json' \
+  -H "x-hub-signature-256: $SIGNATURE" \
+  -d "$BODY"
+```
+
+An `idempotency-key` header deduplicates deliveries: a sender's retry with the same key starts no second run.
+
+Webhook triggers replace webhook channels for starting work from another system. To have an agent do the work, follow the trigger with a [task step](/workflows/steps#hand-work-to-a-task).
+
 ## Integration events
 
 `onIntegrationEvent` names an integration key from `require.integrations` and an event that integration's connection reports, such as a new email or a merged pull request. In **Settings**, you choose which connection supplies the events. A payload that isn't a JSON object, or is too large to carry, arrives as `{ payload, payloadTruncated }`.

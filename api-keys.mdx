@@ -35,6 +35,7 @@ The [MCP gateway](/mcp-gateway/quickstart) and [Final CI Runners](/ci-runners/qu
 | The [agent quickstart](/quickstart) | `agents:read`, `agents:write`, `agents:execute` |
 | [Final Cloud Apps](/cloud-apps/quickstart) | `apps:read` to inspect apps; add `apps:write` to create, deploy, and run jobs |
 | [Final VMs](/vm-platform/quickstart) | The VM permissions for the operations you need |
+| [Tasks](/tasks/overview) | `tasks:read` to read them; `tasks:write` to propose, create, and act on them; `tasks:claim` to [run them](/tasks/runners) |
 
 The dialog lists every permission available to your organization. The [conversation APIs](/client/conversations) use Final's existing signed-in person client. Adding `conversations:read` or `conversations:write` does not make an API key a chat participant or give it a person inbox; its conversation list remains empty. Use [sessions](/client/sessions) for an API-key application.
 
