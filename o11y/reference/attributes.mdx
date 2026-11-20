@@ -37,7 +37,7 @@ A span's status is `ok` or `error`; a trace's status is its root's. A failed spa
 
 ### Resource
 
-Every span is recorded under a resource with `service.name` set to `final` and `deployment.environment.name` set to the environment. Agents and workflows running on Final report `prod`.
+Every span is recorded under a resource with `service.name` set to `final` and `deployment.environment.name` set to the environment: the Final deployment the turn or run happened in, `prod` or `dev`.
 
 ## GenAI attributes
 
@@ -88,7 +88,7 @@ What the conventions don't cover uses `final.*` keys:
 | Attribute | On | Value |
 | --- | --- | --- |
 | `error.type` | Failed spans | The class of error, such as `tool_failed`, `model_call_failed` or the step's error message. |
-| `deployment.environment.name` | Resource | The environment. |
+| `deployment.environment.name` | Resource | The environment: the Final deployment, `prod` or `dev`. |
 | `service.name` | Resource | `final`. |
 
 ## Search by attribute

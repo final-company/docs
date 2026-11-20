@@ -3,7 +3,7 @@ title: "Online evaluation"
 description: "Judge agent turns and workflow runs as they finish, with environments, conditions, sampling, session windows and backfills."
 ---
 
-Online evaluation runs judges on your project's agent turns and workflow runs as they finish. When a turn ends or a run completes, Final matches every online judge against it, and each match becomes one evaluation at the judge's pinned evaluator version.
+Online evaluation runs judges on your project's agent turns and workflow runs as they finish. When a turn ends or a run completes, Final matches every online judge against it: the trace's environment, then the agents and workflows the judge [applies to](/o11y/judges#choose-the-agents-and-workflows-it-judges), then its run conditions, then sampling. Each match becomes one evaluation at the judge's pinned evaluator version.
 
 ## Run settings
 
@@ -30,12 +30,12 @@ await o11y.judges.setJudgeRunSettings({
 | Setting | What it does |
 | --- | --- |
 | `online` | Evaluate finished turns and runs. |
-| `environments` | Required when `online` is true. Only traces from these environments are evaluated. Agents and workflows running on Final report `prod`. |
+| `environments` | Required when `online` is true. Only traces from these environments are evaluated. A trace's environment is the Final deployment it ran in: `prod` or `dev`. |
 | `conditions` | Optional [condition groups](/o11y/judges#deterministic-judges) the trace's root span must match. |
 | `samplingPercent` | 0 to 100. |
 | `sessionTrigger` | For session judges: when to score a session. See [session windows](#session-windows). |
 
-Run settings replace the previous ones. They don't change the judge's evaluator version: pin that on the judge.
+Run settings replace the previous ones. They don't change the judge's evaluator version or the agents and workflows it applies to: set those on the judge.
 
 ## What conditions see
 
@@ -48,7 +48,7 @@ Online conditions are checked when the trace finishes, against its root span:
 | `error` | Whether the turn or run failed. |
 | `attribute` | `deployment.environment.name`, `gen_ai.conversation.id` (the session) and `final.agent.hash` (the agent version). |
 
-To evaluate only some agent versions, match `final.agent.hash` with `in`. To evaluate one workflow, match its root span name.
+To evaluate one agent's turns or one workflow's runs, set the judge's [`appliesTo`](/o11y/judges#choose-the-agents-and-workflows-it-judges). To evaluate only some versions of an agent, match `final.agent.hash` with `in`. To evaluate agent turns only, or workflow runs only, match the root span name.
 
 ## When a trace is evaluated
 
@@ -93,12 +93,24 @@ Each evaluation covers an explicit range of the session's turns. A session that 
 
 ## Backfills
 
-`backfillJudge` runs a judge at its pinned version over the traces in a time range, optionally narrowed by a trace filter: environments, statuses, root span names, operations, models, agents and agent versions, workflows, sessions, labels, cost, duration, span attributes and text. `evaluateAllTraces` does the same for up to 20 judges and any filter. Ask for the estimate first with `dryRun: true`:
+`backfillJudge` runs a judge at its pinned version over the agent turns and workflow runs in a time range. `evaluateAllTraces` does the same for up to 20 judges and any filter. Without a filter, both take every turn and finished run in range. A trace filter narrows them:
+
+| Filter | Takes |
+| --- | --- |
+| `agentIds`, `agentNames` | Turns of these agents, by ID or by published name. Together, turns of any agent either names. |
+| `agentVersions` | Turns at these agent content hashes. |
+| `workflowIds` | Runs of these workflows. |
+| `environments`, `statuses`, `names`, `operations`, `models` | Traces from these environments, with these statuses and root span names, with spans of these operations, or calling these models. |
+| `sessionIds`, `labels` | Traces in these sessions, or with these judges' labels. |
+| `minCostUsd`, `maxCostUsd`, `minDurationMs`, `maxDurationMs` | Traces in a cost or duration range. |
+| `attributes`, `text` | Traces with matching [span attributes](/o11y/reference/attributes#search-by-attribute) or text. |
+
+Each filter narrows the match, so a filter with both agents and workflows takes nothing: backfill them separately. Agent names resolve when the backfill starts, and a name no published agent has matches nothing. Ask for the estimate first with `dryRun: true`:
 
 ```ts
 const estimate = await o11y.judges.evaluateAllTraces({
   judgeIds: [judgeId],
-  filter: { agentIds: ['adef_…'], from: '2026-11-13T00:00:00Z' },
+  filter: { agentNames: ['support'], from: '2026-11-13T00:00:00Z' },
   dryRun: true,
 });
 console.log(estimate.targetCount, estimate.estimatedCostUsd);
@@ -118,11 +130,13 @@ Online evaluation and test scoring each have a per-project rate: a burst of 100 
 
 ## Which evaluations start actions
 
-| Trigger | Publishes `o11y.judge.matched` |
-| --- | --- |
-| Online, at the judge's pinned version | Yes |
-| `runJudge`, `evaluateTraces`, `evaluateAllTraces`, `backfillJudge` | No |
-| Test runs and rescoring | No |
-| External results | No |
+Only online evaluations publish the events that start [actions](/o11y/actions):
 
-An evaluation that fails (`evaluator_error` or `timeout`) publishes `o11y.evaluation.failed`, whatever started it.
+| Trigger | `o11y.judge.matched` | `o11y.evaluation.failed` |
+| --- | --- | --- |
+| Online | When it produces a value at the judge's pinned version | When it ends in `evaluator_error` or `timeout` |
+| `runJudge`, `evaluateTraces`, `evaluateAllTraces`, `backfillJudge` | No | No |
+| Test runs and rescoring | No | No |
+| External results | No | No |
+
+Read the failures of evaluations you start with `listEvaluations({ batchId })`.

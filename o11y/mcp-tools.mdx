@@ -39,11 +39,11 @@ The same operation is the HTTP route `/api/v1/o11y/projects/{projectId}/…` on 
 | Tool | SDK method | What it does | Scope | Effect |
 | --- | --- | --- | --- | --- |
 | `final.o11y.judges.list` | `listJudges` | List judges with the evaluator version online evaluation runs. | `o11y:read` | read |
-| `final.o11y.judges.get` | `getJudge` | Get a judge with its binding and run settings. | `o11y:read` | read |
-| `final.o11y.judges.create` | `createJudge` | Create an agent, deterministic or code judge. An agent judge is a published Final agent; a code judge takes its source from set_code_judge_source; external judges use create_external_judge. | `o11y:write` | write |
-| `final.o11y.judges.update` | `updateJudge` | Change a judge's name, description or binding. Version an agent judge by publishing the agent and pinning its hash. | `o11y:write` | write |
+| `final.o11y.judges.get` | `getJudge` | Get a judge with its binding, run settings and the agents and workflows it applies to. | `o11y:read` | read |
+| `final.o11y.judges.create` | `createJudge` | Create an agent, deterministic or code judge. An agent judge is a published Final agent; a code judge takes its source from set_code_judge_source; external judges use create_external_judge. `appliesTo` limits online evaluation to chosen agents and workflows; omitted, it takes all. | `o11y:write` | write |
+| `final.o11y.judges.update` | `updateJudge` | Change a judge's name, description, binding or the agents and workflows it applies to (null: all). Version an agent judge by publishing the agent and pinning its hash. | `o11y:write` | write |
 | `final.o11y.judges.delete` | `deleteJudge` | Delete a judge and stop its online evaluation; its past results remain. | `o11y:write` | destructive |
-| `final.o11y.judges.set_run_settings` | `setJudgeRunSettings` | Set a judge's online evaluation: environments, conditions, sampling and session triggers. Agent judges spend against the agent's own budget. | `o11y:write` | write |
+| `final.o11y.judges.set_run_settings` | `setJudgeRunSettings` | Set a judge's online evaluation: environments (Final's deployment names, `prod` or `dev`), conditions, sampling and session triggers. Agent judges spend against the agent's own budget. | `o11y:write` | write |
 | `final.o11y.judges.set_code_judge_source` | `setCodeJudgeSource` | Commit a code judge's TypeScript source files to its folder under `o11y/judges/` in the project Files repository, replacing the files there. | `o11y:write` | write |
 | `final.o11y.judges.get_code_judge_source` | `getCodeJudgeSource` | Get a code judge's source files from the project Files repository, at a commit or the latest. | `o11y:read` | read |
 | `final.o11y.judges.list_labels` | `listJudgeLabels` | List judges' labels with their rates. | `o11y:read` | read |

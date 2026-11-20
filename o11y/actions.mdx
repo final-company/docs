@@ -12,7 +12,7 @@ An action is an [AI Workflow](/workflows/overview) that a judge's results start.
 2. Observability publishes it as an `event.published` event named `o11y.judge.matched`, with the judge, the target, the value and a link to the trace.
 3. Every published workflow with a matching `onEvent('o11y.judge.matched', …)` trigger starts a run, with the event's data as its input.
 
-Only online evaluations at the judge's pinned version publish `o11y.judge.matched`. Trials, backfills, test runs and external results don't, so they never start actions. The event is published for every value, passing or failing: to act only on some results, narrow the trigger with `match`, or check `input.value` at the start of `run`.
+Only online evaluations at the judge's pinned version publish `o11y.judge.matched`, and only online evaluations publish `o11y.evaluation.failed`. Trials, backfills, test runs and external results publish neither, so they never start actions. The event is published for every value, passing or failing: to act only on some results, narrow the trigger with `match`, or check `input.value` at the start of `run`.
 
 ```ts
 import { defineWorkflow, onEvent, z } from '@finalai/workflows';
@@ -275,7 +275,7 @@ Observability publishes these `event.published` events to the project's feed. Th
 | Name | When | Data |
 | --- | --- | --- |
 | `o11y.judge.matched` | An online evaluation at the judge's pinned version produced a value. | `judgeId`, `evaluatorVersion`, `evaluationId`, `trigger`, `target` (`kind`, `traceId`, `spanId`, `sessionId`, `fromTraceSeq`, `toTraceSeq`), `environment`, `value` (`labelId`, `label`, `score`, `passed`) and `link` |
-| `o11y.evaluation.failed` | An evaluation ended in `evaluator_error` or `timeout`. | `judgeId`, `evaluatorVersion`, `evaluationId`, `trigger`, `target`, `status` and `errorCode` |
+| `o11y.evaluation.failed` | An online evaluation ended in `evaluator_error` or `timeout`. | `judgeId`, `evaluatorVersion`, `evaluationId`, `trigger`, `target`, `status` and `errorCode` |
 | `o11y.issue.created` | An [issue](/o11y/issues) was opened. | `issueId`, `title`, `severity` and `status` |
 | `o11y.issue.updated` | An issue gained evidence, or changed severity, text or status. | The same as `o11y.issue.created` |
 | `o11y.issue.regressed` | An issue was seen again after it was settled. | The same as `o11y.issue.created` |

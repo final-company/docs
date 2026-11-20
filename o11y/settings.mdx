@@ -16,7 +16,7 @@ console.log(settings.retention, settings.environments);
 
 | Setting | What it does |
 | --- | --- |
-| `environments` | The environments the console offers for online evaluation and filters. |
+| `environments` | The environments the console offers for online evaluation and filters. A trace's environment is the Final deployment it ran in: `prod` or `dev`. |
 | `retention.resultDays` | How long evaluations, external results and reviews are kept, and the evidence snapshots they cite: 1 to 400 days, 365 by default. |
 
 `getSettings` also returns the evaluation defaults a judge starts with when it goes online: sampling at 100% and the session inactivity window.

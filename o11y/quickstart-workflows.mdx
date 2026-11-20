@@ -1,7 +1,7 @@
 ---
 title: "Quickstart: evaluate an AI workflow"
 sidebarTitle: "Evaluate a workflow"
-description: "Judge workflow runs as they finish, backfill past runs by trace ID, and run an experiment against a new version."
+description: "Judge a workflow's runs as they finish, backfill its past runs, and run an experiment against a new version."
 ---
 
 Every run of a published [AI Workflow](/workflows/overview) is a trace. You'll judge a support-triage workflow's runs online, score its past runs, and test its next version on a fixed set of cases before you publish it.
@@ -29,21 +29,14 @@ for (const span of spans) console.log(span.name, span.status.code);
 for (const link of trace.linkedTraces) console.log(link.relation, link.traceId);
 ```
 
-See [traces and span attributes](/o11y/reference/attributes) for every attribute.
+See [traces and span attributes](/o11y/reference/attributes) for every attribute. Finished runs are also rows of the [SQL](/o11y/dashboards-and-sql#catalog) `traces` view, with their root and step spans in `spans`, so queries and dashboards count them beside agent turns.
 
 ## Judge runs as they finish
 
-Publish a judge agent as in the [agent quickstart](/o11y/quickstart), then bind it and turn it on for this workflow's runs. Online run conditions see the root span, so match the workflow by its root span's name:
+Publish a judge agent as in the [agent quickstart](/o11y/quickstart), then bind it to this workflow with `appliesTo` and turn it on:
 
 ```ts
-import {
-  ConditionField,
-  ConditionJoin,
-  ConditionOperator,
-  JudgeResponseKind,
-  JudgeScope,
-  JudgeType,
-} from '@finalai/agents/o11y';
+import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/agents/o11y';
 
 const judge = await o11y.judges.createJudge({
   name: 'Triage matches the email',
@@ -53,33 +46,21 @@ const judge = await o11y.judges.createJudge({
     agent: { name: 'triage-judge' },
     responseKind: JudgeResponseKind.Binary,
   },
+  // This workflow's runs only: no agent turns, no other workflow.
+  appliesTo: { workflows: [{ id: 'wf_…' }] },
 });
 
 await o11y.judges.setJudgeRunSettings({
   judgeId: judge.judgeId,
-  runSettings: {
-    online: true,
-    environments: ['prod'],
-    samplingPercent: 100,
-    conditions: {
-      join: ConditionJoin.And,
-      conditions: [
-        {
-          field: ConditionField.SpanName,
-          op: ConditionOperator.Eq,
-          value: 'workflow Triage support email',
-        },
-      ],
-    },
-  },
+  runSettings: { online: true, environments: ['prod'], samplingPercent: 100 },
 });
 ```
 
-Each run is judged once, when it finishes. Dry runs aren't evaluated. The judge sees the run's input, its steps and their timing, and its result.
+Name the workflow by `name` instead of `id` to follow whichever workflow has that name. Each run is judged once, when it finishes. Dry runs aren't evaluated. The judge sees the run's input, its steps and their timing, and its result.
 
 ## Backfill past runs
 
-`backfillJudge` scores the runs in a time range, narrowed by any [trace filter](/o11y/online-evaluation#backfills). Ask for the estimate first; then start it. To choose the runs yourself, pass their trace IDs to `evaluateTraces`:
+`backfillJudge` scores the traces in a time range. Without a filter it takes every agent turn and workflow run in range; `workflowIds` narrows it to this workflow's runs, and any other [trace filter](/o11y/online-evaluation#backfills) narrows it further. Ask for the estimate first; then start it. To choose the runs yourself, pass their trace IDs to `evaluateTraces`:
 
 ```ts
 import { SpanStatusCode } from '@finalai/agents/o11y';
@@ -105,7 +86,7 @@ await o11y.judges.evaluateTraces({
 });
 ```
 
-Backfills and `evaluateTraces` run the judge at its pinned version and publish no `o11y.judge.matched` events, so they never start [actions](/o11y/actions). Follow one with `listEvaluations({ batchId })` and stop it with `cancelEvaluations({ batchId })`.
+Backfills and `evaluateTraces` run the judge at its pinned version and publish neither `o11y.judge.matched` nor `o11y.evaluation.failed`, so they never start [actions](/o11y/actions). Follow one with `listEvaluations({ batchId })` and stop it with `cancelEvaluations({ batchId })`.
 
 ## Test the next version
 

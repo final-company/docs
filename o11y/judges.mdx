@@ -182,6 +182,34 @@ await o11y.judges.submitJudgeResult({
 
 A target is a trace, a span, a session or a conversation. Submitting again for the same target replaces the current result and keeps the earlier ones as history (`listJudgeResults({ includeHistory: true })`). `metadata` carries your own fields, and `citations` can point at spans. Submitted results trigger no other judges and start no actions.
 
+## Choose the agents and workflows it judges
+
+By default, a judge's [online evaluation](/o11y/online-evaluation) takes every agent's turns and every workflow's runs in the project. `appliesTo` narrows it to the published agents and workflows you name, each by ID or by name (up to 50 of each):
+
+```ts
+import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/agents/o11y';
+
+const refunds = await o11y.judges.createJudge({
+  name: 'Refund policy followed',
+  definition: {
+    type: JudgeType.Agent,
+    scope: JudgeScope.Trace,
+    agent: { name: 'refund-policy-judge', hash: 'sha256:…' },
+    responseKind: JudgeResponseKind.Binary,
+  },
+  appliesTo: { agents: [{ name: 'support' }], workflows: [{ id: 'wf_…' }] },
+});
+
+// Back to every agent and workflow.
+await o11y.judges.updateJudge({ judgeId: refunds.judgeId, appliesTo: null });
+```
+
+- An agent turn is taken when `agents` names its agent; a workflow run when `workflows` names its workflow. Naming only agents leaves out every workflow run, and naming only workflows leaves out every agent turn.
+- Both lists empty or left out, or `appliesTo: null` on `updateJudge`, takes every agent and workflow. Leaving `appliesTo` out of `updateJudge` keeps what the judge has.
+- `getJudge` returns `appliesTo` as you gave it: each entry has the `id` or the `name` you named it by, and `null` for the other. A judge that applies to everything returns `null`.
+
+`appliesTo` is checked before the judge's [run conditions](/o11y/online-evaluation#what-conditions-see), and only for online evaluation. Runs you start yourself take the traces you choose or the [trace filter](/o11y/online-evaluation#backfills) you pass.
+
 ## Run a judge now
 
 | Operation | What it does |

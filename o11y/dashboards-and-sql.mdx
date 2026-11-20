@@ -1,9 +1,9 @@
 ---
 title: "SQL and dashboards"
-description: "Query your agents' turns, model usage and decisions beside judge results, issues and tests, and chart them on dashboards."
+description: "Query your agents' turns, workflow runs, model usage and decisions beside judge results, issues and tests, and chart them on dashboards."
 ---
 
-Query Final's records of your agents next to Observability's own results with SQL, and chart the results on dashboards. The same catalog serves the console, the API, MCP, issue detection and the o11y agent.
+Query Final's records of your agents and workflows next to Observability's own results with SQL, and chart the results on dashboards. The same catalog serves the console, the API, MCP, issue detection and the o11y agent.
 
 ## SQL
 
@@ -11,7 +11,7 @@ Query Final's records of your agents next to Observability's own results with SQ
 const { columns, rows } = await o11y.analytics.sqlQuery({
   sql: `SELECT agent_version, count() AS turns, quantile(0.95)(duration_ms) AS p95_ms, sum(cost_usd) AS cost
         FROM traces
-        WHERE start_time >= now() - INTERVAL 7 DAY
+        WHERE kind = 'turn' AND start_time >= now() - INTERVAL 7 DAY
         GROUP BY agent_version
         ORDER BY turns DESC`,
 });
@@ -35,16 +35,25 @@ You only see your project's rows. The store confines every read to your organiza
 
 ### Final's records
 
-These views read Final's own records of your agents in place, mapped to OpenTelemetry shapes at query time. Trace and span IDs are the same ones the trace API returns, so results join with `scores`.
+These views read Final's own records of your agents and workflows in place, mapped to OpenTelemetry shapes at query time. Trace and span IDs are the same ones the trace API returns, so results join with `scores`. `environment` is the Final deployment the trace ran in: `prod` or `dev`.
 
 | View | What it holds |
 | --- | --- |
-| `traces` | Each agent turn as the trace of its `invoke_agent` root span: `trace_id`, `status`, `start_time`, `end_time`, `duration_ms`, `environment`, `session_id`, `conversation_id`, `turn_id`, `agent_id`, `agent_version` (the content hash), `harness`, `model`, `models`, `stop_reason`, `tool_calls`, `span_count`, token counts and `cost_usd`. |
-| `spans` | The `invoke_agent` root and `chat` model-call spans of agent traces: `operation`, `model`, `provider`, token counts including cache and reasoning tokens, `cost_usd` and timing. |
+| `traces` | Each agent turn and each finished workflow run as one row for its root span: `trace_id`, `span_id`, `name` (`invoke_agent` or `workflow <name>`), `kind` (`turn` or `workflow_run`), `status`, `error_count`, `start_time`, `end_time`, `duration_ms`, `environment` and `span_count`. A turn adds `session_id`, `conversation_id`, `turn_id`, `agent_id`, `agent_version` (the content hash), `harness`, `model`, `models`, `stop_reason`, `tool_calls`, token counts and `cost_usd`. A run adds `workflow_id`, `workflow_run_id`, `workflow_version` and a `stop_reason` of `completed`, `failed` or `cancelled`. |
+| `spans` | The `invoke_agent` root and `chat` model-call spans of agent turns, with `operation`, `model`, `provider`, token counts including cache and reasoning tokens, `cost_usd` and timing; and the `workflow` root and `step` spans of workflow runs, with `workflow_id` and `step_id`. |
 | `model_usage` | Every model request of the project's agents: vendor, model, upstream provider, outcome, tokens, latency, time to first chunk, cost and budget, with the trace and span of the turn it served. |
 | `decisions` | Decisions put to people (permissions and questions) by state change: who raised them, their kind, outcome, audience and age. An outcome signal for the sessions that raised them. |
 
-Workflow runs aren't in these views yet; read them through the [trace API](/o11y/quickstart-workflows#what-a-workflow-run-looks-like).
+Workflow runs appear once they finish. The views hold their structure, status and timing; read a run's input and result through the [trace API](/o11y/quickstart-workflows#what-a-workflow-run-looks-like).
+
+```sql
+SELECT name, workflow_version, count() AS runs, countIf(status = 'error') AS failed,
+       quantile(0.95)(duration_ms) AS p95_ms
+FROM traces
+WHERE kind = 'workflow_run' AND start_time >= {start_time} AND start_time < {end_time}
+GROUP BY name, workflow_version
+ORDER BY runs DESC
+```
 
 ### Observability's results
 
@@ -67,7 +76,8 @@ IDs of Observability's objects in these views (`judge_id`, `label_id`, `issue_id
 SELECT t.agent_version, s.label, count() AS results
 FROM scores AS s
 INNER JOIN traces AS t ON t.trace_id = s.trace_id
-WHERE s.status = 'value' AND s.scored_at >= {start_time} AND s.scored_at < {end_time}
+WHERE t.kind = 'turn' AND s.status = 'value'
+  AND s.scored_at >= {start_time} AND s.scored_at < {end_time}
 GROUP BY t.agent_version, s.label
 ORDER BY t.agent_version, results DESC
 ```

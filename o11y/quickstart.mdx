@@ -71,11 +71,13 @@ export FINAL_PROJECT_ID='prj_your_project'
         agent: { name: 'support-judge', hash: 'sha256:4f1c…' },
         responseKind: JudgeResponseKind.Binary,
       },
+      // The agent you're judging, by its published name.
+      appliesTo: { agents: [{ name: 'support' }] },
     });
     console.log(judge.judgeId, judge.evaluatorVersion);
     ```
 
-    A binary judge without its own `choices` has the labels `Pass` and `Fail`. Leave out `hash` and the judge follows the name's latest publication instead.
+    A binary judge without its own `choices` has the labels `Pass` and `Fail`. Leave out `hash` and the judge follows the name's latest publication instead. `appliesTo` keeps online evaluation to your agent's turns; leave it out to judge every agent and workflow in the project.
   </Step>
   <Step title="Try it on recent turns">
     Run the judge on the agent's turns from the last day. `runJudge` scores up to 100 traces now and publishes no `o11y.judge.matched` events, so no [action](/o11y/actions) reacts to a trial.
@@ -88,7 +90,7 @@ export FINAL_PROJECT_ID='prj_your_project'
     const judgeId = 'ojdg_…';
 
     const { items } = await o11y.traces.searchTraces({
-      filter: { agentIds: ['adef_…'], from: new Date(Date.now() - 86_400_000).toISOString() },
+      filter: { agentNames: ['support'], from: new Date(Date.now() - 86_400_000).toISOString() },
       limit: 20,
     });
     const batch = await o11y.judges.runJudge({
@@ -107,7 +109,6 @@ export FINAL_PROJECT_ID='prj_your_project'
   <Step title="Evaluate new turns online">
     ```ts online.ts
     import { createClient } from '@finalai/agents/client';
-    import { ConditionField, ConditionJoin, ConditionOperator } from '@finalai/agents/o11y';
 
     const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
     const { o11y } = client.project({ id: process.env.FINAL_PROJECT_ID! });
@@ -115,22 +116,11 @@ export FINAL_PROJECT_ID='prj_your_project'
 
     await o11y.judges.setJudgeRunSettings({
       judgeId,
-      runSettings: {
-        online: true,
-        environments: ['prod'],
-        samplingPercent: 25,
-        // Agent turns only, not workflow runs.
-        conditions: {
-          join: ConditionJoin.And,
-          conditions: [
-            { field: ConditionField.SpanName, op: ConditionOperator.Eq, value: 'invoke_agent' },
-          ],
-        },
-      },
+      runSettings: { online: true, environments: ['prod'], samplingPercent: 25 },
     });
     ```
 
-    From now on, a quarter of the project's finished turns are judged at the pinned hash. What judging spends is the judge agent's own model use.
+    From now on, a quarter of your agent's finished turns in `prod` are judged at the pinned hash. What judging spends is the judge agent's own model use.
   </Step>
 </Steps>
 
