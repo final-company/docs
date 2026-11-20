@@ -1,0 +1,96 @@
+---
+title: "Datasets"
+description: "Keep examples as JSON Lines in your project's Files repository, versioned by git commits, and build them from traces, files and reviews."
+---
+
+A dataset is a JSON Lines file in the project's Files repository, under `o11y/datasets/`, with a JSON Schema for its rows beside it. Every change is one git commit, and the commits are the dataset's versions: test cases and exports name the commit they read, so a dataset can keep growing without changing what an earlier run saw.
+
+Because a dataset is an ordinary file, you and your agents can also read and edit it in the project's Files. Rows written through the API are checked against the schema.
+
+## Create a dataset
+
+The schema is JSON Schema (draft 2020-12) for one row. Mark a top-level property with `x-final-kind: "trace"` to hold the trace ID a row came from (at most one), or `"session"` for a session ID; those columns link rows to traces.
+
+```ts
+const dataset = await o11y.data.createDataset({
+  name: 'Refund questions',
+  schema: {
+    type: 'object',
+    properties: {
+      question: { type: 'string' },
+      expected_policy: { type: 'string' },
+      trace: { type: 'string', 'x-final-kind': 'trace' },
+    },
+    required: ['question'],
+  },
+});
+console.log(dataset.path); // o11y/datasets/refund-questions.jsonl
+```
+
+`updateDataset` renames a dataset, or changes its schema until a test case references it; after that the schema is frozen. `deleteDataset` removes the file; earlier commits keep it.
+
+## Add examples
+
+| Operation | Adds |
+| --- | --- |
+| `addExamplesToDataset` | Up to 1,000 rows, each with its `data` and optional `traceId` or `sessionId`. |
+| `addTracesToDataset` | Traces or sessions, by ID or by trace filter, using a preset. |
+| `importDataset` | JSON Lines or CSV content (a header row names the columns). Rejected rows are reported by row number. |
+| `createGoldenDataset` | Reviewed judge results. See [alignment](/o11y/alignment#golden-datasets). |
+| `createLabeledDataset` | A copy of a dataset with each example's current label from the judges you choose as new columns. |
+
+Each call is one commit and returns it with the new example IDs.
+
+```ts
+import { TraceDatasetPreset } from '@finalai/agents/o11y';
+
+await o11y.data.addExamplesToDataset({
+  datasetId: dataset.datasetId,
+  examples: [
+    { data: { question: 'Can I return opened headphones?', expected_policy: 'returns-30d' } },
+  ],
+});
+
+await o11y.data.addTracesToDataset({
+  datasetId: dataset.datasetId,
+  preset: TraceDatasetPreset.Trace,
+  traceIds: ['4bf92f3577b34da6a3ce929d0e0e4736'],
+});
+```
+
+| Preset | Each row holds |
+| --- | --- |
+| `trace` | The trace ID, in the `trace` column. |
+| `session` | The session ID, in the `session` column. |
+| `llm_eval` | The trace's last model call: `input`, `output` and `model`. |
+| `full_trace` | The root span's `input` and `output`, and every span's content in `spans`. |
+
+## Versions
+
+`listDatasetVersions` lists the commits that changed a dataset, newest first, with how many rows each added, removed and updated, and who made it. Read a dataset at any of them:
+
+```ts
+import { DatasetFileFormat } from '@finalai/agents/o11y';
+
+const { items: versions } = await o11y.data.listDatasetVersions({ datasetId: dataset.datasetId });
+const first = versions.at(-1)!;
+const { items: examples } = await o11y.data.listExamples({
+  datasetId: dataset.datasetId,
+  commit: first.commit,
+});
+console.log(examples.length);
+
+const exported = await o11y.data.exportDataset({
+  datasetId: dataset.datasetId,
+  format: DatasetFileFormat.Jsonl,
+});
+console.log(exported.url);
+```
+
+Every example keeps its `exampleId` across commits. `updateExample` replaces one example's data and `removeExamplesFromDataset` removes examples, each in one commit. `exportDataset` returns a short-lived download URL for the file at a commit, as JSON Lines or CSV.
+
+## Use a dataset
+
+- **In tests**: `addTestCasesFromDataset` turns examples at a commit into test cases, mapping one column to the case input and others to checks. See [experiments and CI](/o11y/experiments#cases-from-a-dataset).
+- **From actions**: the [add to dataset](/o11y/actions#templates) workflow template collects each trace a judge matches.
+- **In SQL**: the `datasets` and `examples` views. See [SQL and dashboards](/o11y/dashboards-and-sql).

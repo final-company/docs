@@ -1,0 +1,153 @@
+---
+title: "Quickstart: evaluate an AI workflow"
+sidebarTitle: "Evaluate a workflow"
+description: "Judge workflow runs as they finish, backfill past runs by trace ID, and run an experiment against a new version."
+---
+
+Every run of a published [AI Workflow](/workflows/overview) is a trace. You'll judge a support-triage workflow's runs online, score its past runs, and test its next version on a fixed set of cases before you publish it.
+
+**Before you start**, you need a published workflow that has run, `@finalai/agents` 0.29.0 or later, and a [Final API key](/api-keys) with `o11y:read`, `o11y:write` and `o11y:execute`. The examples share this client:
+
+```ts
+import { createClient } from '@finalai/agents/client';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+export const { o11y } = client.project({ id: process.env.FINAL_PROJECT_ID! });
+```
+
+## What a workflow run looks like
+
+A run's trace has a `workflow <name>` root span and one child span per step, named `step <step id>`, in the order the steps started. Each span carries `final.workflow.id`, `final.workflow.version` and `final.workflow.run_id`, and each step span adds `final.workflow.step_id`. The root's `gen_ai.input.messages` and `gen_ai.output.messages` hold the run's input and result as JSON. A failed step, or a failed run, has status `error` and an `error.type`.
+
+An agent turn that a step starts, such as a `step.agent` or `step.task`, is its own trace with an `invoke_agent` root. The run's root span links to each of those turns, and each turn links back to the run, both with `final.link.relation` set to `subagent`. Judge the run to score the workflow as a whole, or judge the turns to score the agents it calls.
+
+```ts
+const { items } = await o11y.traces.searchTraces({ filter: { workflowIds: ['wf_…'] }, limit: 1 });
+const trace = await o11y.traces.getTrace({ traceId: items[0]!.traceId });
+const { items: spans } = await o11y.traces.listTraceSpans({ traceId: trace.traceId });
+for (const span of spans) console.log(span.name, span.status.code);
+for (const link of trace.linkedTraces) console.log(link.relation, link.traceId);
+```
+
+See [traces and span attributes](/o11y/reference/attributes) for every attribute.
+
+## Judge runs as they finish
+
+Publish a judge agent as in the [agent quickstart](/o11y/quickstart), then bind it and turn it on for this workflow's runs. Online run conditions see the root span, so match the workflow by its root span's name:
+
+```ts
+import {
+  ConditionField,
+  ConditionJoin,
+  ConditionOperator,
+  JudgeResponseKind,
+  JudgeScope,
+  JudgeType,
+} from '@finalai/agents/o11y';
+
+const judge = await o11y.judges.createJudge({
+  name: 'Triage matches the email',
+  definition: {
+    type: JudgeType.Agent,
+    scope: JudgeScope.Trace,
+    agent: { name: 'triage-judge' },
+    responseKind: JudgeResponseKind.Binary,
+  },
+});
+
+await o11y.judges.setJudgeRunSettings({
+  judgeId: judge.judgeId,
+  runSettings: {
+    online: true,
+    environments: ['prod'],
+    samplingPercent: 100,
+    conditions: {
+      join: ConditionJoin.And,
+      conditions: [
+        {
+          field: ConditionField.SpanName,
+          op: ConditionOperator.Eq,
+          value: 'workflow Triage support email',
+        },
+      ],
+    },
+  },
+});
+```
+
+Each run is judged once, when it finishes. Dry runs aren't evaluated. The judge sees the run's input, its steps and their timing, and its result.
+
+## Backfill past runs
+
+`backfillJudge` scores the runs in a time range, narrowed by any [trace filter](/o11y/online-evaluation#backfills). Ask for the estimate first; then start it. To choose the runs yourself, pass their trace IDs to `evaluateTraces`:
+
+```ts
+import { SpanStatusCode } from '@finalai/agents/o11y';
+
+const judgeId = 'ojdg_…';
+const window = { from: '2026-11-01T00:00:00Z', to: '2026-11-20T00:00:00Z' };
+const filter = { workflowIds: ['wf_…'] };
+
+const estimate = await o11y.judges.backfillJudge({ judgeId, ...window, filter, dryRun: true });
+console.log(estimate.targetCount, estimate.estimatedCostUsd);
+
+const backfill = await o11y.judges.backfillJudge({ judgeId, ...window, filter });
+console.log(backfill.batchId);
+
+// Or pick the traces yourself: here, the workflow's failed runs.
+const { items } = await o11y.traces.searchTraces({
+  filter: { ...filter, statuses: [SpanStatusCode.Error] },
+  limit: 100,
+});
+await o11y.judges.evaluateTraces({
+  judgeIds: [judgeId],
+  traceIds: items.map((trace) => trace.traceId),
+});
+```
+
+Backfills and `evaluateTraces` run the judge at its pinned version and publish no `o11y.judge.matched` events, so they never start [actions](/o11y/actions). Follow one with `listEvaluations({ batchId })` and stop it with `cancelEvaluations({ batchId })`.
+
+## Test the next version
+
+An experiment runs a workflow version on every case of a test suite and scores each run with the suite's checks. A case's `input` is the workflow's input:
+
+```ts
+import { NativeCandidateKind, TestCheckOperator, TestRunMode } from '@finalai/agents/o11y';
+
+const judgeId = 'ojdg_…';
+
+const suite = await o11y.tests.createTestSuite({ name: 'Support triage' });
+await o11y.tests.addTestCases({
+  testSuiteId: suite.testSuiteId,
+  cases: [
+    {
+      name: 'Refund request',
+      input: { messageId: 'msg_refund_1' },
+      checks: [{ judgeId, op: TestCheckOperator.Eq, expected: 'Pass' }],
+    },
+  ],
+});
+const { version } = await o11y.tests.publishTestSuite({ testSuiteId: suite.testSuiteId });
+
+const run = await o11y.tests.startTestSuiteRun({
+  testSuiteId: suite.testSuiteId,
+  version,
+  mode: TestRunMode.Native,
+  nativeCandidate: { kind: NativeCandidateKind.Workflow, id: 'wf_…', revision: '4' },
+  candidate: 'triage v4',
+});
+console.log(run.testRunId, run.status);
+```
+
+`revision` is a workflow version number; leave it out to run the published version. Each case's run is a trace like any other, and `getTestSuiteRunResults` returns its trace ID beside each check. Compare two runs with `compareTestSuiteRuns`, or run the suite in CI with `final-agents o11y test run --workflow wf_…`. See [experiments and CI](/o11y/experiments).
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Act on matches" icon="bolt" href="/o11y/actions">
+    Start a workflow when a judge fails a run.
+  </Card>
+  <Card title="Experiments and CI" icon="flask" href="/o11y/experiments">
+    Gate a workflow or agent change on its test suite.
+  </Card>
+</Columns>

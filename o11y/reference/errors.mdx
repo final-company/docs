@@ -1,50 +1,53 @@
 ---
 title: "Error codes"
-description: "API error codes, SDK client error codes and final-o11y exit codes."
+description: "API error codes, SDK client errors and final-agents o11y exit codes."
 ---
 
-Failed API requests return a JSON body with a code and a message:
+Failed API requests return a JSON body with a code, a message and `details` (extra information such as validation issues, or `null`):
 
 ```json
-{ "error": { "code": "forbidden", "message": "missing o11y:write permission" } }
+{ "error": { "code": "forbidden", "message": "missing scope o11y:write", "details": null } }
 ```
 
-API responses also carry `details`: extra information such as validation issues, or `null`. The SDK client throws `O11yApiError` (check with `isO11yApiError`) with `status`, `code`, `message`, `details`, `operation` and `requestId`. Include the request ID when you contact Final.
+The `project.o11y` client throws a `ClientError` (narrow with `isClientError` from `@finalai/agents/client`) with `status`, `code`, `message` and the response `body`. `O11yApiErrorCode` in `@finalai/agents/o11y` lists the codes worth branching on.
 
 ## Server codes
 
 | Code | Status | Meaning |
 | --- | --- | --- |
-| `invalid_request` | 400 | The input failed validation, or the SQL isn't a single read-only statement over the [catalog](/o11y/reference/sql#queries). |
+| `invalid_request` | 400 | The input failed validation, or the SQL isn't a single read-only statement over the [catalog](/o11y/dashboards-and-sql#catalog). |
 | `unauthorized` | 401 | Missing, invalid or expired credentials. |
-| `forbidden` | 403 | The key lacks the operation's scope, or your role doesn't allow it. Ingest keys get this for everything but ingest. |
+| `forbidden` | 403 | The credential lacks the operation's scope, or your role doesn't allow it. See [scopes and roles](/o11y/reference/scopes). |
 | `not_found` | 404 | No such object in this project. |
-| `conflict` | 409 | A stale `revision` (dashboards), or a name already taken. Re-read and retry. |
-| `spend_cap_reached` | 402 | The project reached its monthly cap. Ingest is refused and evaluations are skipped. |
-| `payload_too_large` | 413 | Over an [ingest limit](/o11y/reference/ingest#limits). |
+| `conflict` | 409 | A stale `revision` (dashboards), or a name already taken. Read again and retry. |
+| `payload_too_large` | 413 | The request is over a size limit. |
 | `rate_limited` | 429 | Too many requests. Retry with backoff. |
-| `query_rate_limited` | 429 | Too many SQL queries. See [SQL limits](/o11y/reference/sql#limits). |
+| `query_rate_limited` | 429 | Too many SQL queries. See [SQL limits](/o11y/dashboards-and-sql#limits). |
 | `query_memory_limit` | 422 | The SQL query used too much memory. |
 | `query_timeout` | 504 | The SQL query ran too long. |
+| `not_implemented` | 501 | The setting or operation isn't available yet. |
 | `unavailable` | 503 | A dependency is temporarily unavailable. Retry with backoff. |
+| `internal` | 500 | Something failed on Final's side. Retry, and contact Final if it persists. |
 
-Invalid input is rejected before anything runs: requests are strict, so unknown fields and wrong types are errors rather than being ignored. Other codes may appear; treat unknown codes by their HTTP status.
+Invalid input is rejected before anything runs: requests are strict, so unknown fields and wrong types are errors rather than being ignored. Other codes may appear; treat an unknown code by its HTTP status.
 
 ## Client codes
 
-The SDK client raises these itself:
+The client raises these itself:
 
 | Code | Status | Meaning |
 | --- | --- | --- |
 | `invalid_request` | 0 | The input failed the operation's schema; nothing was sent. |
 | `network_error` | 0 | No response arrived. |
-| `invalid_response` | | The response didn't match the expected shape. |
-| `request_failed` | The HTTP status | A failed response without a JSON error body, such as one from a proxy. The message includes the start of the body. |
+| `invalid_response` | 0 | The response didn't match the operation's shape. |
+| `unknown` | The HTTP status | A failed response without a JSON error body, such as one from a proxy. |
+
+`isRetryableClientError` is true for network errors, `429` and `5xx`.
 
 ## Evaluation statuses
 
-Evaluations don't fail requests; their outcome is a status on the result. See [results](/o11y/judges#results).
+Evaluations don't fail requests; their outcome is a status on the result, such as `evaluator_error` or `skipped_budget`. See [results](/o11y/judges#results).
 
 ## CLI exit codes
 
-`final-o11y` exits `0` on success, `1` when tests fail or regress (or, for other commands, when a request fails), and `2` when it couldn't complete. See [tests in CI](/o11y/tests-in-ci#exit-codes).
+`final-agents o11y <group> <operation>` exits `0` on success, `1` when the request fails, and `2` on usage errors. `final-agents o11y test run` exits `0` when the run passes, `1` when cases fail (or, with `--fail-on regressed`, regress), and `2` when the run couldn't complete. See [experiments and CI](/o11y/experiments#run-in-ci).

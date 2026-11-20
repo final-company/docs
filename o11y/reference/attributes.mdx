@@ -1,117 +1,96 @@
 ---
-title: "Attribute keys and mappers"
-sidebarTitle: "Attributes and mappers"
-description: "The final.* attribute keys Final reads, and mappers that copy your own keys onto them."
+title: "Traces and span attributes"
+sidebarTitle: "Span attributes"
+description: "How agent turns and workflow runs map to OpenTelemetry spans, and every gen_ai.* and final.* attribute on them."
 ---
 
-Final reads the `final.*` attributes below, plus OpenTelemetry GenAI, OpenInference and the other [conventions it normalizes](/o11y/reference/ingest#normalization). Every other attribute is kept as sent. `FinalAttribute` in `@finalai/o11y/contract` (also exported from `/node` and `/workers`) has every key.
+Final records your agents' turns and workflow runs as they happen. Observability reads those records in place and represents each as an OpenTelemetry trace, following the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). The same spans appear in the console's waterfall, the trace API, judges' evidence, SQL and [trace export](/o11y/trace-export). The constants are in `@finalai/agents/o11y`: `GenAiAttribute`, `OtelAttribute`, `FinalAttribute` and `GenAiOperationName`.
 
-## Span kind, input and output
+## Trace shapes
 
-| Key | Value |
-| --- | --- |
-| `final.span_kind` | `llm`, `tool`, `function`, `agent`, `generator` or `span`. |
-| `final.input` | The span's input. Strings as-is; structured values as JSON. |
-| `final.output` | The span's output. |
+### An agent turn
 
-## Trace context
+| Span | Name | Kind | Holds |
+| --- | --- | --- | --- |
+| Root | `invoke_agent` | `internal` | The turn: agent, session, agent version, models, finish reason, token totals, and the turn's input and output messages. |
+| Model call | `chat <model>` | `client` | One model request: provider, model, response ID, tokens and cost. |
+| Tool call | `execute_tool <tool>` | `internal` | One tool call: its name, ID, type, arguments and result. |
 
-Set these on the root span. The SDK's `setSession`, `setCustomer`, `setCustomerUser`, `setAgentVersion` and `tag` do that for you.
+Model and tool calls are children of the root, in start order. Cost sits on the `chat` spans that spent it, so summing spans counts it once; the trace's `costUsd` is that sum.
 
-| Key | Value |
-| --- | --- |
-| `final.session_id` | The session the trace belongs to. Read from the root span only. |
-| `final.customer_id` | The customer or tenant. |
-| `final.customer_user_id` | The person within the customer. |
-| `final.agent_version` | The version of your agent. Traces compare by it. |
-| `final.tags` | A string array of tags. |
-| `deployment.environment.name` | The environment, as a resource attribute. Final has no environment key of its own. |
+### A workflow run
 
-## Model calls
+| Span | Name | Kind | Holds |
+| --- | --- | --- | --- |
+| Root | `workflow <workflow name>` | `internal` | The run: workflow, version and run ID, its input and result. |
+| Step | `step <step id>` | `internal` | One step, from when it started (or started waiting) to when it finished. A step that failed and then succeeded on a retry is `ok`. |
 
-| Key | Value |
-| --- | --- |
-| `final.llm.provider` | Such as `openai` or `anthropic`. |
-| `final.llm.model` | The model ID. |
-| `final.llm.request_parameters` | JSON of the request parameters. |
-| `final.llm.tools_offered` | JSON of the tool definitions offered to the model. |
-| `final.llm.tool_calls` | JSON array of `{ id, name, arguments }`. |
-| `final.llm.context` | The exact messages the model saw. |
-| `final.llm.response_id` | The provider's response ID. |
-| `final.llm.finish_reason` | Why the model stopped. |
-| `final.llm.streaming` | Whether the call streamed. |
+### Links
 
-## Usage and cost
+A workflow run's root links to the trace of every agent turn its steps started, and each of those turns' roots links back to the run. Both links carry `final.link.relation: subagent`. `getTrace` returns them as `linkedTraces` and `parentTrace`.
 
-| Key | Value |
-| --- | --- |
-| `final.usage.input_tokens` | All input tokens, including cache reads and writes. |
-| `final.usage.output_tokens` | Output tokens. |
-| `final.usage.cache_read_tokens` | Input tokens read from a prompt cache. |
-| `final.usage.cache_creation_tokens` | Input tokens written to a prompt cache. |
-| `final.usage.reasoning_tokens` | Reasoning tokens. |
-| `final.usage.image_tokens` | Image tokens. |
-| `final.usage.total_tokens` | Total tokens. |
-| `final.usage.total_cost_usd` | Cost in USD. Omit when unknown; never send `0` for unknown. |
-| `final.usage.source` | Where usage came from. Model calls Final meters itself say `final` (`FINAL_METERED_USAGE_SOURCE` in the contract). |
-| `final.usage.request_id` | The metered request's ID. Usage is counted once per request ID. |
+### IDs and status
 
-When cost is missing, Final computes it from the model's published prices where it knows them, and otherwise leaves it empty.
+Trace IDs are 32 lowercase hex characters and span IDs 16, as OpenTelemetry requires, and they're stable: the trace API, SQL views, judge citations and exported spans all name the same trace and span the same way.
 
-## Tools and MCP
+A span's status is `ok` or `error`; a trace's status is its root's. A failed span carries `error.type`. A turn's root is `error` when the turn ended in error or timed out; a run's root is `error` when the run failed.
 
-| Key | Value |
-| --- | --- |
-| `final.tool.name` | The tool's name. |
-| `final.tool.call_id` | The tool call's ID, matching the model's tool call. |
-| `final.mcp.server_name` | The instrumented MCP server. |
-| `final.mcp.intent` | Why the calling agent used the tool. |
-| `final.mcp.llm_model` | The calling agent's model. |
-| `final.mcp.session_source` | Where the session came from: `app`, `echoed`, `generated` or `transport`. |
+### Resource
 
-## Links, tests and prompts
+Every span is recorded under a resource with `service.name` set to `final` and `deployment.environment.name` set to the environment. Agents and workflows running on Final report `prod`.
 
-| Key | Value |
-| --- | --- |
-| `final.link.trace_id`, `final.link.span_id` | On the root of a linked trace: the span that started it. |
-| `final.link.relation` | `fork`, `subagent` or `continuation`. |
-| `final.test.run_id`, `final.test.case_id`, `final.test.repeat` | Links a trace to a test case. Also sent as W3C baggage with the same names. |
-| `final.prompt.version_id` | The stored prompt version used. |
-| `final.workflow.run_id`, `final.workflow.step_id`, `final.workflow.agent_session_id`, `final.agent.session_id` | Set by Final's [native producers](/o11y/final-agents-and-workflows): the workflow run, step and agent session a root span belongs to. |
-| `final.conversation.observation` | A conversation item on the span, as JSON. See [observations](/o11y/reference/observations). |
+## GenAI attributes
 
-## Mappers
+| Attribute | On | Value |
+| --- | --- | --- |
+| `gen_ai.operation.name` | Every agent span | `invoke_agent`, `chat` or `execute_tool`. |
+| `gen_ai.provider.name` | Root, `chat` | `final` on the root; the model provider on a `chat` span. |
+| `gen_ai.conversation.id` | Root | The Final session the turn belongs to. |
+| `gen_ai.agent.id` | Root | The agent's ID. |
+| `gen_ai.agent.name` | Root | The agent's name. |
+| `gen_ai.request.model` | Root, `chat` | The model requested. On the root, set when the turn used one model. |
+| `gen_ai.response.id` | `chat` | The provider's response ID. |
+| `gen_ai.response.finish_reasons` | Root | Why the turn stopped, such as `end_turn`. |
+| `gen_ai.usage.input_tokens` | Root, `chat` | Input tokens. |
+| `gen_ai.usage.output_tokens` | Root, `chat` | Output tokens. |
+| `gen_ai.tool.name` | `execute_tool` | The tool's name. |
+| `gen_ai.tool.call.id` | `execute_tool` | The tool call's ID. |
+| `gen_ai.tool.type` | `execute_tool` | The kind of tool. |
+| `gen_ai.tool.call.arguments` | `execute_tool` | The call's arguments. Content. |
+| `gen_ai.tool.call.result` | `execute_tool` | The call's result. Content. |
+| `gen_ai.input.messages` | Root | The turn's input messages, or a run's input as JSON. Content. |
+| `gen_ai.output.messages` | Root | The turn's reply messages, or a run's result as JSON. Content. |
 
-A mapper copies a source attribute to a target attribute when spans are processed, so you can map your own keys onto Final's without changing code.
+Messages follow the conventions' shape: `{ role, parts }`, with `text` parts for text and other parts for images, files and JSON.
 
-```ts
-await project.traces.createMapper({
-  sourceKey: 'app.conversation_id',
-  targetKey: 'final.session_id',
-  layer: 10,
-  override: false,
-  removeSource: false,
-});
-```
+**Content** attributes are left out of span lists (`listTraceSpans`) to keep them small; `getSpan` returns every attribute.
 
-| Setting | What it does |
-| --- | --- |
-| `sourceKey`, `targetKey` | Copy the value of `sourceKey` to `targetKey`. |
-| `layer` | 0 to 100. Lower layers apply first, so a later layer can map the output of an earlier one. |
-| `enabled` | Turn a mapper off without deleting it. |
-| `override` | Overwrite a target value the span already has. Off by default. |
-| `removeSource` | Drop the source attribute after mapping. |
+## Final attributes
 
-Mappers apply in layers on top of Final's built-in normalization: built-in conventions first, then your mappers, then enrichment such as span kind and cost. A project inherits mappers from its parent projects; `list_mappers` shows them in layer order, inherited ones included.
+What the conventions don't cover uses `final.*` keys:
 
-Try a mapper before saving it: `preview_mapper` shows sample spans before and after.
+| Attribute | On | Value |
+| --- | --- | --- |
+| `final.agent.hash` | Root of a turn | The content hash (`sha256:…`) of the agent version that ran. Compare versions by it. |
+| `final.turn.id` | Root of a turn | The turn's ID. |
+| `final.workflow.id` | Workflow spans | The workflow's ID. |
+| `final.workflow.version` | Workflow spans | The workflow version that ran. |
+| `final.workflow.run_id` | Workflow spans | The run's ID. |
+| `final.workflow.step_id` | Step spans | The step's ID, as the workflow names it. |
+| `final.usage.cache_read_tokens` | Root, `chat` | Input tokens read from the provider's cache. |
+| `final.usage.cache_creation_tokens` | Root, `chat` | Input tokens written to the provider's cache. |
+| `final.usage.reasoning_tokens` | Root, `chat` | Reasoning tokens. |
+| `final.usage.cost_usd` | `chat` | The call's cost in USD. Left out when unknown, never 0. |
+| `final.link.relation` | Span links | How the linked trace relates: `subagent`, `fork` or `continuation`. |
 
-### Reproject
+## Other attributes
 
-Mappers apply to spans as they arrive. To apply new or changed mappers to traces you already have, reproject a time range:
+| Attribute | On | Value |
+| --- | --- | --- |
+| `error.type` | Failed spans | The class of error, such as `tool_failed`, `model_call_failed` or the step's error message. |
+| `deployment.environment.name` | Resource | The environment. |
+| `service.name` | Resource | `final`. |
 
-```ts
-await project.traces.reprojectTraces({ from: '2026-11-01T00:00:00Z', to: '2026-11-19T00:00:00Z' });
-```
+## Search by attribute
 
-Reprojection rebuilds traces from the retained raw data, so it covers only the raw retention window. Running it twice gives the same result.
+`searchTraces` filters on any span attribute with `attributes: [{ key, op, value }]`, where `op` is `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `contains`, `not_contains`, `exists` or `not_exists`. Deterministic judges match attributes with the `attribute` condition field. See [judges](/o11y/judges#deterministic-judges).

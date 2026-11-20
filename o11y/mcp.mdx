@@ -1,10 +1,10 @@
 ---
 title: "Use Observability over MCP"
 sidebarTitle: "MCP"
-description: "Connect Claude Code, Codex, Cursor or any MCP client and use every Observability operation as a tool."
+description: "Connect Claude Code, Codex, Cursor or any MCP client to Final and use every Observability operation as a final.o11y tool."
 ---
 
-Every Observability operation is a Final MCP tool. Connect Claude Code, Codex, Cursor or any MCP client to Final, and your coding agent can search traces, read spans, write judges, run tests and fix issues in the same session where it edits your code.
+Every Observability operation is a tool on the Final MCP gateway. Connect Claude Code, Codex, Cursor or any MCP client to Final, and your coding agent can read your agents' traces, write judges, run experiments and fix issues in the same session where it edits your agents and workflows.
 
 ## Connect a coding agent
 
@@ -48,30 +48,30 @@ You sign in with your Final account; no API key is needed. If you already added 
 Then ask:
 
 ```text
-Using Final, find yesterday's production traces in project prj_your_project where the
+Using Final, find yesterday's turns of the support agent in project prj_your_project where the
 "Grounded answer" judge returned "Unsupported claim", and show me the span that caused it.
 ```
 
 ## How agents find the tools
 
-Your client doesn't load 180 tools. It sees Final's discovery tools and searches for what it needs: `search_tools` finds a tool, `describe_tools` returns its exact input schema, and `call_tool` runs it. Observability tools have catalog paths like `final.o11y.traces.search_traces`. Agents running on Final find them the same way, through tool search.
+Your client doesn't load every tool. It sees Final's discovery tools and searches for what it needs: `search_tools` finds a tool, `describe_tools` returns its exact input schema, and `call_tool` runs it. Observability tools have catalog paths of the form `final.o11y.<group>.<verb>`, such as `final.o11y.traces.search` for `search_traces` and `final.o11y.judges.create` for `create_judge`. Agents running on Final, including the [o11y agent](/o11y/agent) and agents your workflows start, find them the same way, through tool search.
 
-Every tool takes `projectId`. Agents running in a Final session are confined to their own project and its sub-projects.
+Every tool takes `projectId`. Agents running in a Final session are confined to their own project and the projects below it.
 
 ## Tool groups
 
 | Group | Covers |
 | --- | --- |
-| `final.o11y.traces` | Traces, sessions, conversations, saved views, trace health, mappers and display rules. |
-| `final.o11y.judges` | Judges and versions, run settings, actions, labels, evaluations and external results. |
+| `final.o11y.traces` | Traces of agent turns and workflow runs, spans, sessions, conversations, comparisons and saved views. |
+| `final.o11y.judges` | Judges, run settings, code judge source, labels, evaluations, backfills and external results. |
 | `final.o11y.alignment` | Review sessions, reviews, alignment summaries and golden datasets. |
-| `final.o11y.data` | Datasets, examples and prompts. |
+| `final.o11y.data` | Datasets and their examples. |
 | `final.o11y.tests` | Test suites, cases, runs and comparisons. |
-| `final.o11y.issues` | Issues, evidence, monitoring, fix handoffs and detection. |
+| `final.o11y.issues` | Issues, evidence, monitoring and detection. |
 | `final.o11y.analytics` | SQL, saved queries, dashboards and charts. |
-| `final.o11y.admin` | Settings, ingest keys, usage and limits, deletion, events, audit, the data plane, scheduled analysis and knowledge. |
+| `final.o11y.admin` | Settings, the audit log and trace export. |
 
-The [tool reference](/o11y/mcp-tools) lists every tool with its scope and effect.
+The [tool reference](/o11y/mcp-tools) lists every tool with its SDK method, scope and effect. The tools are generated from the same inventory as the `project.o11y` client and the HTTP API, so they never drift apart.
 
 ## Permissions and approvals
 
@@ -79,6 +79,7 @@ Tools act with your project role. Read tools run without asking. Tools that writ
 
 ## Useful prompts for coding agents
 
-- "Run `get_trace_health_summary` for the last 24 hours and fix the instrumentation for every failing check." Each failing check includes a fix prompt written for coding agents.
 - "Read the open issues with `list_issues`, pick the most severe, and fix it in this repository. Cite the traces you used."
-- "Create a test suite from the failing traces of issue `iss_…` and run it against this branch."
+- "Create a test suite from the failing traces of issue `oiss_…`, then run it against the agent I just published with `final-agents o11y test run`."
+- "Write a deterministic judge for turns that call `issue_refund` more than once, try it on last week's traces with `run_judge`, and show me what it matched."
+- "Compare the last two content hashes of the support agent with `compare_traces` on cost, latency and label rates."

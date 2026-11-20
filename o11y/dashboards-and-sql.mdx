@@ -1,42 +1,113 @@
 ---
-title: "Dashboards and SQL"
-description: "Query traces, scores, issues and test results with SQL, and chart them on dashboards."
+title: "SQL and dashboards"
+description: "Query your agents' turns, model usage and decisions beside judge results, issues and tests, and chart them on dashboards."
 ---
 
-Query traces, scores, issues, datasets and test results with SQL, and chart the results on dashboards. The same catalog serves the console, the API, MCP and the observability agent.
+Query Final's records of your agents next to Observability's own results with SQL, and chart the results on dashboards. The same catalog serves the console, the API, MCP, issue detection and the o11y agent.
 
 ## SQL
 
 ```ts
-const result = await project.analytics.sqlQuery({
-  sql: `
-    SELECT toStartOfHour(start_time) AS hour, count() AS traces, sum(cost_usd) AS cost
-    FROM traces
-    WHERE start_time >= {start_time} AND start_time < {end_time}
-    GROUP BY hour ORDER BY hour`,
-  from: '2026-11-18T00:00:00Z',
-  to: '2026-11-19T00:00:00Z',
-  environment: 'production',
+const { columns, rows } = await o11y.analytics.sqlQuery({
+  sql: `SELECT agent_version, count() AS turns, quantile(0.95)(duration_ms) AS p95_ms, sum(cost_usd) AS cost
+        FROM traces
+        WHERE start_time >= now() - INTERVAL 7 DAY
+        GROUP BY agent_version
+        ORDER BY turns DESC`,
 });
+console.log(columns.map((column) => column.name), rows);
 ```
 
-Queries are ClickHouse SQL: one `SELECT` or `WITH` statement, read-only, over your project's catalog. `{start_time}` and `{end_time}` are filled in from `from` and `to`. Call `discover_schema` for every table and column with its description. See the [SQL reference](/o11y/reference/sql) for the catalog and limits.
+Queries are ClickHouse SQL: one read-only `SELECT` or `WITH` statement, with an optional trailing `;`, over your project's catalog. Anything else is rejected with `invalid_request` before it runs, and a `WITH` clause can't redefine a catalog view.
 
-Save queries with `save_query`, list them with `list_saved_queries`, and delete them with `delete_saved_query`.
+- `{start_time}` and `{end_time}` are replaced with the request's `from` and `to`; dashboards fill them from their time range.
+- `environment` limits the query to one environment.
+
+The result has `queryId`, the `columns` with their types, the `rows` (each an array in column order), `rowCount`, `truncated` (true when a row or byte cap was hit), and `elapsedMs` and `bytesRead` when they're known.
+
+You only see your project's rows. The store confines every read to your organization and project, independently of the SQL, so joins, subqueries and unions can't reach other projects.
+
+`saveQuery` saves a query by name (or replaces one when you pass `savedQueryId`), `listSavedQueries` lists them, and `deleteSavedQuery` deletes one.
+
+## Catalog
+
+`discoverSchema` returns the catalog's version and every view with its columns and their descriptions. Use it for exact column names rather than guessing.
+
+### Final's records
+
+These views read Final's own records of your agents in place, mapped to OpenTelemetry shapes at query time. Trace and span IDs are the same ones the trace API returns, so results join with `scores`.
+
+| View | What it holds |
+| --- | --- |
+| `traces` | Each agent turn as the trace of its `invoke_agent` root span: `trace_id`, `status`, `start_time`, `end_time`, `duration_ms`, `environment`, `session_id`, `conversation_id`, `turn_id`, `agent_id`, `agent_version` (the content hash), `harness`, `model`, `models`, `stop_reason`, `tool_calls`, `span_count`, token counts and `cost_usd`. |
+| `spans` | The `invoke_agent` root and `chat` model-call spans of agent traces: `operation`, `model`, `provider`, token counts including cache and reasoning tokens, `cost_usd` and timing. |
+| `model_usage` | Every model request of the project's agents: vendor, model, upstream provider, outcome, tokens, latency, time to first chunk, cost and budget, with the trace and span of the turn it served. |
+| `decisions` | Decisions put to people (permissions and questions) by state change: who raised them, their kind, outcome, audience and age. An outcome signal for the sessions that raised them. |
+
+Workflow runs aren't in these views yet; read them through the [trace API](/o11y/quickstart-workflows#what-a-workflow-run-looks-like).
+
+### Observability's results
+
+| View | What it holds |
+| --- | --- |
+| `scores` | Judge results: `judge_id`, `evaluator_version`, `label`, `value_number`, `value_bool`, `status`, `reason`, `citations`, the target (`target_kind`, `trace_id`, `span_id`, `session_id`), `trigger`, `source` (`judge` or `customer` for external results), `model`, `cost_usd`, `latency_ms`, `sample_rate` and `scored_at`. |
+| `reviews` | Alignment reviews: verdict, original and corrected label, comment, reviewer and evaluator version. |
+| `judges` | Judges: type, scope, response kind, pinned evaluator version and whether they run online. |
+| `labels` | Judges' labels with their descriptions and categories. |
+| `issues` | Issues: key, title, severity, status, trend, monitoring judge and label, first and last seen. |
+| `issue_evidence` | The traces and spans issues cite. |
+| `datasets` | Datasets with their example counts. |
+| `examples` | Dataset examples with their data, trace and session. |
+| `test_runs` | Test runs: suite version, candidate, mode, trigger, status and counts. |
+| `test_results` | Per-case, per-repeat results with each check, cost and duration. |
+
+IDs of Observability's objects in these views (`judge_id`, `label_id`, `issue_id` and so on) are UUIDs, not the prefixed IDs the API returns; join on them, or filter by names such as `label`. `trace_id` and `span_id` are OpenTelemetry hex IDs everywhere.
+
+```sql
+SELECT t.agent_version, s.label, count() AS results
+FROM scores AS s
+INNER JOIN traces AS t ON t.trace_id = s.trace_id
+WHERE s.status = 'value' AND s.scored_at >= {start_time} AND s.scored_at < {end_time}
+GROUP BY t.agent_version, s.label
+ORDER BY t.agent_version, results DESC
+```
+
+## Limits
+
+| Limit | Value |
+| --- | --- |
+| Time | 30 seconds |
+| Memory | 2 GiB |
+| Result | 10,000 rows or 25 MiB |
+| Rate | A burst of 40, then 4 queries per second per project |
+
+| Error | Status | Cause |
+| --- | --- | --- |
+| `invalid_request` | 400 | Not a single read-only `SELECT` or `WITH` statement over the catalog. |
+| `query_rate_limited` | 429 | Over the rate. Retry after a pause. |
+| `query_memory_limit` | 422 | The query needed more than 2 GiB. Aggregate earlier or narrow the time range. |
+| `query_timeout` | 504 | The query ran past 30 seconds. Narrow the time range. |
 
 ## Dashboards
 
-A dashboard has tabs of charts, a default time range (`1h`, `6h`, `24h`, `7d`, `30d`, `90d` or `all`) and an optional environment filter. Start from a template (project overview, cost and usage, or judges) or an empty dashboard:
+A dashboard has tabs of charts, a default time range (`1h`, `6h`, `24h`, `7d`, `30d`, `90d` or `all`) and an optional environment. Start from a template (`project_overview`, `cost_and_usage` or `judges`; `listDashboardTemplates` lists them) or an empty dashboard with `createDashboard`.
 
 ```ts
-const templates = await project.analytics.listDashboardTemplates();
-const dashboard = await project.analytics.createDashboardFromTemplate({
-  templateId: templates.items[0].templateId,
-  name: 'Support bot',
+import { ChartKind } from '@finalai/agents/o11y';
+
+const dashboard = await o11y.analytics.createDashboardFromTemplate({ templateId: 'project_overview' });
+await o11y.analytics.createDashboardChart({
+  dashboardId: dashboard.dashboardId,
+  revision: dashboard.revision,
+  title: 'Unsupported claims per day',
+  kind: ChartKind.Line,
+  sql: `SELECT toDate(scored_at) AS day, countIf(label = 'Unsupported claim') AS unsupported
+        FROM scores
+        WHERE scored_at >= {start_time} AND scored_at < {end_time}
+        GROUP BY day
+        ORDER BY day`,
 });
 ```
-
-### Charts
 
 | Kind | Use it for |
 | --- | --- |
@@ -46,29 +117,16 @@ const dashboard = await project.analytics.createDashboardFromTemplate({
 | `table` | Rows as returned. |
 | `stat` | One number, with an optional `headlineSql` for the headline. |
 
-```ts
-import { ChartKind } from '@finalai/o11y/contract';
+Saving a chart runs its query once to validate it. `display` takes `horizontal`, `stacked`, `valueLabels`, `cumulative`, `yTitle` and up to 8 series `colors`; `layout` places the chart on the grid.
 
-await project.analytics.createDashboardChart({
-  dashboardId: dashboard.dashboardId,
-  revision: dashboard.revision,
-  title: 'Cost per day',
-  kind: ChartKind.Bar,
-  sql: 'SELECT toDate(start_time) AS day, sum(cost_usd) AS cost FROM traces WHERE start_time >= {start_time} GROUP BY day ORDER BY day',
-  display: { stacked: false, valueLabels: true, yTitle: 'USD per {bucket}' },
-});
-```
-
-Saving a chart runs its query once to validate it. Display options are `horizontal`, `stacked`, `valueLabels`, `cumulative`, `yTitle` (may contain `{bucket}`) and up to 8 series `colors`; `layout` places it on the grid.
-
-Every dashboard has a `revision`. Changes that pass a stale revision fail with `conflict`, so two editors (or an editor and an agent) never overwrite each other. Re-read the dashboard and try again.
-
-`get_label_distribution` and `get_label_relations` power the built-in label charts: how a judge's results split across labels, and which labels co-occur with other judges' labels.
+Every dashboard has a `revision`. A change that passes a stale revision fails with `conflict`, so two editors (or an editor and an agent) never overwrite each other: read the dashboard again and retry.
 
 | Operation | What it does |
 | --- | --- |
-| `update_dashboard` | Change name, tabs, time range or environment; `isDefault` makes it your default dashboard. |
-| `duplicate_dashboard` | Copy a dashboard and its charts. |
-| `archive_dashboard`, `restore_dashboard` | Hide a dashboard and bring it back. |
+| `updateDashboard` | Change the name, tabs, time range or environment; `isDefault` makes it your default dashboard. |
+| `duplicateDashboard` | Copy a dashboard and its charts. |
+| `archiveDashboard`, `restoreDashboard` | Hide a dashboard and bring it back. |
+| `updateDashboardChart`, `removeDashboardChart` | Change or remove a chart. |
+| `getLabelDistribution`, `getLabelRelations` | How a judge's results split across its labels, and which labels co-occur with other judges' labels on the same traces. |
 
-Agents build dashboards with the same tools: ask the observability agent for a chart and it writes the query, validates it and adds it.
+Agents build dashboards with the same tools: ask the [o11y agent](/o11y/agent) for a chart, and it writes the query, validates it and adds it.

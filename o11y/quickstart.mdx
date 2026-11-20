@@ -1,110 +1,156 @@
 ---
-title: "Quickstart: TypeScript SDK"
-sidebarTitle: "TypeScript SDK"
-description: "Install the TypeScript SDK, send your first trace from a Node app, and check its trace health."
+title: "Quickstart: judge a Final agent"
+sidebarTitle: "Judge an agent"
+description: "Publish a judge agent, score your agent's recent turns, then evaluate every new turn online."
 ---
 
-Send your first trace from a Node app and check that it arrived healthy. You need Node 26 or later and a Final project.
+You'll add a judge to a Final agent you already run: a second agent that reads each turn and decides whether it resolved the request. You'll publish the judge, try it on yesterday's turns, and turn on online evaluation. It takes about 10 minutes.
+
+**Before you start**, you need:
+
+- An agent published in your project that has run at least a few turns. The [agent quickstart](/quickstart) builds one.
+- Node.js 26 or later and `@finalai/agents` 0.29.0 or later.
+- A [Final API key](/api-keys) with `o11y:read`, `o11y:write` and `o11y:execute` (add `agents:write` to publish the judge from the same key), and your project ID.
+
+```bash
+export FINAL_API_KEY='paste-your-key-here'
+export FINAL_PROJECT_ID='prj_your_project'
+```
 
 <Steps>
-  <Step title="Create an ingest key">
-    In the [Final dashboard](https://console.final.ai), go to **Observability** > **Settings**, open the **Ingest keys** tab and click **Create key**. The secret is shown once. An ingest key belongs to one project and can only send telemetry; see [scopes and keys](/o11y/reference/scopes).
+  <Step title="Write the judge agent">
+    An agent judge is an ordinary Final agent. Its instructions are the rubric, and its recommended harness and model are what it judges with. Judging is that agent's model use, billed to the project in Final credits, so the [budgets and spending restrictions](/harnesses/settings#subscriptions-and-keys) that apply to it cap what judging spends.
 
-    ```bash
-    export FINAL_API_KEY='paste-your-ingest-key'
-    export FINAL_PROJECT_ID='prj_your_project'
-    ```
+    ```ts judge.ts
+    import { defineAgent } from '@finalai/agents';
+    import { FinalHarness } from '@finalai/agents/harnesses';
 
-    `npx final-o11y init` writes these variables to `.env` and creates a `final-o11y.ts` that calls `init`.
-  </Step>
-  <Step title="Install the SDK">
-    ```bash
-    npm install @finalai/o11y @finalai/o11y-openai openai
-    ```
-
-    This example records OpenAI calls with `@finalai/o11y-openai`. Using another model client or framework? Install [its integration package](/o11y/integrations) instead.
-  </Step>
-  <Step title="Initialize before your agent code">
-    Call `init` once, before the code it traces runs. It reads `FINAL_API_KEY`, `FINAL_PROJECT_ID` and `FINAL_API_URL` when you don't pass them.
-
-    ```ts agent.ts
-    import { SpanKind, init, observe, setCustomer, setSession, shutdown } from '@finalai/o11y/node';
-    import { wrapOpenAI } from '@finalai/o11y-openai';
-    import OpenAI from 'openai';
-
-    init({ environment: 'development' });
-
-    const openai = wrapOpenAI(new OpenAI());
-
-    export const answer = observe(
-      async (question: string, user: { id: string; conversationId: string }) => {
-        setSession(user.conversationId);
-        setCustomer(user.id);
-        const response = await openai.chat.completions.create({
-          model: 'gpt-5.1',
-          messages: [{ role: 'user', content: question }],
-        });
-        return response.choices[0]?.message.content;
+    export const agent = defineAgent({
+      name: 'Support judge',
+      description: 'Decides whether a support turn resolved the customer request.',
+      instructions: `You judge one turn of a support agent.
+    Pass when the reply resolves what the customer asked, using only what its tool calls returned.
+    Fail when it leaves the request unresolved, invents a fact, or promises something it cannot do.
+    Cite the spans you relied on.`,
+      require: {
+        harness: {
+          permissionMode: 'auto',
+          recommended: { harness: FinalHarness.Final, model: 'deepseek-v4.1-flash' },
+        },
       },
-      { name: 'answer', kind: SpanKind.Agent },
-    );
-
-    console.log(await answer('What is OpenTelemetry?', { id: 'cus_42', conversationId: 'conv_1' }));
-    await shutdown(); // exports what is still buffered before the process exits
+    });
     ```
 
-    `observe` records the function's arguments as `final.input` and its return value as `final.output`. The wrapped OpenAI client records each model call as an `llm` span with the model, usage, tools offered and output.
+    A judge agent needs a recommended harness with a model, and nothing else: Final sends it the evidence in its prompt and asks for its verdict as the turn's structured result. It's started with no compute and no integrations.
   </Step>
-  <Step title="Run it and check">
+  <Step title="Publish it">
     ```bash
-    npx tsx agent.ts
+    npx final-agents publish ./judge.ts --name support-judge
     ```
-
-    `final-o11y doctor` reads the trace back, which an ingest key can't do. Create an [API key](/api-keys) with `o11y:read`, pass it as `FINAL_API_KEY`, and pass the ingest key as `FINAL_INGEST_KEY` so the test span is sent with it:
-
-    ```bash
-    FINAL_INGEST_KEY="$FINAL_API_KEY" FINAL_API_KEY='paste-your-api-key' npx final-o11y doctor
-    ```
-
-    `doctor` checks your credentials, sends a test span, waits for it to arrive and prints the project's trace health:
 
     ```text
-    ✓ credentials work for prj_your_project (environments: development)
-    ✓ sent test trace 4bf92f3577b34da6a3ce929d0e0e4736
-    ✓ trace received
-    ✓ trace health: healthy
+    published support-judge: sha256:4f1c...
     ```
 
-    A failing check prints the share of traces that fail it and how to fix it.
+    The hash identifies this exact version of the rubric. You'll pin the judge to it.
+  </Step>
+  <Step title="Create the judge">
+    ```ts create-judge.ts
+    import { createClient } from '@finalai/agents/client';
+    import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/agents/o11y';
+
+    const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+    const { o11y } = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+    const judge = await o11y.judges.createJudge({
+      name: 'Resolved the request',
+      definition: {
+        type: JudgeType.Agent,
+        scope: JudgeScope.Trace,
+        // The full hash publish printed.
+        agent: { name: 'support-judge', hash: 'sha256:4f1c…' },
+        responseKind: JudgeResponseKind.Binary,
+      },
+    });
+    console.log(judge.judgeId, judge.evaluatorVersion);
+    ```
+
+    A binary judge without its own `choices` has the labels `Pass` and `Fail`. Leave out `hash` and the judge follows the name's latest publication instead.
+  </Step>
+  <Step title="Try it on recent turns">
+    Run the judge on the agent's turns from the last day. `runJudge` scores up to 100 traces now and publishes no `o11y.judge.matched` events, so no [action](/o11y/actions) reacts to a trial.
+
+    ```ts try-judge.ts
+    import { createClient } from '@finalai/agents/client';
+
+    const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+    const { o11y } = client.project({ id: process.env.FINAL_PROJECT_ID! });
+    const judgeId = 'ojdg_…';
+
+    const { items } = await o11y.traces.searchTraces({
+      filter: { agentIds: ['adef_…'], from: new Date(Date.now() - 86_400_000).toISOString() },
+      limit: 20,
+    });
+    const batch = await o11y.judges.runJudge({
+      judgeId,
+      traceIds: items.map((trace) => trace.traceId),
+    });
+
+    // Results arrive as each evaluation finishes.
+    const { items: results } = await o11y.judges.listEvaluations({ batchId: batch.batchId });
+    for (const result of results)
+      console.log(result.target.traceId, result.status, result.value?.label, result.reason);
+    ```
+
+    Each result has the label, the judge's reason, citations of the spans it relied on, its cost, and the judging session, which you can open like any other session. Read a few. If the judge is wrong, change the instructions, publish again, and pass the new hash to `runJudge` as `evaluatorVersion` to compare before you pin it with `updateJudge`.
+  </Step>
+  <Step title="Evaluate new turns online">
+    ```ts online.ts
+    import { createClient } from '@finalai/agents/client';
+    import { ConditionField, ConditionJoin, ConditionOperator } from '@finalai/agents/o11y';
+
+    const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+    const { o11y } = client.project({ id: process.env.FINAL_PROJECT_ID! });
+    const judgeId = 'ojdg_…';
+
+    await o11y.judges.setJudgeRunSettings({
+      judgeId,
+      runSettings: {
+        online: true,
+        environments: ['prod'],
+        samplingPercent: 25,
+        // Agent turns only, not workflow runs.
+        conditions: {
+          join: ConditionJoin.And,
+          conditions: [
+            { field: ConditionField.SpanName, op: ConditionOperator.Eq, value: 'invoke_agent' },
+          ],
+        },
+      },
+    });
+    ```
+
+    From now on, a quarter of the project's finished turns are judged at the pinned hash. What judging spends is the judge agent's own model use.
   </Step>
 </Steps>
 
 <Check>
-Open **Observability** > **Traces** in your project. The `answer` trace shows an `agent` span with an `llm` span under it.
+Open **Observability** > **Judges** in the console to see the judge's label rates over time, or filter **Traces** by its `Fail` label.
 </Check>
-
-## `init` options
-
-| Option | Default | What it does |
-| --- | --- | --- |
-| `environment` | Required | Sets `deployment.environment.name`. Judges, monitors and dashboards filter on it. |
-| `apiKey` | `FINAL_API_KEY` | An ingest key, or an API key with `o11y:ingest`. |
-| `baseUrl` | `FINAL_API_URL`, else `https://api.final.ai` | The API origin. With a [BYOC data plane](/o11y/byoc/overview), still Final's API. |
-| `projectId` | `FINAL_PROJECT_ID` | Needed only for `tag({ traceIds })` and `asyncEvaluate`. |
-| `serviceName` | `unknown_service` | The `service.name` resource attribute. |
-| `resourceAttributes` | | Extra resource attributes on every span. |
-| `redact` | | Rewrites or drops any attribute before export. Return `undefined` to drop it. |
-| `additionalExporters` | | Also export every span to these. See [dual export](/o11y/dual-export). |
-| `exporter` | OTLP/HTTP protobuf to Final | Replaces the exporter, for example with an in-memory exporter in tests. |
-| `batch` | `true` | Export in batches, or span by span with `false`. |
-| `installAsGlobalProvider` | `false` | Make this the global tracer provider for instrumentations that use the global API. |
-| `instrumentations` | | OpenTelemetry instrumentations to register with this provider. |
-| `onError` | Logs a warning | Called with export and evaluation errors. |
-
-`init` returns a handle with `forceFlush()` and `shutdown()`; the same functions are exported from `/node`.
 
 ## Next steps
 
-- [Integrations](/o11y/integrations) for Anthropic, the Vercel AI SDK, agent frameworks and MCP servers
-- [Context](/o11y/context) for sessions, customers, agent versions and tags
-- [Tracing patterns](/o11y/tracing-patterns) for streaming, queues, approvals and subagents
+<Columns cols={2}>
+  <Card title="Act on matches" icon="bolt" href="/o11y/actions">
+    Start a workflow when the judge fails a turn: notify the project, post to Slack, or collect the trace.
+  </Card>
+  <Card title="Check the judge against people" icon="scale-balanced" href="/o11y/alignment">
+    Review its results and measure agreement before you rely on it.
+  </Card>
+  <Card title="Evaluate an AI workflow" icon="diagram-project" href="/o11y/quickstart-workflows">
+    Judge workflow runs, backfill past runs, and test a new version.
+  </Card>
+  <Card title="All judge types" icon="gavel" href="/o11y/judges">
+    Deterministic, code and external judges.
+  </Card>
+</Columns>
