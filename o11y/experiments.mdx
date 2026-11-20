@@ -1,0 +1,221 @@
+---
+title: "Experiments and CI"
+description: "Define test suites with judge checks, rescore stored traces or run a published agent or workflow on every case, compare runs, and gate CI."
+---
+
+A test suite is a set of cases your agent or workflow should get right, checked by judges. A run either rescores traces you already have, or runs a published agent or workflow on every case: an experiment. Compare a run with a baseline to find regressions, and gate CI on it with `final-agents o11y test run`.
+
+## Suites and versions
+
+A suite has a name, description, labels, numbered published versions and one draft. Edit the draft, then publish it as the next immutable version, or discard it. Runs always use a published version.
+
+```ts
+const suite = await o11y.tests.createTestSuite({ name: 'Refunds', labels: ['support'] });
+// Add cases to the draft, then:
+const { version } = await o11y.tests.publishTestSuite({
+  testSuiteId: suite.testSuiteId,
+  notes: 'Initial cases',
+});
+```
+
+## Cases and checks
+
+A case has a name, an input, checks, tags, metadata, and optionally the trace it came from. Its `caseId` stays the same across suite versions, so results compare case by case.
+
+- For an agent, the input is the message the agent receives: a string, or JSON that is sent as formatted text.
+- For a workflow, the input is the workflow's input object.
+
+A check compares one judge's output with an expected value: a label for binary and categorical judges, a number for numeric ones. Operators are `eq` and `ne` for every judge, `in` and `not_in` for categorical judges, and `lt`, `lte`, `gt` and `gte` for numeric ones. Each check pins the judge's evaluator version when it's saved, so publishing a new judge agent can't silently change what a check means. Judges never see `expected` or `rationale`.
+
+```ts
+import { TestCheckOperator } from '@finalai/agents/o11y';
+
+await o11y.tests.addTestCases({
+  testSuiteId: suite.testSuiteId,
+  cases: [
+    {
+      name: 'Duplicate charge',
+      input: 'I was charged twice for order 1042.',
+      checks: [
+        {
+          judgeId,
+          op: TestCheckOperator.Eq,
+          expected: 'Grounded',
+          rationale: 'The order lookup shows both charges.',
+        },
+      ],
+      tags: ['billing'],
+    },
+  ],
+});
+```
+
+| Operation | What it does |
+| --- | --- |
+| `addTestCases` | Adds up to 1,000 cases to the draft. |
+| `addTestCasesFromTraces` | Adds cases from traces: their input, the trace link and the checks you give. |
+| `addTestCasesFromDataset` | Adds cases from a dataset at a commit, mapping columns to the input and to checks. |
+| `updateTestCase`, `removeTestCase` | Change or remove a case in the draft. |
+| `repinTestSuiteChecks` | Moves the draft's checks for a judge to another evaluator version. |
+
+To turn production failures into cases, ask the [o11y agent](/o11y/agent), or call `addTestCasesFromTraces` with the failing traces.
+
+### Cases from a dataset
+
+```ts
+import { TestCheckOperator } from '@finalai/agents/o11y';
+
+await o11y.tests.addTestCasesFromDataset({
+  testSuiteId,
+  datasetId: 'odset_…',
+  inputColumn: 'question',
+  checks: [{ column: 'expected_policy', judgeId, op: TestCheckOperator.Eq }],
+});
+```
+
+`datasetCommit` reads the dataset at a commit (the latest by default), and `exampleIds` picks some of its examples. Each check column becomes the expected value of a check on its judge.
+
+### Repin checks
+
+When you pin a judge to a new agent hash or code commit, its existing checks keep the old one. `repinTestSuiteChecks({ testSuiteId, judgeId, evaluatorVersion })` moves the draft's checks for that judge; publish the draft to use them.
+
+## Run modes
+
+| Mode | What runs | Use it for |
+| --- | --- | --- |
+| `stored_traces` | Nothing executes. Each case's linked trace (a turn or a workflow run) is scored again. | Checking a new judge version, or rescoring evidence you already have. |
+| `native` | Final runs a published agent or workflow on each case, then scores its trace. | Experiments: a new agent hash or workflow version against the same cases. |
+
+`startTestSuiteRun` takes the suite `version`, the `mode`, `caseSelection` (`all`, `tags`, `case_ids` or `last_failures`), `repeats` (1 to 20), a `candidate` label such as a commit SHA with `candidateMeta`, and `trigger`. Native runs add `nativeCandidate`: the agent or workflow `id`, an optional `revision` (an agent content hash or a workflow version number; the published one by default) and `concurrency` (1 to 50).
+
+```ts
+import { NativeCandidateKind, TestRunMode } from '@finalai/agents/o11y';
+
+// Rescore the stored traces the cases link to.
+const rescore = await o11y.tests.startTestSuiteRun({
+  testSuiteId,
+  version,
+  mode: TestRunMode.StoredTraces,
+});
+
+// An experiment: run another revision of the agent on every case, three times each.
+const experiment = await o11y.tests.startTestSuiteRun({
+  testSuiteId,
+  version,
+  mode: TestRunMode.Native,
+  nativeCandidate: { kind: NativeCandidateKind.Agent, id: 'adef_…', revision: 'sha256:…' },
+  repeats: 3,
+  candidate: 'refund-prompt-v2',
+});
+```
+
+A native agent case starts a session of the agent with the case input as its message. A native workflow case starts a run with the case input. Either way, the case's trace is an ordinary trace you can open from its result.
+
+## Results
+
+A run moves through `pending`, `running` and `scoring` to `completed`, `failed` or `cancelled`. `getTestSuiteRun` counts cases in total, with output, scored, passed, failed and errored. `getTestSuiteRunResults` returns each case's outcome (`passed`, `failed`, `errored`, `no_output` or `pending`), its trace, output, checks with the judge's value and reason, cost and latency. `cancelTestSuiteRun` stops a run.
+
+```ts
+import { O11yOperation } from '@finalai/agents/o11y';
+
+for await (const page of o11y.pages(O11yOperation.GetTestSuiteRunResults, {
+  testRunId: experiment.testRunId,
+  failedOnly: true,
+}))
+  for (const result of page.items) console.log(result.caseName, result.outcome, result.traceId);
+```
+
+Executing and scoring are separate: `scoreTestSuiteRun` creates a new run that scores a run's stored evidence against the latest checks, without executing anything again. When a run completes, Final publishes `o11y.test_run.completed`; see [actions](/o11y/actions#events).
+
+## Compare runs
+
+`compareTestSuiteRuns` pairs cases between a baseline run and a candidate run:
+
+```ts
+const comparison = await o11y.tests.compareTestSuiteRuns({
+  testRunId: experiment.testRunId,
+  baselineRunId: rescore.testRunId,
+});
+console.log(comparison.regressions, comparison.fixes, comparison.costDeltaUsd);
+```
+
+| Change | Meaning |
+| --- | --- |
+| `regressed` | Passed in the baseline, fails now. |
+| `fixed` | Failed in the baseline, passes now. |
+| `still_passing`, `still_failing` | Unchanged. |
+| `flaky` | Passes in some repeats and fails in others. |
+| `added`, `removed` | In only one of the runs. |
+
+It also reports each case's pass rates with a confidence interval across repeats, and the cost and latency deltas.
+
+## Run in CI
+
+`final-agents o11y test run` starts a run of the suite's latest published version, waits for it, writes reports and exits with a code your CI understands:
+
+```bash
+npx final-agents o11y test run --suite otst_… --agent adef_… --candidate "$GITHUB_SHA" \
+  --fail-on regressed --junit results.xml --markdown summary.md
+```
+
+It reads `FINAL_API_KEY` (an API key with `o11y:read` and `o11y:execute`), `FINAL_PROJECT_ID` (or `--project`) and `FINAL_API_HOST` (or `--host`, `https://agent-session.final.ai` by default).
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `--suite <id>` | Required | The test suite. |
+| `--version <n>` | Latest published | The suite version. |
+| `--agent <id>`, `--workflow <id>` | | Run this published agent or workflow on each case (`native`). |
+| `--revision <rev>` | The published one | An agent content hash or workflow version to run instead. |
+| `--mode <mode>` | `native` with `--agent` or `--workflow`, else `stored_traces` | `stored_traces` or `native`. |
+| `--candidate <label>` | | What is under test, such as a commit SHA. |
+| `--repeats <n>` | 1 | Run each case `n` times, to find flaky cases. |
+| `--fail-on <mode>` | `failed` | `failed` fails on any failing case; `regressed` fails only on regressions against the baseline. |
+| `--baseline <run id>` | The previous completed run of the suite | The run to compare with for `--fail-on regressed`. |
+| `--junit <path>` | | Write a JUnit XML report. |
+| `--markdown <path>` | | Write a Markdown summary. It's also printed. |
+| `--timeout <seconds>` | 1800 | How long to wait for the run. |
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | The run passed. |
+| `1` | Cases failed, or with `--fail-on regressed`, cases regressed against the baseline. |
+| `2` | The run couldn't complete: bad usage, an API error, a timeout, or a run that ended `failed` or `cancelled`. |
+
+With `--fail-on regressed` and no earlier completed run, it fails on failures instead. Runs started where `CI` is set are recorded with the trigger `ci`.
+
+To test a change before it ships, publish the agent from the branch under a separate name, such as `support-agent-candidate`, and pass the hash `final-agents publish` printed as `--revision`. For a workflow, pass the version to test.
+
+```yaml .github/workflows/agent-tests.yml
+name: Agent tests
+on: pull_request
+
+jobs:
+  agent-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+      - run: npm ci
+      - name: Publish the candidate
+        id: publish
+        run: echo "hash=$(npx final-agents publish ./agent.ts --name support-agent-candidate | grep -o 'sha256:[0-9a-f]*')" >> "$GITHUB_OUTPUT"
+        env:
+          FINAL_API_KEY: ${{ secrets.FINAL_API_KEY }}
+          FINAL_PROJECT_ID: ${{ vars.FINAL_PROJECT_ID }}
+      - name: Run the suite
+        run: >
+          npx final-agents o11y test run --suite ${{ vars.FINAL_SUITE_ID }}
+          --agent ${{ vars.FINAL_AGENT_ID }} --revision ${{ steps.publish.outputs.hash }}
+          --candidate ${{ github.sha }} --fail-on regressed
+          --junit results.xml --markdown summary.md
+        env:
+          FINAL_API_KEY: ${{ secrets.FINAL_API_KEY }}
+          FINAL_PROJECT_ID: ${{ vars.FINAL_PROJECT_ID }}
+      - name: Summary
+        if: always()
+        run: cat summary.md >> "$GITHUB_STEP_SUMMARY"
+```
+
+The key needs `agents:write` to publish the candidate, and `o11y:read` and `o11y:execute` to run the suite.

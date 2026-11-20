@@ -1,60 +1,67 @@
 ---
 title: "Judges"
-description: "Score spans, traces and sessions with agentic, deterministic, code and external judges, and version them."
+description: "Score spans, traces and sessions with published Final agents, conditions, TypeScript in your project's Files, or results you submit."
 ---
 
-A judge scores a span, a trace or a session and returns one of its labels, a score, or pass/fail, with a reason. Judges run [online](/o11y/online-evaluation) on new traces, on demand, over past traces, and in [tests](/o11y/tests).
+A judge scores a span, a trace or a session and returns one of its labels, a score, or pass/fail, with a reason. Judges run [online](/o11y/online-evaluation) as turns and runs finish, on demand, over past traces, and in [test suites](/o11y/experiments).
 
-## Types
+A judge is a binding: it names what judges (an agent, conditions, code or you), what it scores, and the labels it may return. Versioning comes from what it binds to, and every result records the exact **evaluator version** that produced it.
 
-| Type | How it decides | Scopes | Output |
-| --- | --- | --- | --- |
-| `agentic` | A model reads the evidence with a rubric. | Span, trace, session | Binary, categorical or numeric |
-| `deterministic` | Conditions on duration, cost, errors, span names and attributes. | Span, trace | Two fixed labels: Matched and Not matched |
-| `code` | Your TypeScript runs on the evidence. | Span, trace | Binary, categorical or numeric |
-| `external` | You submit results: human feedback or your own evaluators. | Span, trace, session | Binary, categorical or numeric |
+| Type | What decides | Scopes | Output | Evaluator version |
+| --- | --- | --- | --- | --- |
+| `agent` | A published Final agent reads the evidence. | Span, trace, session | Binary, categorical or numeric | The agent's content hash |
+| `deterministic` | Conditions on duration, cost, errors, span names and attributes. | Span, trace | `Matched` or `Not matched` | A hash of the conditions |
+| `code` | TypeScript in the project's Files repository. | Span, trace | Binary, categorical or numeric | A git commit |
+| `external` | Results you submit through the API. | Span, trace, session | Binary, categorical or numeric | A hash of the configuration |
 
-Categorical and binary judges list their `choices` (2 to 50 labels, each with an optional description). Numeric judges give a `numericRange`, or choices with a `value` each.
+Categorical judges list their `choices` (2 to 50 labels, each with an optional description). A binary judge has two choices, pass then fail, or the labels `Pass` and `Fail` when you give none. Numeric judges give a `numericRange`, or choices with a `value` each.
 
-### Agentic
-
-An agentic judge runs as a short-lived Final agent with read-only access to a frozen snapshot of the evidence. It must cite what it relied on: each citation names a trace and span, quotes the excerpt and links to it as `final://o11y/<project>/trace/<trace>#span=<span>`, and Final checks citations against the snapshot. Every agentic judge names its model; there is no default.
+The examples use a project client:
 
 ```ts
-import { createO11yClient } from '@finalai/o11y/client';
-import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/o11y/contract';
+import { createClient } from '@finalai/agents/client';
 
-const client = createO11yClient({ baseUrl: 'https://api.final.ai', apiKey: process.env.FINAL_API_KEY! });
-const project = client.project('prj_your_project');
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+export const { o11y } = client.project({ id: process.env.FINAL_PROJECT_ID! });
+```
 
-const judge = await project.judges.createJudge({
+## Agent judges
+
+An agent judge references an agent published in the project, by name, and pins the content hash production runs use. The agent is the whole evaluator: its instructions are the rubric, its recommended harness and model are what it judges with, and its spend is its own model use, billed to the project in Final credits and held to the budgets and spending restrictions that apply to it. You version it the way you version any agent: edit it, try it, and [publish](/operate/publishing).
+
+```ts
+import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/agents/o11y';
+
+const grounded = await o11y.judges.createJudge({
   name: 'Grounded answer',
   definition: {
-    type: JudgeType.Agentic,
+    type: JudgeType.Agent,
     scope: JudgeScope.Trace,
+    agent: { name: 'grounding-judge', hash: 'sha256:…' },
     responseKind: JudgeResponseKind.Categorical,
-    rubric: 'Decide whether every factual claim in the final answer is supported by a tool result in the trace.',
     choices: [
       { label: 'Grounded', description: 'Every claim is supported by a tool result.' },
       { label: 'Unsupported claim', description: 'At least one claim has no supporting tool result.' },
     ],
-    model: 'claude-opus-5-5',
-    effort: 'medium',
   },
 });
 ```
 
-`preprocessor` takes TypeScript that extracts evidence before the model sees it, for traces too large or noisy to read whole. Session-scoped agentic judges read a window of the session's traces; see [session scoring](/o11y/online-evaluation#session-scoring).
+For each evaluation, Final freezes a snapshot of the evidence and starts a short session of the agent at the pinned hash, with the evidence in its prompt and the labels it may return. The agent answers with a structured verdict: a label, score or pass/fail, a reason, and citations of the spans it relied on. Final checks each citation against the snapshot and asks the agent to fix a verdict that doesn't hold up once. The judging session is linked from the result, so you can read how the judge reasoned.
 
-### Deterministic
+The judge agent needs a recommended harness with a model; it is started with no compute and no integrations, so give it no tools that need them. Leave out `hash` and the judge follows the name's latest publication, which suits a judge you're still writing but not one in production.
+
+To change the rubric, publish the agent again and pass the new hash to `runJudge` as `evaluatorVersion` to compare results on the same traces. When you're satisfied, pin it with `updateJudge`. Test suites keep checking with the hash they pinned until you [repin them](/o11y/experiments#repin-checks).
+
+## Deterministic judges
 
 Conditions combine with `and` and `or`; a nested group is a parenthesis. Fields are `duration_ms`, `cost_usd`, `error`, `span_name` and `attribute` (with `attributeKey`). Operators are `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `in`, `not_in`, `contains`, `not_contains`, `exists`, `not_exists` and `matches`. A group holds up to 50 conditions.
 
 ```ts
-import { ConditionField, ConditionJoin, ConditionOperator, JudgeScope, JudgeType } from '@finalai/o11y/contract';
+import { ConditionField, ConditionJoin, ConditionOperator, JudgeScope, JudgeType } from '@finalai/agents/o11y';
 
-await project.judges.createJudge({
-  name: 'Slow or expensive',
+await o11y.judges.createJudge({
+  name: 'Slow or failed',
   definition: {
     type: JudgeType.Deterministic,
     scope: JudgeScope.Trace,
@@ -62,112 +69,178 @@ await project.judges.createJudge({
       join: ConditionJoin.Or,
       conditions: [
         { field: ConditionField.DurationMs, op: ConditionOperator.Gt, value: 30_000 },
-        { field: ConditionField.CostUsd, op: ConditionOperator.Gt, value: 0.5 },
+        { field: ConditionField.Error, op: ConditionOperator.Eq, value: true },
+        {
+          field: ConditionField.Attribute,
+          attributeKey: 'gen_ai.tool.name',
+          op: ConditionOperator.Eq,
+          value: 'issue_refund',
+        },
       ],
     },
   },
 });
 ```
 
-Deterministic judges run without a model, so they cost no model spend.
+On a trace, a condition on span names or attributes holds when any span satisfies it, and its negation (`ne`, `not_in`, `not_contains`, `not_exists`) holds when no span does. Attribute keys are [span attribute](/o11y/reference/attributes) names. Deterministic judges call no model, so they cost nothing to run.
 
-### Code
+## Code judges
 
-A code judge is a TypeScript bundle of up to 1 MiB. It receives the evidence snapshot and returns a binary, categorical or numeric response with a reason. It runs in an isolate with no network access and with CPU and wall-clock deadlines.
+A code judge is TypeScript kept in the project's Files repository, in its own folder under `o11y/judges/`. Its git commits are its versions: pin one, or leave the pin out to run the latest commit that changed the folder.
 
-Create the judge with its output shape, then upload the bundle into its draft, base64-encoded. Environment variables are stored encrypted as project secrets and are never returned; names are uppercase letters, digits and underscores.
+The folder's `index.ts` is the judge, and it must be self-contained. Its default export is a function, or a class with an `evaluate` method, that takes `{ evidence, target, env }` and returns a verdict:
+
+```ts index.ts
+interface SpanIface {
+  spanId: string;
+  name: string;
+  attributes: Record<string, unknown>;
+}
+
+interface InputIface {
+  evidence: { spans: SpanIface[]; missing: string[]; truncated: boolean };
+  env: Record<string, string>;
+}
+
+export default (input: InputIface) => {
+  const root = input.evidence.spans.find((span) => span.name.startsWith('invoke_agent'));
+  const messages = root?.attributes['gen_ai.output.messages'];
+  if (root == null || messages == null) return { insufficientEvidence: true, reason: 'No output.' };
+  const length = JSON.stringify(messages).length;
+  const passed = length <= 4_000;
+  return {
+    label: passed ? 'Pass' : 'Fail',
+    passed,
+    reason: `The answer is ${length} characters long.`,
+    citations: [{ spanId: root.spanId }],
+  };
+};
+```
+
+- **`evidence.spans`** are the target's spans, each with `spanId`, `parentSpanId`, `name`, `kind`, `startTime`, `endTime`, `statusCode`, `errorMessage`, `model`, `attributes` and `events`. Long values may be cut to fit; `truncated` and each span's `truncatedKeys` say where.
+- **`target`** is what's being judged: its `kind` and `traceId`, `spanId` or `sessionId`.
+- **`env`** holds the environment variables you mapped to project secrets.
+- **The verdict** has `label` (categorical and binary), `score` (numeric), `passed` (binary), `reason`, and `citations` of `{ spanId, quote? }`. Return `insufficientEvidence: true` when the evidence can't decide.
+
+A code judge runs in an isolate with no network access, no bindings and a 5-second CPU limit.
+
+Create the judge, then commit its source with `setCodeJudgeSource`, which replaces the files in its folder in one commit. `secrets` maps environment variable names to [project secrets](/o11y/settings#project-secrets) by name; values are never sent or returned.
 
 ```ts
+import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/agents/o11y';
 import { readFile } from 'node:fs/promises';
-import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/o11y/contract';
 
-const judge = await project.judges.createJudge({
-  name: 'Valid JSON reply',
+const judge = await o11y.judges.createJudge({
+  name: 'Answer length',
   definition: { type: JudgeType.Code, scope: JudgeScope.Trace, responseKind: JudgeResponseKind.Binary },
 });
 
-await project.judges.uploadCodeJudge({
+const source = await o11y.judges.setCodeJudgeSource({
   judgeId: judge.judgeId,
-  bundle: (await readFile('dist/judge.js')).toString('base64'),
-  env: { SCHEMA_VERSION: '3' },
+  files: [{ path: 'index.ts', content: await readFile('./index.ts', 'utf8') }],
+  message: 'First version',
 });
-```
 
-### External
-
-External judges hold results you submit. Their output shape is fixed when you create them.
-
-```ts
-import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/o11y/contract';
-
-const thumbs = await project.judges.createExternalJudge({
-  name: 'User feedback',
+// Pin production runs to this commit.
+await o11y.judges.updateJudge({
+  judgeId: judge.judgeId,
   definition: {
-    type: JudgeType.External,
+    type: JudgeType.Code,
     scope: JudgeScope.Trace,
     responseKind: JudgeResponseKind.Binary,
+    commit: source.commit,
   },
 });
 ```
 
-See [external feedback](/o11y/alignment#external-feedback) to submit results.
+`getCodeJudgeSource({ judgeId, commit })` reads the files at any commit. Because the source is an ordinary folder in the project's Files, you and your agents can also edit it there; the next run picks up the new commit unless the judge is pinned.
 
-## Versions
+## External judges
 
-Creating or editing a judge changes its draft. Nothing runs from a draft until you publish it.
-
-<Steps>
-  <Step title="Edit the draft">
-    `update_judge` edits the definition; `set_judge_run_settings` and `set_judge_action_groups` edit online evaluation and actions. Each creates the draft from the latest version if there is none.
-  </Step>
-  <Step title="Publish">
-    `publish_judge_version` with `bump: 'major'` or `'minor'` creates an immutable version such as `2.1`. Any change to the rubric, choices, model, run settings or actions needs a new version.
-  </Step>
-  <Step title="Promote">
-    `promote_judge_version` makes a published version the production version, the one that runs online. Promote an older version to roll back.
-  </Step>
-</Steps>
+An external judge holds results you submit: user feedback on Final sessions, reviews from your support team, or scores from evaluators you run yourself. Its output shape is fixed when you create it.
 
 ```ts
-import { VersionBump } from '@finalai/o11y/contract';
+import { EvaluationTargetKind, JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/agents/o11y';
 
-const version = await project.judges.publishJudgeVersion({
-  judgeId: judge.judgeId,
-  bump: VersionBump.Major,
-  notes: 'First rubric',
+const feedback = await o11y.judges.createExternalJudge({
+  name: 'User feedback',
+  definition: {
+    type: JudgeType.External,
+    scope: JudgeScope.Session,
+    responseKind: JudgeResponseKind.Binary,
+    choices: [{ label: 'Helpful' }, { label: 'Not helpful' }],
+  },
 });
-await project.judges.promoteJudgeVersion({ judgeId: judge.judgeId, versionId: version.versionId });
+
+await o11y.judges.submitJudgeResult({
+  judgeId: feedback.judgeId,
+  target: { kind: EvaluationTargetKind.Session, sessionId: 'ases_…' },
+  value: { label: 'Not helpful' },
+  reason: 'The customer said the refund policy was wrong.',
+});
 ```
 
-Every result records the judge version that produced it, so results from an old and a revised rubric never mix. Deleting a judge stops its online evaluation; its past results remain.
+A target is a trace, a span, a session or a conversation. Submitting again for the same target replaces the current result and keeps the earlier ones as history (`listJudgeResults({ includeHistory: true })`). `metadata` carries your own fields, and `citations` can point at spans. Submitted results trigger no other judges and start no actions.
+
+## Choose the agents and workflows it judges
+
+By default, a judge's [online evaluation](/o11y/online-evaluation) takes every agent's turns and every workflow's runs in the project. `appliesTo` narrows it to the published agents and workflows you name, each by ID or by name (up to 50 of each):
+
+```ts
+import { JudgeResponseKind, JudgeScope, JudgeType } from '@finalai/agents/o11y';
+
+const refunds = await o11y.judges.createJudge({
+  name: 'Refund policy followed',
+  definition: {
+    type: JudgeType.Agent,
+    scope: JudgeScope.Trace,
+    agent: { name: 'refund-policy-judge', hash: 'sha256:…' },
+    responseKind: JudgeResponseKind.Binary,
+  },
+  appliesTo: { agents: [{ name: 'support' }], workflows: [{ id: 'wf_…' }] },
+});
+
+// Back to every agent and workflow.
+await o11y.judges.updateJudge({ judgeId: refunds.judgeId, appliesTo: null });
+```
+
+- An agent turn is taken when `agents` names its agent; a workflow run when `workflows` names its workflow. Naming only agents leaves out every workflow run, and naming only workflows leaves out every agent turn.
+- Both lists empty or left out, or `appliesTo: null` on `updateJudge`, takes every agent and workflow. Leaving `appliesTo` out of `updateJudge` keeps what the judge has.
+- `getJudge` returns `appliesTo` as you gave it: each entry has the `id` or the `name` you named it by, and `null` for the other. A judge that applies to everything returns `null`.
+
+`appliesTo` is checked before the judge's [run conditions](/o11y/online-evaluation#what-conditions-see), and only for online evaluation. Runs you start yourself take the traces you choose or the [trace filter](/o11y/online-evaluation#backfills) you pass.
 
 ## Run a judge now
 
 | Operation | What it does |
 | --- | --- |
-| `run_judge` | Runs a judge on specific traces or sessions; `versionId` picks the version. |
-| `evaluate_traces` | Runs judges' production versions on up to 1,000 traces. |
-| `evaluate_all_traces` | Runs production versions on every trace matching a filter. `dryRun: true` returns the count and cost estimate first. |
-| `backfill_judge` | Runs a version over a time range. See [backfills](/o11y/online-evaluation#backfills). |
-| `cancel_evaluations` | Cancels pending or running evaluations by ID or batch. |
+| `runJudge` | Runs one judge on up to 100 traces or sessions. `evaluatorVersion` tries another agent hash or commit before you pin it. |
+| `evaluateTraces` | Runs up to 20 judges, at their pinned versions, on up to 1,000 traces. |
+| `evaluateAllTraces` | Runs judges on every trace matching a filter. `dryRun: true` returns the count and cost estimate first. |
+| `backfillJudge` | Runs a judge over a time range. See [backfills](/o11y/online-evaluation#backfills). |
+| `cancelEvaluations` | Cancels pending or running evaluations by ID or batch. |
 
-None of these fire actions. From code that's already traced, `asyncEvaluate(judgeIds)` requests an evaluation of the current trace once the active span ends and is exported; it needs `init({ projectId })` and an API key with `o11y:execute`.
+Each returns a batch with its `batchId`, target count and cost estimate. None of them publishes `o11y.judge.matched`, so they never start [actions](/o11y/actions).
 
 ## Results
 
-`list_evaluations` and `get_evaluation` return each result with its value (label, score or pass/fail), reason, citations, model, cost, latency, the sampling rate in force, the trigger (`online`, `backfill`, `manual`, `test` or `rescore`) and the evidence snapshot it saw.
+`listEvaluations` and `getEvaluation` return each result with its value (label, score or pass/fail), reason, citations, model, cost, latency, the sampling rate in force, the trigger (`online`, `backfill`, `manual`, `test` or `rescore`), the exact `evaluatorVersion`, and for agent judges the judging session. Filter by judge, evaluator version, trace, session, batch, review session, label, trigger or status.
 
 | Status | Meaning |
 | --- | --- |
 | `pending`, `running` | Not finished. |
 | `value` | The judge produced a value. |
-| `insufficient_evidence` | The evidence couldn't support a verdict, for example a missing output. Never counted as a pass or a fail. |
-| `evaluator_error` | The judge failed, such as a code judge that threw. |
+| `insufficient_evidence` | The evidence couldn't support a verdict. Never counted as a pass or a fail. |
+| `evaluator_error` | The judge failed, such as a code judge that threw or an agent that returned no valid verdict. |
 | `timeout` | The judge ran past its deadline. |
 | `skipped_rate_limited` | Over the project's evaluation rate. Recorded, never silently dropped. |
-| `skipped_budget` | Over the judge's budget or the project's spend cap. |
+| `skipped_budget` | The judge agent's budget or spending restriction refused the spend. |
 | `cancelled` | Cancelled before it finished. |
+
+Each citation links to its span as `final://o11y/<project>/trace/<trace>#span=<span>`; `evidenceLink` from `@finalai/agents/o11y` builds the same link.
 
 ## Labels
 
-A label is one of a judge's outputs. Each has a description, an optional category, a rate, its last application and a time series (`get_label_analytics`). `update_judge_label` changes the description or category. Labels index your traces: filter search by label, join `labels` and `scores` in [SQL](/o11y/dashboards-and-sql), and chart `get_label_distribution` and `get_label_relations`.
+A label is one of a judge's outputs. Each has a description, an optional category, a rate over the last 7 days, its last application and a time series (`getLabelAnalytics`). `updateJudgeLabel` changes the description or category. Labels index your traces: filter `searchTraces` by `labels`, join `labels` and `scores` in [SQL](/o11y/dashboards-and-sql), and chart `getLabelDistribution` and `getLabelRelations`.
+
+Deleting a judge stops its online evaluation; its past results remain.

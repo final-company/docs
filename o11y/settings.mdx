@@ -1,0 +1,39 @@
+---
+title: "Settings and audit"
+sidebarTitle: "Settings"
+description: "Environments, retention of Observability's results, project secrets, and the audit log."
+---
+
+Observability's settings are per project, in **Observability** > **Settings** in the console or through `o11y.admin`. Changing them needs the project admin role.
+
+## Settings
+
+```ts
+await o11y.admin.updateSettings({ retention: { resultDays: 180 }, environments: ['prod'] });
+const settings = await o11y.admin.getSettings();
+console.log(settings.retention, settings.environments);
+```
+
+| Setting | What it does |
+| --- | --- |
+| `environments` | The environments the console offers for online evaluation and filters. A trace's environment is the Final deployment it ran in: `prod` or `dev`. |
+| `retention.resultDays` | How long evaluations, external results and reviews are kept, and the evidence snapshots they cite: 1 to 400 days, 365 by default. |
+
+`getSettings` also returns the evaluation defaults a judge starts with when it goes online: sampling at 100% and the session inactivity window.
+
+Final's sessions and workflow runs keep their own retention: Observability reads them in place and keeps no copy of them.
+
+## Project secrets
+
+Code judges read environment variables, and [trace export](/o11y/trace-export) sends headers, from project secrets. Create them under **Developer** > **Secrets** in the Final dashboard, and refer to them by name. Observability stores only the name, and never returns a secret's value.
+
+## Audit log
+
+Every write operation in the project is recorded: the operation's tool name, who ran it (a person, an API key, an agent or Final itself), the object it acted on, a digest of its input, and when.
+
+```ts
+const { items } = await o11y.admin.listAuditEvents({ limit: 20 });
+for (const event of items) console.log(event.occurredAt, event.operation, event.actor.name);
+```
+
+Filter by `operation`, `actorId` and a time range.

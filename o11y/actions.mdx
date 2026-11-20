@@ -1,0 +1,309 @@
+---
+title: "Actions with AI Workflows"
+sidebarTitle: "Actions"
+description: "Start an AI Workflow when a judge scores a turn or run, with throttling and cooldowns, from four templates."
+---
+
+An action is an [AI Workflow](/workflows/overview) that a judge's results start. Observability publishes an event to the project's [event feed](/operate/events) for every result of an online evaluation; a workflow whose `onEvent` trigger names `o11y.judge.matched` runs on it. Anything a workflow can do, an action can: open a Task for an agent, post to Slack, add the trace to a dataset, run another judge, or call any integration.
+
+## How it works
+
+1. A judge running [online](/o11y/online-evaluation) produces a value for a finished turn or run.
+2. Observability publishes it as an `event.published` event named `o11y.judge.matched`, with the judge, the target, the value and a link to the trace.
+3. Every published workflow with a matching `onEvent('o11y.judge.matched', …)` trigger starts a run, with the event's data as its input.
+
+Only online evaluations at the judge's pinned version publish `o11y.judge.matched`, and only online evaluations publish `o11y.evaluation.failed`. Trials, backfills, test runs and external results publish neither, so they never start actions. The event is published for every value, passing or failing: to act only on some results, narrow the trigger with `match`, or check `input.value` at the start of `run`.
+
+```ts
+import { defineWorkflow, onEvent, z } from '@finalai/workflows';
+
+export default defineWorkflow({
+  name: 'Escalate failed refunds',
+  input: z.object({
+    judgeId: z.string(),
+    value: z.object({ label: z.string().nullable(), passed: z.boolean().nullable() }),
+    link: z.string().nullable(),
+  }),
+  triggers: [
+    onEvent('o11y.judge.matched', {
+      match: { judgeId: 'ojdg_…' },
+      throttle: { limit: 5, period: '1h' },
+      cooldown: '10m',
+    }),
+  ],
+  async run({ input }) {
+    if (input.value.passed !== false) return { escalated: false };
+    // Escalate: open a Task, post to a channel, call an integration…
+    return { escalated: true, link: input.link };
+  },
+});
+```
+
+## Throttle and cooldown
+
+A noisy judge can match thousands of turns an hour. `onEvent` limits how often a trigger starts runs:
+
+- **`throttle: { limit, period }`** starts at most `limit` (1 to 1,000) runs in any window of `period`.
+- **`cooldown`** starts nothing for that long after a run starts.
+
+Both take a duration (`'90s'`, `'1h'`, `'2d'`) or milliseconds, from 1 second to 30 days, and count only the runs this trigger starts, after `match`. Events they hold back are dropped, not queued. `match` compares top-level values of the event's data, such as `judgeId`, `environment` or `trigger`, and must be a literal.
+
+## Templates
+
+A judge's **Actions** tab in the console lists the published workflows its results start and creates new ones from four templates. Creating one fills in the project and the judge; you finish the rest (the integrations, a channel or a dataset) in the workflow editor, then publish it.
+
+<AccordionGroup>
+  <Accordion title="Notify the project" icon="bell">
+    Opens a Task in the project for the [o11y agent](/o11y/agent) to look into each match: what went wrong, whether it looks like an existing issue, with cited spans. The Task shows in the project's Tasks, and its followers hear when it finishes. At most ten Tasks a day, and none within an hour of the last.
+
+    ```ts
+    // Template: when a judge matches, open a Task in the project for the o11y agent to look into the
+    // matched trace. The Task is how the project hears of it: it shows in the project's Tasks, and
+    // its followers are told when it finishes.
+    // Set the project, the judge (in the trigger's match, which must be a literal) and the model,
+    // then publish.
+    import { defineWorkflow, onEvent, z } from '@finalai/workflows';
+
+    const PROJECT_ID = 'prj_…';
+    // The model the o11y agent works on; Final's serverless harness bills it to the project.
+    const MODEL = 'deepseek-v4.1-flash-1017';
+
+    export default defineWorkflow({
+      name: 'Notify the project when a judge matches',
+      description: "Opens a Task for the o11y agent to look into each of a judge's matches.",
+      input: z.object({
+        judgeId: z.string(),
+        target: z.object({ traceId: z.string().nullable(), sessionId: z.string().nullable() }),
+        value: z.object({ label: z.string().nullable(), score: z.number().nullable() }),
+        link: z.string().nullable(),
+      }),
+      require: {
+        integrations: {
+          final: { description: "Final's tools: the o11y groups the agent reads the trace with." },
+        },
+      },
+      // A noisy judge opens at most ten Tasks a day, and none within an hour of the last.
+      triggers: [
+        onEvent('o11y.judge.matched', {
+          match: { judgeId: 'ojdg_…' },
+          throttle: { limit: 10, period: '1d' },
+          cooldown: '1h',
+        }),
+      ],
+      async run({ input, step, integrations }) {
+        const what = input.value.label ?? `score ${String(input.value.score)}`;
+        return step.task('notify', {
+          title: `Judge ${input.judgeId} matched: ${what}`,
+          brief: [
+            `Judge ${input.judgeId} matched ${input.link ?? 'a trace'} in project ${PROJECT_ID} (${what}).`,
+            'Read the trace and the evaluation with the final.o11y tools, say in a few lines what went wrong and whether it looks like an existing issue, and cite the spans.',
+            'Change nothing: no judges, datasets or issues.',
+          ].join('\n\n'),
+          agent: 'final/o11y',
+          provide: {
+            harness: { harness: 'final/final', configuration: { model: MODEL } },
+            integrations: { final: integrations.final },
+          },
+          // An event-started run acts for nobody, so nobody reviews the result.
+          review: 'none',
+          labels: { o11y: 'judge-match' },
+        });
+      },
+    });
+    ```
+  </Accordion>
+  <Accordion title="Post to Slack" icon="slack">
+    Posts each match, with a link to the trace, to a Slack channel through the project's Slack integration. At most twenty posts an hour.
+
+    ```ts
+    // Template: post each of a judge's matches to a Slack channel, through the project's Slack
+    // integration. Set the judge (in the trigger's match, which must be a literal) and the channel,
+    // then publish and provide a Slack integration for `slack`.
+    import { defineWorkflow, onEvent, z } from '@finalai/workflows';
+
+    const CHANNEL = '#agent-quality';
+
+    export default defineWorkflow({
+      name: 'Post judge matches to Slack',
+      description: "Posts each of a judge's matches, with a link to the trace, to a Slack channel.",
+      input: z.object({
+        judgeId: z.string(),
+        environment: z.string().nullable(),
+        value: z.object({
+          label: z.string().nullable(),
+          score: z.number().nullable(),
+          passed: z.boolean().nullable(),
+        }),
+        link: z.string().nullable(),
+      }),
+      require: {
+        integrations: {
+          slack: {
+            description: 'The Slack workspace to post in.',
+            tools: { allow: ['chat.postMessage'] },
+          },
+        },
+      },
+      // At most twenty posts an hour, so a burst of matches does not flood the channel.
+      triggers: [
+        onEvent('o11y.judge.matched', {
+          match: { judgeId: 'ojdg_…' },
+          throttle: { limit: 20, period: '1h' },
+        }),
+      ],
+      async run({ input, step, integrations }) {
+        const value =
+          input.value.label ??
+          (input.value.passed == null
+            ? `score ${String(input.value.score)}`
+            : String(input.value.passed));
+        const where = input.environment == null ? '' : ` in ${input.environment}`;
+        return step.call('post', integrations.slack, 'chat.postMessage', {
+          channel: CHANNEL,
+          text: `Judge ${input.judgeId} matched${where}: ${value}${input.link == null ? '' : `\n${input.link}`}`,
+        });
+      },
+    });
+    ```
+  </Accordion>
+  <Accordion title="Add to a dataset" icon="database">
+    Adds each matched trace to a [dataset](/o11y/datasets), so the failures a judge finds become test cases. A session match adds the whole session. Provide Final's gateway for `final`.
+
+    ```ts
+    // Template: add each trace a judge matches to a dataset, through Final's o11y tools, so the
+    // failures it finds become test cases. Set the project, the dataset and the judge (in the
+    // trigger's match, which must be a literal), then publish and provide Final's gateway for `final`.
+    import { defineWorkflow, onEvent, z } from '@finalai/workflows';
+
+    const PROJECT_ID = 'prj_…';
+    const DATASET_ID = 'odset_…';
+
+    export default defineWorkflow({
+      name: 'Add matched traces to a dataset',
+      description: 'Adds each trace a judge matches to a dataset as an example.',
+      input: z.object({
+        target: z.object({ traceId: z.string().nullable(), sessionId: z.string().nullable() }),
+      }),
+      require: {
+        integrations: {
+          final: {
+            description: "Final's o11y tools.",
+            tools: { allow: ['final.o11y.data.add_traces_to_dataset'] },
+          },
+        },
+      },
+      triggers: [onEvent('o11y.judge.matched', { match: { judgeId: 'ojdg_…' } })],
+      async run({ input, step, integrations }) {
+        const { traceId, sessionId } = input.target;
+        // A session-level match adds the whole session; any other adds its trace.
+        if (traceId == null && sessionId == null) return { added: false };
+        await step.call(
+          'add-to-dataset',
+          integrations.final,
+          'final.o11y.data.add_traces_to_dataset',
+          traceId == null
+            ? {
+                projectId: PROJECT_ID,
+                datasetId: DATASET_ID,
+                preset: 'session',
+                sessionIds: [sessionId],
+              }
+            : { projectId: PROJECT_ID, datasetId: DATASET_ID, preset: 'trace', traceIds: [traceId] },
+        );
+        return { added: true };
+      },
+    });
+    ```
+  </Accordion>
+  <Accordion title="Run another judge" icon="gavel">
+    Runs other judges at their pinned versions on each matched trace, such as a costlier agent judge that confirms a cheap deterministic one. Judges run this way publish no `o11y.judge.matched`, so chains can't loop. At most a hundred runs an hour, which bounds what a burst of matches spends.
+
+    ```ts
+    // Template: when one judge matches a trace, run other judges on it at their pinned versions,
+    // such as a costlier agent judge that confirms a cheap deterministic one. Running judges this
+    // way emits no lifecycle events, so chains do not loop. Set the project, the judges to run and
+    // the judge (in the trigger's match, which must be a literal), then publish and provide Final's
+    // gateway for `final`.
+    import { defineWorkflow, onEvent, z } from '@finalai/workflows';
+
+    const PROJECT_ID = 'prj_…';
+    const JUDGES_TO_RUN = ['ojdg_…'];
+
+    export default defineWorkflow({
+      name: 'Run another judge on matched traces',
+      description: 'Runs more judges on each trace a judge matches.',
+      input: z.object({
+        target: z.object({ traceId: z.string().nullable() }),
+      }),
+      require: {
+        integrations: {
+          final: {
+            description: "Final's o11y tools.",
+            tools: { allow: ['final.o11y.judges.evaluate_traces'] },
+          },
+        },
+      },
+      // At most a hundred runs an hour, which bounds what a burst of matches spends on judging.
+      triggers: [
+        onEvent('o11y.judge.matched', {
+          match: { judgeId: 'ojdg_…' },
+          throttle: { limit: 100, period: '1h' },
+        }),
+      ],
+      async run({ input, step, integrations }) {
+        const { traceId } = input.target;
+        if (traceId == null) return { evaluated: false };
+        const batch = await step.call(
+          'evaluate',
+          integrations.final,
+          'final.o11y.judges.evaluate_traces',
+          { projectId: PROJECT_ID, judgeIds: JUDGES_TO_RUN, traceIds: [traceId] },
+        );
+        return { evaluated: true, batch };
+      },
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+A run that an event starts acts for nobody, so its [approvals](/workflows/approvals) must name approvers and its task steps use `review: 'none'`.
+
+## Events
+
+Observability publishes these `event.published` events to the project's feed. Their names are the values of `LifecycleEventKind` in `@finalai/agents/o11y`. Data carries IDs and state, never trace content: read the details through the API.
+
+| Name | When | Data |
+| --- | --- | --- |
+| `o11y.judge.matched` | An online evaluation at the judge's pinned version produced a value. | `judgeId`, `evaluatorVersion`, `evaluationId`, `trigger`, `target` (`kind`, `traceId`, `spanId`, `sessionId`, `fromTraceSeq`, `toTraceSeq`), `environment`, `value` (`labelId`, `label`, `score`, `passed`) and `link` |
+| `o11y.evaluation.failed` | An online evaluation ended in `evaluator_error` or `timeout`. | `judgeId`, `evaluatorVersion`, `evaluationId`, `trigger`, `target`, `status` and `errorCode` |
+| `o11y.issue.created` | An [issue](/o11y/issues) was opened. | `issueId`, `title`, `severity` and `status` |
+| `o11y.issue.updated` | An issue gained evidence, or changed severity, text or status. | The same as `o11y.issue.created` |
+| `o11y.issue.regressed` | An issue was seen again after it was settled. | The same as `o11y.issue.created` |
+| `o11y.issue.resolved` | A monitored issue's label stayed at zero for the stale window. | The same as `o11y.issue.created` |
+| `o11y.test_run.completed` | A [test run](/o11y/experiments) completed. | `testRunId`, `testSuiteId`, `suiteVersion`, `candidate`, `status` and `counts` |
+
+Every one can start a workflow with `onEvent(name)`. Outside workflows, read them from the feed with `names`, or have them pushed to your endpoint with an [event subscription](/operate/events#receive-webhooks):
+
+```ts
+import { createClient, PlatformEventKind } from '@finalai/agents/client';
+import { LifecycleEventKind } from '@finalai/agents/o11y';
+
+const client = createClient({ auth: { apiKey: process.env.FINAL_API_KEY! } });
+const project = client.project({ id: process.env.FINAL_PROJECT_ID! });
+
+const page = await project.events.list({
+  kinds: [PlatformEventKind.EventPublished],
+  names: ['o11y.*'],
+});
+for (const event of page.events)
+  if (event.kind === PlatformEventKind.EventPublished && event.data.name === LifecycleEventKind.IssueRegressed)
+    console.log(event.data.data);
+
+const { subscription, signingSecret } = await project.eventSubscriptions.create({
+  url: 'https://example.com/final/o11y',
+  kinds: [PlatformEventKind.EventPublished],
+  names: [LifecycleEventKind.IssueRegressed, LifecycleEventKind.TestRunCompleted],
+});
+```
+
+`names` takes exact names or a dotted prefix such as `o11y.issue.*`. An app installed in many organizations reads the same events across all of them with `client.app.events.list({ names: ['o11y.*'] })` and an app-level token.

@@ -1,6 +1,6 @@
 ---
-title: "Scopes and keys"
-description: "API key scopes, the kinds of credentials, and which scopes common tasks need."
+title: "Scopes and roles"
+description: "The o11y scopes every operation needs, the credentials that carry them, and the project roles that also apply."
 ---
 
 ## Scopes
@@ -9,33 +9,39 @@ Every operation needs one scope. Grant API keys only the scopes they use.
 
 | Scope | Allows |
 | --- | --- |
-| `o11y:ingest` | Sending telemetry: OTLP and `ingest_observations`. |
-| `o11y:read` | Every read: traces, results, issues, SQL, dashboards, settings. |
-| `o11y:write` | Creating, changing and deleting: judges, datasets, suites, issues, dashboards, settings and keys. |
-| `o11y:execute` | Starting work that runs: evaluations, backfills, test runs, reprojection, detection, scheduled analyses, event replay and fix tasks. |
+| `o11y:read` | Every read: traces, sessions, results, labels, datasets, test runs, issues, SQL, dashboards, settings and the trace export configuration. |
+| `o11y:write` | Creating, changing and deleting: judges, run settings, code judge source, reviews, datasets, test suites, issues, saved views and queries, dashboards, settings and trace export. |
+| `o11y:execute` | Starting work that runs and may spend: running judges, evaluations and backfills, test runs, issue detection, and the trace export test. |
 
-Operations with the effect `destructive` (deleting, rotating, removing) need `o11y:write`. The [tool reference](/o11y/mcp-tools) lists the scope and effect of every operation.
+Operations with the effect `destructive` (deleting or removing) need `o11y:write`. The [tool reference](/o11y/mcp-tools) lists the scope and effect of every operation.
 
-The scope is necessary, not sufficient: your project role also has to allow the operation. See [roles](/o11y/administration#roles).
-
-## Kinds of credentials
+## Credentials
 
 | Credential | Use it for | Scopes |
 | --- | --- | --- |
-| Ingest key | Apps that send telemetry. Bound to one project. | Ingest only. Every other operation returns `403`. |
-| API key | Scripts, CI and the SDK client. Create one in **Developer** > **API keys**; see [Get an API key](/api-keys). | The `o11y:*` permissions you choose. |
-| Your Final account | The console, and MCP clients that sign in with Final. | Your project role. |
+| API key | Scripts, CI, the `project.o11y` client and the `final-agents o11y` CLI. Create one in **Developer** > **API keys**; see [Get an API key](/api-keys). | The `o11y:*` permissions you choose. |
+| Your Final account | The console, and MCP clients that sign in with Final. | Implied by your account's access: reading projects grants `o11y:read`, changing them `o11y:write`, and running agents `o11y:execute`. |
+| An app's token | Apps that act in projects that installed them. | The same implied scopes, from the app's grants, or `o11y:*` scopes granted directly. |
 
-Use an ingest key in every running app, so a leaked key can only send data. Use an API key with `read` and `execute` in CI for [tests](/o11y/tests-in-ci), and add `ingest` only if the runner also sends traces with it.
+Send the credential as `Authorization: Bearer <token>` to `https://agent-session.final.ai/api/v1/o11y`. The SDK and CLI do this for you.
+
+## Roles
+
+The scope is necessary, not sufficient: your project role also has to allow the operation. Organization admins can do everything.
+
+| Role | Can |
+| --- | --- |
+| Viewer | Every `read` operation. |
+| Editor | Every operation but the admin ones below. |
+| Admin | Also `update_settings`, `set_trace_export`, `test_trace_export` and `list_audit_events`. |
 
 ## Common combinations
 
 | Task | Scopes |
 | --- | --- |
-| Send traces | `ingest` |
-| `tag({ traceIds })` from the SDK | `ingest`, `write` |
-| `asyncEvaluate` from the SDK | `ingest`, `execute` |
-| `final-o11y doctor` | `read` (plus an ingest key in `FINAL_INGEST_KEY`) |
-| `final-o11y test run` | `read`, `execute` |
-| Turn on native producers | `write` |
-| Read the event feed | `read` |
+| Read traces and results, run SQL | `read` |
+| Create judges and turn on online evaluation | `read`, `write` |
+| Try a judge with `runJudge`, or backfill | `read`, `execute` |
+| `final-agents o11y test run` | `read`, `execute` |
+| Publish a judge agent | `agents:write` |
+| Set up trace export | `write`, `execute` for the test, and the project admin role |

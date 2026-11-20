@@ -22,6 +22,7 @@ icon: "book"
 | `@finalai/agents/client` | Starting and talking to agents, in Node, browsers, React Native, and Workers | `createClient`, `sessionUpdateOf`, `textOf`, `isRequirementsUnmetError`, `isClientError`, `Capability`, `AgentApiErrorCode`, and the API's types and enums |
 | `@finalai/agents/verify` | [Verifying tokens Final signs](/build/integrations#verify-calls-from-final) | `verifyPlatformIdentity`, `verifyAccessToken`, `verifyHumanInput` |
 | `@finalai/agents/webhooks` | [Event webhooks](/operate/events#receive-webhooks) | `verifyWebhook` |
+| `@finalai/agents/o11y` | [Observability](/o11y/overview): the operation inventory behind `project.o11y` | `JudgeType`, `JudgeScope`, `TestRunMode`, `GenAiAttribute`, `FinalAttribute`, `LifecycleEventKind`, `O11yOperation`, `O11Y_OPERATIONS`, `buildOpenApiDocument` |
 | `@finalai/agents/testing` | Testing code that uses the client | `createFakeFetch`, `createFakeTransport` |
 | `@finalai/daytona-agent-provider/sandboxes` | Daytona sandboxes | `daytona` |
 
@@ -95,6 +96,14 @@ Runs the harness conformance kit against a harness implementation the module exp
 
 ```bash
 npx final-agents conformance ./my-harness.ts --profile final-required
+```
+
+### `o11y <command>`
+
+Calls any [Observability](/o11y/overview) operation (`final-agents o11y <group> <operation> --json '<input>'`), lists them (`operations`), writes the OpenAPI document (`openapi`), and runs a test suite for CI (`test run`). See [experiments and CI](/o11y/experiments#run-in-ci).
+
+```bash
+npx final-agents o11y traces search-traces --json '{"limit":5}'
 ```
 
 ### Options

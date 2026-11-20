@@ -1,90 +1,112 @@
 ---
-title: "Issues"
-description: "Detect recurring failures, triage them, monitor each with a judge, and hand fixes to a coding agent."
+title: "Issues on Tasks"
+sidebarTitle: "Issues"
+description: "Recurring failures as Tasks in your project: detection on a schedule, cited evidence, monitoring with a judge, and regressions."
 ---
 
-An issue is a recurring failure in your agent, backed by evidence. Detection opens issues, you triage them, a judge monitors each one, and a coding agent fixes it.
+An issue is a recurring failure in your agents or workflows, backed by evidence. Each issue is a **Task** in the project, labeled `o11y: issue`, plus a fingerprint Observability keeps for it: the key detection matches it by, its evidence, incidents over time, and the judge that monitors it. You triage an issue the way you work any Task: comment, assign, follow, complete or cancel it. Observability moves the Task when the failure stops or comes back.
 
 ## What an issue holds
 
 | Field | What it holds |
 | --- | --- |
-| Title | A short name for the failure. |
-| Observed | What the evidence shows, as fact. |
-| Suspected cause | Why it happens. Kept apart from what was observed, and it must cite evidence. |
-| Impact, Consider | Who is affected, and what to look at. |
-| Severity | `critical`, `high`, `medium` or `low`. |
-| Trend | `first_seen`, `ongoing` or `regressed`. |
-| Evidence | Cited traces and spans, each with an optional note, quote and `final://o11y/...` link, and the incidents over time. |
-| Monitoring | The judge and label that track it. |
-| Fix tasks | Handoffs to coding agents. |
-| Activity | Status changes, comments, evidence, merges and handoffs. |
+| `title` | A short name for the failure. It's the Task's title. |
+| `observed` | What the evidence shows, as fact. |
+| `suspectedCause` | Why it happens. Kept apart from what was observed, and it must cite evidence in `suspectedCauseCitations`. |
+| `impact`, `consider` | Who is affected, and what to look at. |
+| `severity` | `critical`, `high`, `medium` or `low`. |
+| `trend` | `first_seen`, `ongoing` or `regressed`. |
+| `evidence` | Cited traces and spans, each with an optional note, quote and `final://o11y/…` link. |
+| `incidents` | How often it was seen, over time. |
+| `monitorJudgeId`, `monitorLabelId` | The judge and label that track it. |
+| `issueKey` | The key detection updates it by, instead of opening a duplicate. |
+| `taskId` | The Task it's triaged on. |
 
-Each issue has an `issue_key` that detection uses to update an existing issue rather than open a duplicate.
+## Create an issue
 
-## Lifecycle
+Detection opens most issues. You, the [o11y agent](/o11y/agent) or your own code can also open one:
+
+```ts
+import { IssueSeverity } from '@finalai/agents/o11y';
+
+const issue = await o11y.issues.createIssue({
+  title: 'Quotes the old refund window',
+  issueKey: 'refund-policy/wrong-window',
+  severity: IssueSeverity.High,
+  observed: 'The agent quotes a 14-day refund window in 12 turns since Monday.',
+  suspectedCause: 'The policy lookup returns the archived policy page.',
+  suspectedCauseCitations: [
+    { traceId: '4bf92f3577b34da6a3ce929d0e0e4736', spanId: '00f067aa0ba902b7' },
+  ],
+  evidence: [{ traceId: '4bf92f3577b34da6a3ce929d0e0e4736', note: 'Quotes 14 days.' }],
+});
+console.log(issue.taskId, issue.status);
+```
+
+Creating an issue with the `issueKey` of an existing one adds to it instead. `addIssueEvidence` cites more traces, `updateIssue` changes the severity and the text, and `mergeIssues` folds duplicates into one issue. Status, assignee and comments belong to the Task, so change them there.
+
+## Status
+
+An issue's status reads its Task together with what Observability has seen:
 
 | Status | Meaning |
 | --- | --- |
-| `needs_review` | New or recurring; someone should look. |
-| `monitored` | A judge and label are linked, and the judge's production version runs online with sampling above 0. |
-| `dismissed` | Not a problem. |
-| `inactive` | Not seen for the stale window (1 to 365 days, 10 by default; you can turn the rule off). |
-| `regressed` | Seen again after being monitored or inactive. Goes back to `needs_review`. |
-| `resolved` | Set by Final when the monitored label stays at zero for the stale window. |
-| `merged` | Merged into another issue. Final. |
-
-You can set `needs_review`, `dismissed` and `inactive` with `update_issue`; the other states are transitions Final makes. Reopen a dismissed or inactive issue by setting it back to `needs_review`.
-
-## Detection
-
-Two kinds of detection open and update issues. Configure both with `update_issue_detection`, or with **Detection settings** on the **Issues** page.
-
-**Agentic detection** is a scheduled analysis by the detection agent. It reads recent traces, labels and health, and opens issues with cited evidence. Set its instructions, model, schedule (daily, weekly, an interval or cron, in a time zone) and optional Slack channels for reports. `run_issue_detection` runs it now and `stop_issue_detection` stops a run.
-
-**Deterministic detectors** run SQL over your traces and scores:
-
-| Detector | Finds |
-| --- | --- |
-| `error_spike` | A jump in error rate. |
-| `judge_failure_rate` | A jump in a judge's failure rate. |
-| `retry_loop` | Repeated identical calls within a trace. |
-| `cost_outlier` | Traces far above typical cost. |
-| `latency_outlier` | Traces far above typical latency. |
-
-Each detector can be turned on or off and given a `threshold`. Both kinds match new findings to existing issues by key and evidence, and update them instead of opening duplicates.
-
-## Triage
-
-`list_issues` sorts by severity, latest or evidence, and filters by status, severity, text and time. In the console, the inbox adds grouping, `j` and `k` to move between issues, and bulk dismiss or **Ask agent**.
-
-| Operation | What it does |
-| --- | --- |
-| `update_issue` | Change status, severity, title or description. |
-| `merge_issues` | Merge other issues into this one. |
-| `add_issue_evidence` | Cite more traces and spans. |
-| `comment_on_issue` | Add a comment. |
-| `create_issue` | Open an issue yourself. The suspected cause needs citations. |
+| `needs_review` | The Task is open and nobody has settled it. A failed Task (the fix didn't work) also comes back here. |
+| `monitored` | A judge and label are linked, and the judge runs online with sampling above 0. |
+| `regressed` | Seen again after it was settled. Its Task is reopened. |
+| `dismissed` | Its Task was cancelled by a person. Detection doesn't reopen it. |
+| `inactive` | No new evidence for the stale window, so Observability cancelled its Task. It comes back as `regressed` if seen again. |
+| `resolved` | The Task was completed, or Observability completed it because the monitored label stayed at zero for the stale window. |
+| `merged` | Merged into another issue, which carries on. Final. |
 
 ## Monitor with a judge
 
-Link a judge and one of its labels to an issue. Once that judge's production version runs online with sampling above 0, the issue is `monitored`, and its incidents come from the label's rate.
+Link a judge and one of its labels to an issue. Once the judge runs [online](/o11y/online-evaluation) with sampling above 0, the issue is `monitored`: Observability watches the label's rate, resolves the issue when the label stays at zero for the stale window, and marks it `regressed` when the label fires again.
 
 ```ts
-await project.issues.monitorIssueWithJudge({ issueId, judgeId, labelId });
+await o11y.issues.monitorIssueWithJudge({
+  issueId: 'oiss_…',
+  judgeId,
+  labelId: 'olbl_…',
+});
 ```
 
-No judge fits? Ask the observability agent to create one from the issue's evidence, then publish and promote it.
+## Detection
 
-## Hand off a fix
+Detection opens and updates issues on its own. It has two parts, both set with `updateIssueDetection` or in **Observability** > **Issues** > **Detection**.
 
-`create_issue_fix_task` hands an issue to a coding agent, with its observed facts, suspected cause and evidence:
+**Agentic detection** is an [agent schedule](/build/schedules): the detection agent, `final/o11y-detection`, runs on your schedule with your instructions, reads the period since its last run, and files or updates issues with cited evidence. It runs as the person who set it up, and its runs are that schedule's runs.
 
-| `target` | What happens |
-| --- | --- |
-| `final_task` | Creates a Final Task for `agentId` in `repository`. |
-| `codex`, `claude_code`, `cursor` | Returns a prompt to paste into that agent. |
+**Deterministic detectors** are fixed SQL over the [catalog](/o11y/dashboards-and-sql#catalog), run every hour. Each compares the last hour with the 24 before it:
 
-Add `instructions` for anything the agent should know. The handoff is recorded on the issue. After the fix ships, the monitoring judge shows whether the label rate drops, and a regression reopens the issue.
+| Detector | Opens an issue when | Threshold (default) |
+| --- | --- | --- |
+| `error_spike` | The error rate of agent turns rises well above its baseline. | Multiple of the baseline rate (3) |
+| `judge_failure_rate` | A judge's failing-label rate rises. | Absolute rise in the rate (0.2) |
+| `cost_outlier` | Agent turns cost far more than usual. | Robust z-score (5) |
+| `latency_outlier` | Agent turns take far longer than usual. | Robust z-score (5) |
 
-To keep a fix fixed, turn the issue's failing traces into [test cases](/o11y/tests) and run them in [CI](/o11y/tests-in-ci).
+```ts
+import { IssueDetector, ScheduleKind } from '@finalai/agents/o11y';
+
+await o11y.issues.updateIssueDetection({
+  agentic: {
+    enabled: true,
+    instructions: 'Refund and billing failures matter most.',
+    schedule: { kind: ScheduleKind.Daily, timeOfDay: '08:00', timezone: 'America/New_York' },
+  },
+  deterministic: [
+    { detector: IssueDetector.ErrorSpike, enabled: true },
+    { detector: IssueDetector.CostOutlier, enabled: true, threshold: 6 },
+  ],
+  staleAfterDays: 14,
+});
+```
+
+`schedule.kind` is `daily` or `weekly` (with `timeOfDay`, and `weekday` for weekly), `interval` (`intervalMinutes`, 15 to 1,440) or `cron`, always with an IANA `timezone`. `model` picks the model agentic detection runs on. `runIssueDetection` runs detection now, `stopIssueDetection` stops a run, and `getIssueDetection` returns the settings, the agent schedule's ID, and the last and next run.
+
+`staleAfterDays` (1 to 365) turns on the stale rule, and `null` turns it off. Without it, issues never go `inactive`, and a monitored issue is resolved after its label stays at zero for 10 days.
+
+## Events
+
+Every change publishes an event to the project's feed: `o11y.issue.created`, `o11y.issue.updated`, `o11y.issue.regressed` and `o11y.issue.resolved`, each with the issue's ID, title, severity and status. Start a workflow from one, such as paging on-call when a critical issue regresses. See [actions](/o11y/actions#events).

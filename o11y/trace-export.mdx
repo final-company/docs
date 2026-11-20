@@ -1,0 +1,54 @@
+---
+title: "Trace export (OTLP)"
+sidebarTitle: "Trace export"
+description: "Send your agents' turns and workflow runs, as OpenTelemetry GenAI spans, to your own collector over OTLP/HTTP."
+---
+
+Trace export sends every finished agent turn and workflow run in the project to an OpenTelemetry collector or backend you choose, over OTLP/HTTP. The spans are the same ones Observability reads, following the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) with `final.*` attributes for the rest, so your own tools see Final's agents beside the rest of your system.
+
+## Set it up
+
+Store each header your endpoint needs, such as an API key, as a project secret under **Developer** > **Secrets** in the Final dashboard. Then point the export at your endpoint, naming each header's secret:
+
+```ts
+import { TraceExportProtocol } from '@finalai/agents/o11y';
+
+await o11y.admin.setTraceExport({
+  enabled: true,
+  endpoint: 'https://otlp.example.com/v1/traces',
+  protocol: TraceExportProtocol.HttpProtobuf,
+  headers: [{ name: 'Authorization', secret: 'OTLP_AUTHORIZATION' }],
+  filter: { environments: ['prod'], samplingPercent: 100 },
+});
+
+const test = await o11y.admin.testTraceExport();
+console.log(test.ok, test.httpStatus, test.traceId, test.error);
+```
+
+| Field | What it holds |
+| --- | --- |
+| `enabled` | Whether finished traces are sent. |
+| `endpoint` | The full `https://` traces URL, such as `https://collector.example.com/v1/traces`. |
+| `protocol` | `http/protobuf` or `http/json`, as `OTEL_EXPORTER_OTLP_PROTOCOL` names them. |
+| `headers` | Up to 20 headers, each a `name` and the project `secret` its value is read from. Values are never stored with the export or returned. |
+| `filter.agentIds`, `filter.workflowIds` | Export only these agents' and workflows' traces. Empty or omitted: all of them. |
+| `filter.environments` | Export only traces from these environments. |
+| `filter.samplingPercent` | 0 to 100, decided per trace; 100 by default. Raising it only adds traces. |
+
+`setTraceExport` replaces the whole configuration and needs the project admin role. `getTraceExport` returns it with `lastExportedAt` and the last failure's `lastError`. `testTraceExport` sends one sample span, even while export is disabled, and reports whether the endpoint accepted it; look for its `traceId` in your backend.
+
+## What's sent
+
+Each trace is sent once, soon after the turn ends or the run finishes, as OTLP `ExportTraceServiceRequest` bodies of at most 4 MiB; a large trace is split across requests, always by whole spans.
+
+- **Resource**: `service.name` is `final`, and `deployment.environment.name` is the environment.
+- **Instrumentation scope**: `ai.final`.
+- **Spans**: an agent turn's `invoke_agent` root, its `chat` and `execute_tool` spans, or a workflow run's `workflow` root and step spans, with their links. Content attributes (`gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result`) are included. See [traces and span attributes](/o11y/reference/attributes).
+
+Trace and span IDs are the ones the trace API returns, so a span in your backend and in Final's console are the same span.
+
+## Delivery
+
+Requests leave Final from its own network, never your project's sandboxes, and only to public addresses. Each request has a 15-second timeout.
+
+An answer of `408`, `429` or `5xx`, or no answer, is retried with backoff starting at 10 seconds and doubling, up to 8 attempts. Any other `4xx`, or a response that rejects spans, fails the trace without retrying. An endpoint that keeps failing with no success for three days turns the export off; fix the endpoint, then set `enabled: true` again. Traces that finished while export was off aren't sent later.

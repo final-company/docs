@@ -1,247 +1,184 @@
 ---
 title: "MCP tool reference"
 sidebarTitle: "Tool reference"
-description: "Every Observability MCP tool with its group, required scope and effect."
+description: "Every Observability tool on the Final MCP gateway, with its catalog path, SDK method, scope and effect."
 ---
 
-{/* Generated from the operation inventory in @finalai/o11y 0.1.0. Regenerate rather than edit by hand. */}
+{/* Generated from the operation inventory of @finalai/agents 0.29.0 (@finalai/agents/o11y). Regenerate rather than edit by hand. */}
 
-Every Observability operation is one Final MCP tool, 180 in all. Its catalog path is `final.o11y.<group>.<tool>`, for example `final.o11y.traces.search_traces`. Every tool takes `projectId`. The same operation is an HTTP route under `/v1/o11y`, a method on `client.project(id).<group>` in the SDK, and a `final-o11y <group> <tool>` command.
+Every Observability operation is one tool on the Final MCP gateway, 115 in all. Its catalog path is `final.o11y.<group>.<verb>`: the tool name, without the group's noun when that leaves it unambiguous, so `list_judges` is `final.o11y.judges.list`. Every tool takes `projectId`.
 
-**Scope** is the API key permission the call needs. **Effect** is what it does: `read` changes nothing, `write` creates or changes something, `execute` starts work that runs (and may spend money), and `destructive` deletes or replaces something that can't be recovered. See [scopes and keys](/o11y/reference/scopes).
+The same operation is the HTTP route `/api/v1/o11y/projects/{projectId}/…` on the agents API, the method `project.o11y.<group>.<method>` in `@finalai/agents/client`, and the command `final-agents o11y <group> <tool-name>` (with `-` for `_`).
 
-## Traces & health
+**Scope** is the permission the call needs. **Effect** is what it does: `read` changes nothing, `write` creates or changes something, `execute` starts work that runs (and may spend), and `destructive` deletes something. In an agent session, every tool but a `read` asks for approval first. See [scopes and roles](/o11y/reference/scopes).
 
-`final.o11y.traces`: Traces, sessions, conversations, saved views, trace health, mappers and display rules. 30 tools.
+## Traces
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `search_traces` | Search traces by time, environment, status, model, customer, labels, cost, latency, attributes or text. | `o11y:read` | read |
-| `get_trace` | Get a trace with its health, labels and linked traces. | `o11y:read` | read |
-| `list_trace_spans` | List a trace's spans in start order, for the waterfall. | `o11y:read` | read |
-| `get_span` | Get a span with input, output, model context, tools offered, usage, cost, events, attributes and attachments. Large values are previews; read them with read_span_attribute. | `o11y:read` | read |
-| `read_span_attribute` | Read a large span attribute value in pages of bytes. | `o11y:read` | read |
-| `get_span_attachment` | Get a short-lived download URL for a span attachment. | `o11y:read` | read |
-| `search_sessions` | Search sessions by time, environment, customer, agent version, labels or text. | `o11y:read` | read |
-| `get_session` | Get a session with its scores per evaluated window. | `o11y:read` | read |
-| `list_session_traces` | List a session's traces in order. | `o11y:read` | read |
-| `get_conversation` | Get conversation items (messages, tool calls and results, reasoning) after display rules. | `o11y:read` | read |
-| `compare_traces` | Compare traces, or cohorts by agent version, on latency, cost, errors and label rates. | `o11y:read` | read |
-| `tag_traces` | Add tags to traces. | `o11y:write` | write |
-| `untag_traces` | Remove tags from traces. | `o11y:write` | write |
-| `ingest_observations` | Record up to 100 conversation observations, on spans or standalone. Unknown fields reject the observation. | `o11y:ingest` | write |
-| `list_saved_views` | List saved trace views. | `o11y:read` | read |
-| `create_saved_view` | Save trace filters, sort and columns as a named view. | `o11y:write` | write |
-| `update_saved_view` | Change a saved view. | `o11y:write` | write |
-| `delete_saved_view` | Delete a saved view. | `o11y:write` | destructive |
-| `get_trace_health_summary` | Summarize tracing and conversation health checks over a window, with remediation and fix prompts. | `o11y:read` | read |
-| `get_trace_health` | Get one trace's health check results. | `o11y:read` | read |
-| `list_trace_health_failures` | List traces failing a health check. | `o11y:read` | read |
-| `list_mappers` | List attribute mappers, including those inherited from ancestor projects, in layer order. | `o11y:read` | read |
-| `get_mapper` | Get an attribute mapper. | `o11y:read` | read |
-| `create_mapper` | Map a source attribute to a target attribute at projection time. | `o11y:write` | write |
-| `update_mapper` | Change an attribute mapper. | `o11y:write` | write |
-| `delete_mapper` | Delete an attribute mapper. | `o11y:write` | destructive |
-| `preview_mapper` | Show sample spans before and after a proposed mapper, without saving it. | `o11y:read` | read |
-| `reproject_traces` | Apply the current mappers to retained raw traces in a time range. | `o11y:execute` | execute |
-| `get_conversation_display_rules` | Get the rules that turn spans into conversation items. | `o11y:read` | read |
-| `set_conversation_display_rules` | Replace the rules that turn spans into conversation items. | `o11y:write` | write |
+`final.o11y.traces`: Traces of agent turns and workflow runs, spans, sessions, conversations, comparisons and saved views. 13 tools.
 
-## Judges, evaluations & feedback
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.traces.search` | `searchTraces` | Search traces of Final agents' turns and workflow runs by time, environment, status, operation, model, agent, workflow, session, labels, cost, latency, attributes or text. | `o11y:read` | read |
+| `final.o11y.traces.get` | `getTrace` | Get a trace with its labels and linked traces. | `o11y:read` | read |
+| `final.o11y.traces.list_spans` | `listTraceSpans` | List a trace's OpenTelemetry spans in start order, for the waterfall. Content attributes (messages, tool arguments and results) are left out; read them with get_span. | `o11y:read` | read |
+| `final.o11y.traces.get_span` | `getSpan` | Get an OpenTelemetry span with every attribute (GenAI semantic conventions and `final.*`), its events, links and resource. | `o11y:read` | read |
+| `final.o11y.traces.search_sessions` | `searchSessions` | Search Final sessions by time, environment, agent, agent version, labels or text. | `o11y:read` | read |
+| `final.o11y.traces.get_session` | `getSession` | Get a session with its scores per evaluated window. | `o11y:read` | read |
+| `final.o11y.traces.list_session_traces` | `listSessionTraces` | List a session's traces in order. | `o11y:read` | read |
+| `final.o11y.traces.get_conversation` | `getConversation` | Get a conversation's items in order: messages, tool calls and results, and reasoning. | `o11y:read` | read |
+| `final.o11y.traces.compare` | `compareTraces` | Compare traces, or cohorts by an agent's content hash, on latency, cost, errors and label rates. | `o11y:read` | read |
+| `final.o11y.traces.list_saved_views` | `listSavedViews` | List saved trace views. | `o11y:read` | read |
+| `final.o11y.traces.create_saved_view` | `createSavedView` | Save trace filters, sort and columns as a named view. | `o11y:write` | write |
+| `final.o11y.traces.update_saved_view` | `updateSavedView` | Change a saved view. | `o11y:write` | write |
+| `final.o11y.traces.delete_saved_view` | `deleteSavedView` | Delete a saved view. | `o11y:write` | destructive |
 
-`final.o11y.judges`: Judges and versions, run settings, actions, labels, evaluations and external results. 29 tools.
+## Judges
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `list_judges` | List judges with their latest and production versions. | `o11y:read` | read |
-| `get_judge` | Get a judge with its draft or latest version. | `o11y:read` | read |
-| `create_judge` | Create an agentic, deterministic or code judge as a draft. Code judges take their bundle from upload_code_judge; external judges use create_external_judge. | `o11y:write` | write |
-| `update_judge` | Edit a judge's draft (created from the latest version if none exists). Publish it to take effect. | `o11y:write` | write |
-| `delete_judge` | Delete a judge and stop its online evaluation; its past results remain. | `o11y:write` | destructive |
-| `list_judge_versions` | List a judge's versions, newest first. | `o11y:read` | read |
-| `get_judge_version` | Get one judge version with its definition, run settings and actions. | `o11y:read` | read |
-| `publish_judge_version` | Publish the judge's draft as an immutable major or minor version. | `o11y:write` | write |
-| `promote_judge_version` | Make a published version the production version that runs online. | `o11y:write` | write |
-| `set_judge_run_settings` | Set the draft's online evaluation: environments, conditions, sampling, session triggers and budget. | `o11y:write` | write |
-| `upload_code_judge` | Upload a code judge's TypeScript bundle (up to 1 MiB) and its environment variables into the draft. | `o11y:write` | write |
-| `get_code_judge_source` | Get the source files of a code judge's uploaded bundle (the draft's, or a given version's). | `o11y:read` | read |
-| `list_judge_action_groups` | List the action groups of a judge's draft or a given version. | `o11y:read` | read |
-| `set_judge_action_groups` | Replace the draft's action groups. Only online production results fire actions. | `o11y:write` | write |
-| `list_action_deliveries` | List action deliveries with status, attempts and errors. | `o11y:read` | read |
-| `list_judge_labels` | List judges' labels with their rates. | `o11y:read` | read |
-| `get_judge_label` | Get a label. | `o11y:read` | read |
-| `update_judge_label` | Change a label's description or category. | `o11y:write` | write |
-| `get_label_analytics` | A label's rate, last application and time series. | `o11y:read` | read |
-| `run_judge` | Run a judge version on chosen traces or sessions now. Never fires actions. | `o11y:execute` | execute |
-| `evaluate_traces` | Run judges' production versions on chosen traces. Never fires actions. | `o11y:execute` | execute |
-| `evaluate_all_traces` | Run judges' production versions on every trace matching a filter. Set dryRun to see the count and cost estimate first. Never fires actions. | `o11y:execute` | execute |
-| `backfill_judge` | Run a judge version over past traces in a time range. Set dryRun to see the cost estimate first; cancellable; never fires actions. | `o11y:execute` | execute |
-| `list_evaluations` | List evaluation results by judge, version, target, trigger, status or label. | `o11y:read` | read |
-| `get_evaluation` | Get an evaluation with its value, reason, citations, cost and provenance. | `o11y:read` | read |
-| `cancel_evaluations` | Cancel pending or running evaluations, by ID or by batch. | `o11y:execute` | execute |
-| `create_external_judge` | Create a judge whose results you submit (human feedback, your own evaluators). | `o11y:write` | write |
-| `submit_judge_result` | Record an external judge's result on a trace, session or conversation. Replaces the current result for that target and keeps history; never triggers judges or actions. | `o11y:write` | write |
-| `list_judge_results` | List an external judge's submitted results. | `o11y:read` | read |
+`final.o11y.judges`: Judges, run settings, code judge source, labels, evaluations, backfills and external results. 22 tools.
 
-## Judge alignment
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.judges.list` | `listJudges` | List judges with the evaluator version online evaluation runs. | `o11y:read` | read |
+| `final.o11y.judges.get` | `getJudge` | Get a judge with its binding, run settings and the agents and workflows it applies to. | `o11y:read` | read |
+| `final.o11y.judges.create` | `createJudge` | Create an agent, deterministic or code judge. An agent judge is a published Final agent; a code judge takes its source from set_code_judge_source; external judges use create_external_judge. `appliesTo` limits online evaluation to chosen agents and workflows; omitted, it takes all. | `o11y:write` | write |
+| `final.o11y.judges.update` | `updateJudge` | Change a judge's name, description, binding or the agents and workflows it applies to (null: all). Version an agent judge by publishing the agent and pinning its hash. | `o11y:write` | write |
+| `final.o11y.judges.delete` | `deleteJudge` | Delete a judge and stop its online evaluation; its past results remain. | `o11y:write` | destructive |
+| `final.o11y.judges.set_run_settings` | `setJudgeRunSettings` | Set a judge's online evaluation: environments (Final's deployment names, `prod` or `dev`), conditions, sampling and session triggers. Agent judges spend against the agent's own budget. | `o11y:write` | write |
+| `final.o11y.judges.set_code_judge_source` | `setCodeJudgeSource` | Commit a code judge's TypeScript source files to its folder under `o11y/judges/` in the project Files repository, replacing the files there. | `o11y:write` | write |
+| `final.o11y.judges.get_code_judge_source` | `getCodeJudgeSource` | Get a code judge's source files from the project Files repository, at a commit or the latest. | `o11y:read` | read |
+| `final.o11y.judges.list_labels` | `listJudgeLabels` | List judges' labels with their rates. | `o11y:read` | read |
+| `final.o11y.judges.get_label` | `getJudgeLabel` | Get a label. | `o11y:read` | read |
+| `final.o11y.judges.update_label` | `updateJudgeLabel` | Change a label's description or category. | `o11y:write` | write |
+| `final.o11y.judges.get_label_analytics` | `getLabelAnalytics` | A label's rate, last application and time series. | `o11y:read` | read |
+| `final.o11y.judges.run` | `runJudge` | Run a judge on chosen traces or sessions now, optionally at another evaluator version to try a change before pinning it. Emits no lifecycle events. | `o11y:execute` | execute |
+| `final.o11y.judges.evaluate_traces` | `evaluateTraces` | Run judges at their pinned versions on chosen traces. Emits no lifecycle events. | `o11y:execute` | execute |
+| `final.o11y.judges.evaluate_all_traces` | `evaluateAllTraces` | Run judges at their pinned versions on every trace matching a filter. Set dryRun to see the count and cost estimate first. Emits no lifecycle events. | `o11y:execute` | execute |
+| `final.o11y.judges.backfill` | `backfillJudge` | Run a judge at its pinned version over past traces in a time range. Set dryRun to see the cost estimate first; cancellable; emits no lifecycle events. | `o11y:execute` | execute |
+| `final.o11y.judges.list_evaluations` | `listEvaluations` | List evaluation results by judge, evaluator version, target, trigger, status or label. | `o11y:read` | read |
+| `final.o11y.judges.get_evaluation` | `getEvaluation` | Get an evaluation with its value, reason, citations, cost and the exact evaluator version. | `o11y:read` | read |
+| `final.o11y.judges.cancel_evaluations` | `cancelEvaluations` | Cancel pending or running evaluations, by ID or by batch. | `o11y:execute` | execute |
+| `final.o11y.judges.create_external_judge` | `createExternalJudge` | Create a judge whose results you submit, such as user feedback on Final sessions or your own evaluators. | `o11y:write` | write |
+| `final.o11y.judges.submit_result` | `submitJudgeResult` | Record an external judge's result on a trace, session or conversation. Replaces the current result for that target and keeps history; triggers no other judges. | `o11y:write` | write |
+| `final.o11y.judges.list_results` | `listJudgeResults` | List an external judge's submitted results. | `o11y:read` | read |
+
+## Alignment
 
 `final.o11y.alignment`: Review sessions, reviews, alignment summaries and golden datasets. 8 tools.
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `create_review_session` | Collect a judge's results matching a filter for reviewers to agree or disagree with. | `o11y:write` | write |
-| `list_review_sessions` | List review sessions with their progress. | `o11y:read` | read |
-| `get_review_session` | Get a review session. | `o11y:read` | read |
-| `submit_review` | Agree or disagree with a judge's result, with the corrected label and a comment. | `o11y:write` | write |
-| `list_reviews` | List reviews, optionally only agreements or disagreements. | `o11y:read` | read |
-| `delete_review` | Delete a review. | `o11y:write` | destructive |
-| `get_alignment_summary` | Agreement, per-label precision and recall, and the confusion matrix from reviews. | `o11y:read` | read |
-| `create_golden_dataset` | Turn reviewed results into a dataset with an `expected_&lt;judge>` column holding the reviewers' labels. | `o11y:write` | write |
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.alignment.create_review_session` | `createReviewSession` | Collect a judge's results matching a filter for reviewers to agree or disagree with. | `o11y:write` | write |
+| `final.o11y.alignment.list_review_sessions` | `listReviewSessions` | List review sessions with their progress. | `o11y:read` | read |
+| `final.o11y.alignment.get_review_session` | `getReviewSession` | Get a review session. | `o11y:read` | read |
+| `final.o11y.alignment.submit_review` | `submitReview` | Agree or disagree with a judge's result, with the corrected label and a comment. | `o11y:write` | write |
+| `final.o11y.alignment.list_reviews` | `listReviews` | List reviews, optionally only agreements or disagreements. | `o11y:read` | read |
+| `final.o11y.alignment.delete_review` | `deleteReview` | Delete a review. | `o11y:write` | destructive |
+| `final.o11y.alignment.get_summary` | `getAlignmentSummary` | Agreement, per-label precision and recall, and the confusion matrix from reviews. | `o11y:read` | read |
+| `final.o11y.alignment.create_golden_dataset` | `createGoldenDataset` | Turn reviewed results into a dataset with an `expected_<judge>` column holding the reviewers' labels. | `o11y:write` | write |
 
-## Datasets & prompts
+## Datasets
 
-`final.o11y.data`: Datasets, examples, imports and exports, and versioned prompts. 22 tools.
+`final.o11y.data`: Datasets and their examples, versioned as commits in the project Files repository. 14 tools.
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `list_datasets` | List datasets. | `o11y:read` | read |
-| `get_dataset` | Get a dataset with its schema and current version. | `o11y:read` | read |
-| `create_dataset` | Create a dataset with a JSON Schema for its rows (at most one `trace` column). | `o11y:write` | write |
-| `update_dataset` | Rename a dataset, or change its schema until test cases reference it. | `o11y:write` | write |
-| `delete_dataset` | Delete a dataset and its examples. | `o11y:write` | destructive |
-| `list_dataset_versions` | List a dataset's versions; every change creates one. | `o11y:read` | read |
-| `list_examples` | List a dataset's examples at a version (default: current). | `o11y:read` | read |
-| `add_examples_to_dataset` | Add rows to a dataset, creating a version. | `o11y:write` | write |
-| `update_example` | Replace an example's data, creating a version. | `o11y:write` | write |
-| `remove_examples_from_dataset` | Remove examples from the current version; earlier versions keep them. | `o11y:write` | destructive |
-| `add_traces_to_dataset` | Add traces or sessions as examples using a preset: trace, session, LLM eval or full trace. | `o11y:write` | write |
-| `import_dataset` | Import JSON Lines or CSV rows into a dataset, creating a version. | `o11y:write` | write |
-| `export_dataset` | Export a dataset version as JSON Lines or CSV. | `o11y:read` | read |
-| `create_labeled_dataset` | Copy a dataset with each example's current label from the chosen judges added as columns. | `o11y:write` | write |
-| `list_prompts` | List prompts with their tags. | `o11y:read` | read |
-| `list_prompt_versions` | List a prompt's versions, newest first. | `o11y:read` | read |
-| `get_prompt` | Get a prompt at a tag or version number (default: latest). | `o11y:read` | read |
-| `create_prompt` | Create a prompt with its first version. | `o11y:write` | write |
-| `create_prompt_version` | Add a version to a prompt. | `o11y:write` | write |
-| `tag_prompt_version` | Point a tag (production, staging or your own) at a version, moving it if it exists. | `o11y:write` | write |
-| `untag_prompt_version` | Remove a tag from a prompt. | `o11y:write` | write |
-| `delete_prompt` | Delete a prompt and its versions. | `o11y:write` | destructive |
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.data.list_datasets` | `listDatasets` | List datasets. | `o11y:read` | read |
+| `final.o11y.data.get_dataset` | `getDataset` | Get a dataset with its schema, file and latest commit. | `o11y:read` | read |
+| `final.o11y.data.create_dataset` | `createDataset` | Create a dataset: a JSON Lines file under `o11y/datasets/` in the project Files repository, with a JSON Schema for its rows (at most one `trace` column). | `o11y:write` | write |
+| `final.o11y.data.update_dataset` | `updateDataset` | Rename a dataset, or change its schema until test cases reference it. | `o11y:write` | write |
+| `final.o11y.data.delete_dataset` | `deleteDataset` | Delete a dataset and its file; the repository history keeps earlier commits. | `o11y:write` | destructive |
+| `final.o11y.data.list_dataset_versions` | `listDatasetVersions` | List the commits that changed a dataset, newest first; every change is one. | `o11y:read` | read |
+| `final.o11y.data.list_examples` | `listExamples` | List a dataset's examples at a commit (default: the latest). | `o11y:read` | read |
+| `final.o11y.data.add_examples_to_dataset` | `addExamplesToDataset` | Add rows to a dataset in one commit. | `o11y:write` | write |
+| `final.o11y.data.update_example` | `updateExample` | Replace an example's data in one commit. | `o11y:write` | write |
+| `final.o11y.data.remove_examples_from_dataset` | `removeExamplesFromDataset` | Remove examples in one commit; earlier commits keep them. | `o11y:write` | destructive |
+| `final.o11y.data.add_traces_to_dataset` | `addTracesToDataset` | Add traces or sessions as examples using a preset: trace, session, LLM eval or full trace. | `o11y:write` | write |
+| `final.o11y.data.import_dataset` | `importDataset` | Import JSON Lines or CSV rows into a dataset in one commit. | `o11y:write` | write |
+| `final.o11y.data.export_dataset` | `exportDataset` | Export a dataset at a commit (default: the latest) as JSON Lines or CSV. | `o11y:read` | read |
+| `final.o11y.data.create_labeled_dataset` | `createLabeledDataset` | Copy a dataset with each example's current label from the chosen judges added as columns. | `o11y:write` | write |
 
-## Test suites & runs
+## Experiments and tests
 
-`final.o11y.tests`: Suites, cases and checks, runs and comparisons. 22 tools.
+`final.o11y.tests`: Test suites, cases, runs and run comparisons. 22 tools.
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `list_test_suites` | List test suites. | `o11y:read` | read |
-| `get_test_suite` | Get a test suite at a published version, or its draft. | `o11y:read` | read |
-| `create_test_suite` | Create a test suite with an empty draft. | `o11y:write` | write |
-| `update_test_suite` | Change a suite's name, description or labels. | `o11y:write` | write |
-| `delete_test_suite` | Delete a test suite, its versions and runs. | `o11y:write` | destructive |
-| `list_test_suite_versions` | List a suite's published versions. | `o11y:read` | read |
-| `publish_test_suite` | Publish the suite's draft as the next immutable version. | `o11y:write` | write |
-| `discard_test_suite_draft` | Discard the suite's unpublished changes. | `o11y:write` | destructive |
-| `list_test_cases` | List a suite version's cases (default: the draft). | `o11y:read` | read |
-| `add_test_cases` | Add up to 1,000 cases to the suite's draft. | `o11y:write` | write |
-| `add_test_cases_from_traces` | Add cases to the draft from traces: their input, the trace link, and the given checks. | `o11y:write` | write |
-| `add_test_cases_from_dataset` | Add cases to the draft from a dataset version's examples, mapping columns to input and expected values. | `o11y:write` | write |
-| `update_test_case` | Change a case in the draft. | `o11y:write` | write |
-| `remove_test_case` | Remove a case from the draft. | `o11y:write` | destructive |
-| `repin_test_suite_checks` | Move the draft's checks for a judge to another major/minor version. | `o11y:write` | write |
-| `start_test_suite_run` | Run a suite version: external (your runner links traces), stored_traces (rescore case traces) or native (run a Final agent or workflow revision per case). | `o11y:execute` | execute |
-| `score_test_suite_run` | Create a new run that rescores a run's stored evidence against the latest checks, without executing anything. | `o11y:execute` | execute |
-| `cancel_test_suite_run` | Cancel a pending or running test run. | `o11y:execute` | execute |
-| `list_test_suite_runs` | List test runs, newest first. | `o11y:read` | read |
-| `get_test_suite_run` | Get a test run with its counts: total, with output, scored and passed. | `o11y:read` | read |
-| `get_test_suite_run_results` | Per-case results: trace, checks, judge output, reason and error. | `o11y:read` | read |
-| `compare_test_suite_runs` | Pair cases between a baseline run and this run: regressions, fixes, flaky cases, cost and latency deltas. | `o11y:read` | read |
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.tests.list_suites` | `listTestSuites` | List test suites. | `o11y:read` | read |
+| `final.o11y.tests.get_suite` | `getTestSuite` | Get a test suite at a published version, or its draft. | `o11y:read` | read |
+| `final.o11y.tests.create_suite` | `createTestSuite` | Create a test suite with an empty draft. | `o11y:write` | write |
+| `final.o11y.tests.update_suite` | `updateTestSuite` | Change a suite's name, description or labels. | `o11y:write` | write |
+| `final.o11y.tests.delete_suite` | `deleteTestSuite` | Delete a test suite, its versions and runs. | `o11y:write` | destructive |
+| `final.o11y.tests.list_suite_versions` | `listTestSuiteVersions` | List a suite's published versions. | `o11y:read` | read |
+| `final.o11y.tests.publish_suite` | `publishTestSuite` | Publish the suite's draft as the next immutable version. | `o11y:write` | write |
+| `final.o11y.tests.discard_suite_draft` | `discardTestSuiteDraft` | Discard the suite's unpublished changes. | `o11y:write` | destructive |
+| `final.o11y.tests.list_cases` | `listTestCases` | List a suite version's cases (default: the draft). | `o11y:read` | read |
+| `final.o11y.tests.add_cases` | `addTestCases` | Add up to 1,000 cases to the suite's draft. | `o11y:write` | write |
+| `final.o11y.tests.add_cases_from_traces` | `addTestCasesFromTraces` | Add cases to the draft from traces: their input, the trace link, and the given checks. | `o11y:write` | write |
+| `final.o11y.tests.add_cases_from_dataset` | `addTestCasesFromDataset` | Add cases to the draft from a dataset's examples at a commit, mapping columns to input and expected values. | `o11y:write` | write |
+| `final.o11y.tests.update_case` | `updateTestCase` | Change a case in the draft. | `o11y:write` | write |
+| `final.o11y.tests.remove_case` | `removeTestCase` | Remove a case from the draft. | `o11y:write` | destructive |
+| `final.o11y.tests.repin_suite_checks` | `repinTestSuiteChecks` | Move the draft's checks for a judge to another evaluator version: an agent content hash or a code commit. | `o11y:write` | write |
+| `final.o11y.tests.start_suite_run` | `startTestSuiteRun` | Run a suite version: stored_traces rescores the agent turns and AI workflow runs linked to the cases; native runs a published Final agent or AI workflow, or another revision of it, on each case. | `o11y:execute` | execute |
+| `final.o11y.tests.score_suite_run` | `scoreTestSuiteRun` | Create a new run that rescores a run's stored evidence against the latest checks, without executing anything. | `o11y:execute` | execute |
+| `final.o11y.tests.cancel_suite_run` | `cancelTestSuiteRun` | Cancel a pending or running test run. | `o11y:execute` | execute |
+| `final.o11y.tests.list_suite_runs` | `listTestSuiteRuns` | List test runs, newest first. | `o11y:read` | read |
+| `final.o11y.tests.get_suite_run` | `getTestSuiteRun` | Get a test run with its counts: total, with output, scored and passed. | `o11y:read` | read |
+| `final.o11y.tests.get_suite_run_results` | `getTestSuiteRunResults` | Per-case results: trace, checks, judge output, reason and error. | `o11y:read` | read |
+| `final.o11y.tests.compare_suite_runs` | `compareTestSuiteRuns` | Pair cases between a baseline run and this run: regressions, fixes, flaky cases, cost and latency deltas. | `o11y:read` | read |
 
-## Issues & detection
+## Issues
 
-`final.o11y.issues`: Issues, evidence, monitoring, fix handoffs and detection. 14 tools.
+`final.o11y.issues`: Issues on Tasks, evidence, monitoring and detection. 11 tools.
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `list_issues` | List issues by status, severity or text, sorted by severity, latest or evidence. | `o11y:read` | read |
-| `get_issue` | Get an issue with its evidence, incidents and fix handoffs. | `o11y:read` | read |
-| `create_issue` | Open an issue. Keep observed facts and the suspected cause apart; the cause must cite evidence. | `o11y:write` | write |
-| `update_issue` | Change an issue's status, severity, title or description. | `o11y:write` | write |
-| `merge_issues` | Merge other issues into this one; merged issues are final. | `o11y:write` | write |
-| `add_issue_evidence` | Cite traces and spans as evidence for an issue. | `o11y:write` | write |
-| `comment_on_issue` | Add a comment to an issue. | `o11y:write` | write |
-| `list_issue_activity` | List an issue's activity and comments. | `o11y:read` | read |
-| `monitor_issue_with_judge` | Link a judge and label to an issue; it becomes Monitored once the judge's production version runs online with sampling above 0. | `o11y:write` | write |
-| `create_issue_fix_task` | Hand an issue to a coding agent: create a Final Task, or return a prompt for Codex, Claude Code or Cursor. | `o11y:execute` | execute |
-| `get_issue_detection` | Get agentic and deterministic issue detection settings and status. | `o11y:read` | read |
-| `update_issue_detection` | Change detection instructions, model, schedule, Slack reports, detectors and the stale rule. | `o11y:write` | write |
-| `run_issue_detection` | Run issue detection now. | `o11y:execute` | execute |
-| `stop_issue_detection` | Stop a running detection. | `o11y:execute` | execute |
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.issues.list` | `listIssues` | List issues by status, severity or text, sorted by severity, latest or evidence. | `o11y:read` | read |
+| `final.o11y.issues.get` | `getIssue` | Get an issue with its Task, evidence and incidents. | `o11y:read` | read |
+| `final.o11y.issues.create` | `createIssue` | Open an issue: a Final Task labeled `o11y` with a fingerprint. Keep observed facts and the suspected cause apart; the cause must cite evidence. | `o11y:write` | write |
+| `final.o11y.issues.update` | `updateIssue` | Change an issue's severity, title or description. Triage status, assignee and comments are the Task's. | `o11y:write` | write |
+| `final.o11y.issues.merge` | `mergeIssues` | Merge other issues into this one; merged issues are final. | `o11y:write` | write |
+| `final.o11y.issues.add_evidence` | `addIssueEvidence` | Cite traces and spans as evidence for an issue. | `o11y:write` | write |
+| `final.o11y.issues.monitor_with_judge` | `monitorIssueWithJudge` | Link a judge and label to an issue; it becomes Monitored once the judge runs online with sampling above 0. | `o11y:write` | write |
+| `final.o11y.issues.get_detection` | `getIssueDetection` | Get agentic and deterministic issue detection settings and status. | `o11y:read` | read |
+| `final.o11y.issues.update_detection` | `updateIssueDetection` | Change detection instructions, model and schedule (kept on the observability agent's schedule), detectors and the stale rule. | `o11y:write` | write |
+| `final.o11y.issues.run_detection` | `runIssueDetection` | Run issue detection now. | `o11y:execute` | execute |
+| `final.o11y.issues.stop_detection` | `stopIssueDetection` | Stop a running detection. | `o11y:execute` | execute |
 
-## SQL & dashboards
+## SQL and dashboards
 
-`final.o11y.analytics`: The SQL catalog, saved queries, dashboards and charts. 19 tools.
+`final.o11y.analytics`: The SQL catalog, queries, saved queries, dashboards, charts and label analytics. 19 tools.
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `discover_schema` | List the SQL catalog: traces, spans, observations, scores, labels, issues, datasets, tests and their columns. | `o11y:read` | read |
-| `sql_query` | Run one read-only SELECT over the project’s catalog (30 s, 10,000 rows, 25 MiB). | `o11y:read` | read |
-| `list_saved_queries` | List saved SQL queries. | `o11y:read` | read |
-| `save_query` | Save a SQL query, or replace a saved one when savedQueryId is given. | `o11y:write` | write |
-| `delete_saved_query` | Delete a saved query. | `o11y:write` | destructive |
-| `list_dashboards` | List dashboards. | `o11y:read` | read |
-| `get_dashboard` | Get a dashboard with its tabs and charts. | `o11y:read` | read |
-| `create_dashboard` | Create an empty dashboard. | `o11y:write` | write |
-| `update_dashboard` | Change a dashboard; fails with a conflict if `revision` is stale. | `o11y:write` | write |
-| `duplicate_dashboard` | Copy a dashboard and its charts. | `o11y:write` | write |
-| `archive_dashboard` | Archive a dashboard; restore it later. | `o11y:write` | write |
-| `restore_dashboard` | Restore an archived dashboard. | `o11y:write` | write |
-| `list_dashboard_templates` | List dashboard templates: project overview, cost and usage, judges. | `o11y:read` | read |
-| `create_dashboard_from_template` | Create a dashboard from a template. | `o11y:write` | write |
-| `create_dashboard_chart` | Add a chart; its query runs once to validate before saving. | `o11y:write` | write |
-| `update_dashboard_chart` | Change a chart; a changed query runs once to validate before saving. | `o11y:write` | write |
-| `remove_dashboard_chart` | Remove a chart from a dashboard. | `o11y:write` | destructive |
-| `get_label_distribution` | How a judge's results split across its labels. | `o11y:read` | read |
-| `get_label_relations` | Which of a judge's labels co-occur with other judges' labels on the same traces. | `o11y:read` | read |
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.analytics.discover_schema` | `discoverSchema` | List the SQL catalog and its columns: Final's agent turns, model usage and decisions, workflow runs, and o11y's scores, reviews, labels, issues and tests. | `o11y:read` | read |
+| `final.o11y.analytics.sql_query` | `sqlQuery` | Run one read-only SELECT over the project’s catalog (30 s, 10,000 rows, 25 MiB). | `o11y:read` | read |
+| `final.o11y.analytics.list_saved_queries` | `listSavedQueries` | List saved SQL queries. | `o11y:read` | read |
+| `final.o11y.analytics.save_query` | `saveQuery` | Save a SQL query, or replace a saved one when savedQueryId is given. | `o11y:write` | write |
+| `final.o11y.analytics.delete_saved_query` | `deleteSavedQuery` | Delete a saved query. | `o11y:write` | destructive |
+| `final.o11y.analytics.list_dashboards` | `listDashboards` | List dashboards. | `o11y:read` | read |
+| `final.o11y.analytics.get_dashboard` | `getDashboard` | Get a dashboard with its tabs and charts. | `o11y:read` | read |
+| `final.o11y.analytics.create_dashboard` | `createDashboard` | Create an empty dashboard. | `o11y:write` | write |
+| `final.o11y.analytics.update_dashboard` | `updateDashboard` | Change a dashboard; fails with a conflict if `revision` is stale. | `o11y:write` | write |
+| `final.o11y.analytics.duplicate_dashboard` | `duplicateDashboard` | Copy a dashboard and its charts. | `o11y:write` | write |
+| `final.o11y.analytics.archive_dashboard` | `archiveDashboard` | Archive a dashboard; restore it later. | `o11y:write` | write |
+| `final.o11y.analytics.restore_dashboard` | `restoreDashboard` | Restore an archived dashboard. | `o11y:write` | write |
+| `final.o11y.analytics.list_dashboard_templates` | `listDashboardTemplates` | List dashboard templates: project overview, cost and usage, judges. | `o11y:read` | read |
+| `final.o11y.analytics.create_dashboard_from_template` | `createDashboardFromTemplate` | Create a dashboard from a template. | `o11y:write` | write |
+| `final.o11y.analytics.create_dashboard_chart` | `createDashboardChart` | Add a chart; its query runs once to validate before saving. | `o11y:write` | write |
+| `final.o11y.analytics.update_dashboard_chart` | `updateDashboardChart` | Change a chart; a changed query runs once to validate before saving. | `o11y:write` | write |
+| `final.o11y.analytics.remove_dashboard_chart` | `removeDashboardChart` | Remove a chart from a dashboard. | `o11y:write` | destructive |
+| `final.o11y.analytics.get_label_distribution` | `getLabelDistribution` | How a judge's results split across its labels. | `o11y:read` | read |
+| `final.o11y.analytics.get_label_relations` | `getLabelRelations` | Which of a judge's labels co-occur with other judges' labels on the same traces. | `o11y:read` | read |
 
-## Administration
+## Settings and export
 
-`final.o11y.admin`: Settings, ingest keys, usage and limits, deletion, events, audit, the data plane, scheduled analysis and knowledge. 36 tools.
+`final.o11y.admin`: Settings, the audit log and trace export. 6 tools.
 
-| Tool | What it does | Scope | Effect |
-| --- | --- | --- | --- |
-| `get_o11y_settings` | Get the project's retention, environments, redaction, Slack defaults and native producer opt-ins. | `o11y:read` | read |
-| `update_o11y_settings` | Change retention, environments, redaction rules, Slack defaults or native producer opt-ins. | `o11y:write` | write |
-| `list_ingest_keys` | List the project's ingest-only keys; secrets are never listed. | `o11y:read` | read |
-| `create_ingest_key` | Create a project-bound key that can only ingest; the secret is shown once. | `o11y:write` | write |
-| `rotate_ingest_key` | Replace an ingest key’s secret; the old secret stops working. The new secret is shown once. | `o11y:write` | destructive |
-| `delete_ingest_key` | Revoke an ingest key. | `o11y:write` | destructive |
-| `get_usage` | Ingest, retention and evaluation usage and charges over a time range. | `o11y:read` | read |
-| `list_usage_statements` | List monthly usage statements. | `o11y:read` | read |
-| `get_spend_limits` | Get the monthly cap, evaluation budget and free allowance. | `o11y:read` | read |
-| `update_spend_limits` | Set the monthly cap and evaluation budget; null removes a limit. At the cap, ingest returns 402 and evaluations are skipped. | `o11y:write` | write |
-| `list_usage_alerts` | List usage alert thresholds. | `o11y:read` | read |
-| `set_usage_alerts` | Replace usage alerts: up to 10 thresholds per meter, notifying project roles. | `o11y:write` | write |
-| `delete_traces` | Delete traces by ID or filter. They are hidden at once, then purged from storage. | `o11y:write` | destructive |
-| `list_deletion_requests` | List trace deletion requests and their progress. | `o11y:read` | read |
-| `list_event_subscriptions` | List webhook subscriptions to lifecycle events. | `o11y:read` | read |
-| `create_event_subscription` | Deliver lifecycle events to a webhook, signed with a secret shown once. | `o11y:write` | write |
-| `update_event_subscription` | Change a subscription's URL, kinds or description, or pause it. | `o11y:write` | write |
-| `delete_event_subscription` | Stop delivering to a webhook. | `o11y:write` | destructive |
-| `replay_events` | Redeliver past events in a time range to a subscription. | `o11y:execute` | execute |
-| `list_events` | Read the project's lifecycle event feed in order. | `o11y:read` | read |
-| `list_audit_events` | List write operations performed in the project, newest first. | `o11y:read` | read |
-| `get_data_plane` | Get where the project's telemetry is stored: managed, or a registered BYOC data plane. | `o11y:read` | read |
-| `register_data_plane` | Register a BYOC data plane by its endpoint and public key. Requires organization admin. | `o11y:write` | write |
-| `list_scheduled_analyses` | List scheduled analyses with their last run. | `o11y:read` | read |
-| `get_scheduled_analysis` | Get a scheduled analysis. | `o11y:read` | read |
-| `create_scheduled_analysis` | Run the observability agent on a schedule with instructions, reporting to Slack if set. | `o11y:write` | write |
-| `update_scheduled_analysis` | Change a scheduled analysis, or pause or resume it. | `o11y:write` | write |
-| `delete_scheduled_analysis` | Delete a scheduled analysis; past runs remain. | `o11y:write` | destructive |
-| `run_scheduled_analysis` | Run a scheduled analysis now. | `o11y:execute` | execute |
-| `list_scheduled_analysis_runs` | List a scheduled analysis's runs, newest first. | `o11y:read` | read |
-| `list_knowledge_files` | List files in the project's observability knowledge folder. | `o11y:read` | read |
-| `read_knowledge_files` | Read up to 20 knowledge files. | `o11y:read` | read |
-| `search_knowledge_files` | Search knowledge files by text. | `o11y:read` | read |
-| `write_knowledge_file` | Create or replace a knowledge file. Files under `skills/` become slash commands. | `o11y:write` | write |
-| `delete_knowledge_file` | Delete a knowledge file. | `o11y:write` | destructive |
-| `export_memory` | Export the agent's memory files as JSON Lines. | `o11y:read` | read |
+| Tool | SDK method | What it does | Scope | Effect |
+| --- | --- | --- | --- | --- |
+| `final.o11y.admin.get_settings` | `getSettings` | Get the project's evaluation defaults, environments and how long o11y keeps its own results and evidence. | `o11y:read` | read |
+| `final.o11y.admin.update_settings` | `updateSettings` | Change evaluation defaults, environments or retention of results and evidence. | `o11y:write` | write |
+| `final.o11y.admin.list_audit_events` | `listAuditEvents` | List write operations performed in the project, newest first. | `o11y:read` | read |
+| `final.o11y.admin.get_trace_export` | `getTraceExport` | Get where the project's traces are exported over OTLP/HTTP: endpoint, protocol, secret headers, filter and the last export's outcome. | `o11y:read` | read |
+| `final.o11y.admin.set_trace_export` | `setTraceExport` | Export the project's traces (Final agents' turns and workflow runs, as OpenTelemetry GenAI spans) to an OTLP/HTTP endpoint. Header values come from project secrets. Replaces the previous configuration. | `o11y:write` | write |
+| `final.o11y.admin.test_trace_export` | `testTraceExport` | Send one sample span to the configured endpoint, even while export is disabled, and report whether it was accepted. | `o11y:execute` | execute |

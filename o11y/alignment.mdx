@@ -1,75 +1,65 @@
 ---
-title: "Alignment and feedback"
-description: "Check judges against human reviews, measure agreement, and submit feedback from outside Final."
+title: "Alignment"
+description: "Check a judge against people, measure agreement per label, and turn reviews into a golden dataset."
 ---
 
-Check a judge against people, correct it, and bring in feedback from outside Final.
+Before you act on a judge's results, check that people agree with it. Reviewers agree or disagree with a sample of its results; the alignment summary measures agreement per label; and the reviewed results become a golden dataset for testing the next version of the judge.
 
 ## Review sessions
 
-A review session collects a judge's results that match a filter. Reviewers agree or disagree with each one, and give the correct label and a comment when they disagree.
+A review session collects a judge's results that match a filter: a time range, an evaluator version, labels, triggers and environments, up to 1,000 results. Reviewers agree or disagree with each one, and give the correct label and a comment when they disagree. In the console, open **Observability** > **Alignment**.
 
 ```ts
-import { ReviewVerdict } from '@finalai/o11y/contract';
+import { EvaluationTrigger, ReviewVerdict } from '@finalai/agents/o11y';
 
-const session = await project.alignment.createReviewSession({
+const review = await o11y.alignment.createReviewSession({
   name: 'Grounding, week 47',
   judgeId,
-  filter: { from: '2026-11-17T00:00:00Z', environments: ['production'] },
+  filter: { triggers: [EvaluationTrigger.Online], limit: 100 },
 });
 
-await project.alignment.submitReview({
-  reviewSessionId: session.reviewSessionId,
-  evaluationId,
+const { items } = await o11y.judges.listEvaluations({ reviewSessionId: review.reviewSessionId });
+await o11y.alignment.submitReview({
+  reviewSessionId: review.reviewSessionId,
+  evaluationId: items[0]!.evaluationId,
   verdict: ReviewVerdict.Disagree,
-  correctedLabelId: groundedLabelId,
-  comment: 'The claim is supported by the second search result.',
+  correctedLabelId: 'olbl_…',
+  comment: 'The order number came from the lookup tool.',
 });
 ```
 
-`list_reviews` filters by verdict, so you can read only disagreements.
+`listReviews` filters by verdict, so you can read only the disagreements. Each review keeps the evaluator version it reviewed.
 
 ## Alignment summary
 
-`get_alignment_summary` reports, for a judge version or review session:
+`getAlignmentSummary` reports, for a judge, optionally narrowed to one evaluator version or review session:
 
-- agreement between the judge and reviewers;
+- how many results were reviewed, and the agreement rate;
 - precision and recall per label;
-- the confusion matrix;
+- the confusion matrix of the judge's labels against the reviewers';
 - a warning when a label has too few reviews to trust its numbers.
 
-## Improve the rubric
+```ts
+const summary = await o11y.alignment.getAlignmentSummary({ judgeId });
+console.log(summary.agreementRate);
+for (const label of summary.labels) console.log(label.label, label.precision, label.recall);
+```
 
-Ask the [observability agent](/o11y/agent) to improve a judge from its disagreements. It drafts a new version of the rubric; you review, publish and promote it. Results keep the version that produced them, so you can compare the old and revised rubrics on the same traces.
+## Improve the judge
+
+For an agent judge, the fix is a better rubric. Ask the [o11y agent](/o11y/agent) to improve it from the disagreements: it reads the reviews and proposes revised instructions. Publish the judge agent with them, run the new hash with `runJudge({ evaluatorVersion })` on the reviewed traces, and compare its summary with `getAlignmentSummary({ evaluatorVersion })` before you pin it. For a code judge, the same loop runs on a new commit.
 
 ## Golden datasets
 
-`create_golden_dataset` turns reviewed results into a dataset with an `expected_<judge>` column holding the reviewers' labels. Use it as test cases to check future judge versions.
-
-## External feedback
-
-External judges hold results from outside Final's evaluators: thumbs up or down from your users, human labels, or your own evaluators. Submit a result on a trace, span, session or conversation:
+`createGoldenDataset` turns reviewed results into a [dataset](/o11y/datasets) with an `expected_<judge>` column holding the reviewers' labels: the judge's label where they agreed, and the corrected one where they didn't.
 
 ```ts
-import { EvaluationTargetKind } from '@finalai/o11y/contract';
-
-await project.judges.submitJudgeResult({
-  judgeId: thumbs.judgeId,
-  target: { kind: EvaluationTargetKind.Trace, traceId },
-  value: { passed: false },
-  reason: 'User clicked thumbs down',
-  metadata: { surface: 'web' },
-});
+const golden = await o11y.alignment.createGoldenDataset({ judgeId, name: 'Grounding golden set' });
+console.log(golden.path);
 ```
 
-| Field | What it holds |
-| --- | --- |
-| `target` | `kind` (`span`, `trace`, `session` or `conversation`) and the matching IDs. |
-| `value` | `label`, `score` or `passed`, matching the judge's output. |
-| `reason` | Up to 20,000 characters. |
-| `citations` | Up to 50 trace and span references with quotes. |
-| `metadata` | Any JSON. |
+Add its rows to a test suite with `addTestCasesFromDataset`, mapping `expected_<judge>` to a check on the judge, and every future version of the judge is tested against what people decided. See [experiments and CI](/o11y/experiments#cases-from-a-dataset).
 
-There is one current result per judge and target. Submitting again replaces it and keeps the history (`list_judge_results({ includeHistory: true })`). External results never trigger judges or actions.
+## Feedback from your users
 
-Final's own [outcome signals](/o11y/final-agents-and-workflows#outcome-signals) arrive the same way with source `final_outcome`, kept distinct from results you submit (`customer`).
+Thumbs up and down, support escalations, and scores from your own evaluators come in as results of an [external judge](/o11y/judges#external-judges). They sit beside your judges' results: filter traces by them, chart them, and compare them with a judge's labels in [SQL](/o11y/dashboards-and-sql).

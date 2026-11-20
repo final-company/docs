@@ -194,18 +194,7 @@
             "pages": [
               "o11y/overview",
               "o11y/quickstart",
-              "o11y/quickstart-otlp",
-              "o11y/quickstart-workers",
-              "o11y/final-agents-and-workflows"
-            ]
-          },
-          {
-            "group": "Instrument",
-            "pages": [
-              "o11y/integrations",
-              "o11y/tracing-patterns",
-              "o11y/context",
-              "o11y/dual-export"
+              "o11y/quickstart-workflows"
             ]
           },
           {
@@ -213,24 +202,24 @@
             "pages": [
               "o11y/judges",
               "o11y/online-evaluation",
-              "o11y/judge-actions",
               "o11y/alignment",
-              "o11y/datasets-and-prompts"
+              "o11y/datasets",
+              "o11y/experiments"
             ]
           },
           {
-            "group": "Test and fix",
+            "group": "Act",
             "pages": [
-              "o11y/tests",
-              "o11y/tests-in-ci",
-              "o11y/issues"
+              "o11y/issues",
+              "o11y/actions"
             ]
           },
           {
             "group": "Analyze",
             "pages": [
+              "o11y/dashboards-and-sql",
               "o11y/agent",
-              "o11y/dashboards-and-sql"
+              "o11y/trace-export"
             ]
           },
           {
@@ -243,26 +232,13 @@
           {
             "group": "Administer",
             "pages": [
-              "o11y/administration"
-            ]
-          },
-          {
-            "group": "BYOC data plane",
-            "pages": [
-              "o11y/byoc/overview",
-              "o11y/byoc/aws",
-              "o11y/byoc/runbooks"
+              "o11y/settings"
             ]
           },
           {
             "group": "Reference",
             "pages": [
-              "o11y/reference/ingest",
               "o11y/reference/attributes",
-              "o11y/reference/observations",
-              "o11y/reference/trace-health",
-              "o11y/reference/sql",
-              "o11y/reference/events",
               "o11y/reference/scopes",
               "o11y/reference/errors"
             ]
@@ -528,6 +504,86 @@
     {
       "source": "/build/connections",
       "destination": "/build/integrations"
+    },
+    {
+      "source": "/o11y/quickstart-otlp",
+      "destination": "/o11y/overview"
+    },
+    {
+      "source": "/o11y/quickstart-workers",
+      "destination": "/o11y/overview"
+    },
+    {
+      "source": "/o11y/final-agents-and-workflows",
+      "destination": "/o11y/reference/attributes"
+    },
+    {
+      "source": "/o11y/integrations",
+      "destination": "/o11y/overview"
+    },
+    {
+      "source": "/o11y/tracing-patterns",
+      "destination": "/o11y/reference/attributes"
+    },
+    {
+      "source": "/o11y/context",
+      "destination": "/o11y/reference/attributes"
+    },
+    {
+      "source": "/o11y/dual-export",
+      "destination": "/o11y/trace-export"
+    },
+    {
+      "source": "/o11y/judge-actions",
+      "destination": "/o11y/actions"
+    },
+    {
+      "source": "/o11y/datasets-and-prompts",
+      "destination": "/o11y/datasets"
+    },
+    {
+      "source": "/o11y/tests",
+      "destination": "/o11y/experiments"
+    },
+    {
+      "source": "/o11y/tests-in-ci",
+      "destination": "/o11y/experiments"
+    },
+    {
+      "source": "/o11y/administration",
+      "destination": "/o11y/settings"
+    },
+    {
+      "source": "/o11y/byoc/overview",
+      "destination": "/o11y/overview"
+    },
+    {
+      "source": "/o11y/byoc/aws",
+      "destination": "/o11y/overview"
+    },
+    {
+      "source": "/o11y/byoc/runbooks",
+      "destination": "/o11y/overview"
+    },
+    {
+      "source": "/o11y/reference/ingest",
+      "destination": "/o11y/reference/attributes"
+    },
+    {
+      "source": "/o11y/reference/observations",
+      "destination": "/o11y/reference/attributes"
+    },
+    {
+      "source": "/o11y/reference/trace-health",
+      "destination": "/o11y/reference/attributes"
+    },
+    {
+      "source": "/o11y/reference/events",
+      "destination": "/o11y/actions"
+    },
+    {
+      "source": "/o11y/reference/sql",
+      "destination": "/o11y/dashboards-and-sql"
     }
   ],
   "logo": {
